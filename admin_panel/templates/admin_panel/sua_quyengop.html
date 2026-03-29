@@ -1,0 +1,62 @@
+{% extends 'admin_panel/trangchu.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="m-0 fw-bold text-danger">
+                    <i class="fas fa-user-secret me-2"></i>Chỉnh sửa Giao dịch #{{ donation.id }}
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                
+                <div class="alert alert-warning border-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Cảnh báo:</strong> Việc sửa đổi số tiền tại đây sẽ khiến mã Hash không khớp. 
+                    Hệ thống Blockchain bên Client sẽ báo lỗi <strong>"Dữ liệu bị thay đổi"</strong>.
+                </div>
+
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="fw-bold small text-muted">Người ủng hộ</label>
+                        {{ form.donor_name }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold small text-muted">Số tiền (VNĐ)</label>
+                        {{ form.amount }}
+                        <div class="form-text">Thử sửa số tiền này để test chức năng Blockchain.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold small text-muted">Lời nhắn</label>
+                        {{ form.message }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold small text-muted">Trạng thái</label>
+                            {{ form.status }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold small text-muted">Phương thức</label>
+                            {{ form.payment_method }}
+                        </div>
+                    </div>
+
+                    <hr>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-light">Hủy bỏ</a>
+                        <button type="submit" class="btn btn-primary fw-bold">
+                            <i class="fas fa-save me-1"></i> Lưu thay đổi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

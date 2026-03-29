@@ -1,0 +1,411 @@
+{% extends 'client/base_client.html' %}
+{% load humanize %}
+
+{% block content %}
+
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8">
+           <div class="rounded-4 overflow-hidden shadow-sm mb-4 position-relative">
+    <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
+         class="w-100 object-fit-cover" 
+         style="height: 400px;" 
+         alt="{{ campaign.title }}"
+         onerror="this.src='https://placehold.co/800x400?text=Chiến+dịch';">
+    
+    <div class="position-absolute top-0 start-0 m-3">
+        <span class="badge bg-primary fs-6 shadow">
+            <i class="bi bi-tag-fill me-1"></i> {{ campaign.category.name|default:"Chung" }}
+        </span>
+    </div>
+</div>
+
+            <h1 class="fw-bold mb-3 text-dark">{{ campaign.title }}</h1>
+            
+            <div class="d-flex align-items-center mb-4 text-muted">
+                <i class="bi bi-calendar-event me-2"></i>
+                <span>Ngày tạo: {{ campaign.created_at|date:"d/m/Y" }}</span>
+                <span class="mx-3">|</span>
+                <i class="bi bi-building me-2"></i>
+                <span>Tổ chức: <strong>{{ campaign.organization.name }}</strong></span>
+            </div>
+
+            <hr>
+
+            <div class="campaign-content mt-4 lh-lg">
+                <h4 class="fw-bold mb-3">Câu chuyện</h4>
+                <p class="text-secondary">{{ campaign.full_description|linebreaks }}</p>
+            </div>
+
+            {% if active_proposals %}
+            <div class="mt-5 p-4 rounded-4 border" style="background: linear-gradient(135deg, #f0f4ff 0%, #fefefe 100%);">
+                <h4 class="fw-bold mb-4 border-start border-4 border-primary ps-3">
+                    🗳️ Bỏ phiếu giải ngân
+                </h4>
+
+                {% if user_can_vote %}
+                <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius: 12px;">
+                    <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+                    <div>
+                        <strong>Quyền bỏ phiếu của bạn:</strong> Trọng số {{ user_voting_power|intcomma }}đ 
+                        ({{ user_voting_pct|floatformat:1 }}% tổng quyền biểu quyết)
+                        <br><small class="text-muted">Trọng số được tính dựa trên số tiền bạn đã ủng hộ (giới hạn tối đa 30% tổng quỹ)</small>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% for item in active_proposals %}
+                <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
+                    <div class="card-header border-0 py-3" style="background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-white">
+                                <h5 class="mb-0 fw-bold">{{ item.proposal.title }}</h5>
+                                {% if item.proposal.purpose %}
+                                <small class="opacity-75">{{ item.proposal.purpose }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-white text-danger fs-6 fw-bold px-3 py-2" style="border-radius: 20px;">
+                                    {{ item.proposal.amount_requested|intcomma }}đ
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-4">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {% if item.proposal.recipient_name %}
+                                <p class="mb-2"><i class="bi bi-person-fill text-primary me-2"></i><strong>Đơn vị thụ hưởng:</strong> {{ item.proposal.recipient_name }}</p>
+                                {% endif %}
+                                <p class="mb-2"><i class="bi bi-person-badge text-muted me-2"></i><strong>Người đề xuất:</strong> {{ item.proposal.created_by.get_full_name|default:item.proposal.created_by.username }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><i class="bi bi-clock text-warning me-2"></i><strong>Hạn bỏ phiếu:</strong> {{ item.proposal.end_date|date:"d/m/Y H:i" }}</p>
+                                <p class="mb-2"><i class="bi bi-people-fill text-info me-2"></i><strong>Đã bỏ phiếu:</strong> {{ item.votes_count }}/{{ item.total_donors }} người</p>
+                            </div>
+                        </div>
+
+                        {% if item.proposal.description %}
+                        <div class="bg-light p-3 rounded-3 mb-3">
+                            <small class="text-muted fw-bold">Mô tả chi tiết:</small>
+                            <p class="mb-0 mt-1">{{ item.proposal.description|truncatechars:300 }}</p>
+                        </div>
+                        {% endif %}
+
+                        {% if item.proposal.proof_images %}
+                        <div class="mb-3">
+                            <small class="text-muted fw-bold">Minh chứng:</small>
+                            <div class="d-flex gap-2 mt-1 flex-wrap">
+                                {% for img in item.proposal.proof_images %}
+                                <a href="{{ img }}" target="_blank">
+                                    <img src="{{ img }}" style="height: 60px; border-radius: 8px;" class="border shadow-sm">
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="fw-bold text-success"><i class="bi bi-hand-thumbs-up-fill"></i> Đồng ý: {{ item.yes_pct|floatformat:1 }}%</span>
+                                <span class="fw-bold text-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Từ chối: {{ item.no_pct|floatformat:1 }}%</span>
+                            </div>
+                            <div class="progress" style="height: 12px; border-radius: 20px; background: #e2e8f0;">
+                                {% if item.total_voted > 0 %}
+                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ item.yes_pct }}%; border-radius: 20px 0 0 20px;" title="Đồng ý"></div>
+                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ item.no_pct }}%;" title="Từ chối"></div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted">{{ item.yes_power|intcomma }}đ đồng ý</small>
+                                <small class="text-muted">{{ item.no_power|intcomma }}đ từ chối</small>
+                            </div>
+                        </div>
+
+                        {% if item.proposal.end_date %}
+                        <div class="text-center mb-3">
+                            <span class="badge bg-light text-dark border px-3 py-2" style="font-size: 0.85rem;">
+                                <i class="bi bi-hourglass-split text-warning"></i>
+                                Còn lại: <strong class="countdown" data-end="{{ item.proposal.end_date|date:'c' }}">đang tính...</strong>
+                            </span>
+                        </div>
+                        {% endif %}
+
+                        {% if user.is_authenticated %}
+                            {% if item.user_voted is not None %}
+                                <div class="text-center">
+                                    <div class="alert {% if item.user_voted %}alert-success{% else %}alert-danger{% endif %} d-inline-block" style="border-radius: 12px;">
+                                        {% if item.user_voted %}
+                                            <i class="bi bi-check-circle-fill me-2"></i> Bạn đã bỏ phiếu <strong>ĐỒNG Ý</strong>
+                                        {% else %}
+                                            <i class="bi bi-x-circle-fill me-2"></i> Bạn đã bỏ phiếu <strong>TỪ CHỐI</strong>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% elif user_can_vote %}
+                                <div class="d-flex gap-3 justify-content-center">
+                                    <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="vote" value="yes">
+                                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm" style="border-radius: 12px;"
+                                                onclick="return confirm('Bạn xác nhận ĐỒNG Ý giải ngân {{ item.proposal.amount_requested|intcomma }}đ?')">
+                                            <i class="bi bi-hand-thumbs-up-fill me-2"></i> Đồng ý
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="vote" value="no">
+                                        <button type="submit" class="btn btn-outline-danger btn-lg px-4" style="border-radius: 12px;"
+                                                onclick="return confirm('Bạn xác nhận TỪ CHỐI giải ngân này?')">
+                                            <i class="bi bi-hand-thumbs-down-fill me-2"></i> Từ chối
+                                        </button>
+                                    </form>
+                                </div>
+                            {% else %}
+                                <div class="text-center">
+                                    <p class="text-muted mb-0"><i class="bi bi-lock-fill"></i> Bạn cần ủng hộ chiến dịch này để có quyền bỏ phiếu.</p>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center">
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-warning">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để bỏ phiếu
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if completed_proposals %}
+            <div class="mt-5 p-4 bg-light rounded-4 border">
+                <h4 class="fw-bold mb-4 border-start border-4 border-success ps-3">
+                    📊 Lịch sử giải ngân
+                </h4>
+
+                {% for item in completed_proposals %}
+                <div class="card border-0 shadow-sm mb-3" style="border-radius: 12px;">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1 fw-bold">{{ item.proposal.title }}</h6>
+                                <small class="text-muted">
+                                    {{ item.proposal.executed_at|date:"d/m/Y"|default:item.proposal.created_at|date:"d/m/Y" }}
+                                    &bull; {{ item.votes_count }} phiếu
+                                    &bull; {{ item.yes_pct|floatformat:0 }}% đồng ý
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="fw-bold {% if item.proposal.status == 'executed' %}text-success{% else %}text-danger{% endif %} fs-5">
+                                    {% if item.proposal.status == 'executed' %}
+                                        -{{ item.proposal.amount_requested|intcomma }}đ
+                                    {% else %}
+                                        {{ item.proposal.amount_requested|intcomma }}đ
+                                    {% endif %}
+                                </span>
+                                <br>
+                                {% if item.proposal.status == 'executed' %}
+                                    <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-circle"></i> Đã giải ngân</span>
+                                {% elif item.proposal.status == 'rejected' %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-x-circle"></i> Bị từ chối</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if item.proposal.disbursement_eth_tx_hash %}
+                        <div class="mt-2">
+                            <a href="https://sepolia.etherscan.io/tx/{{ item.proposal.disbursement_eth_tx_hash }}" target="_blank"
+                               class="badge bg-success-subtle text-success border border-success text-decoration-none">
+                                <i class="bi bi-shield-check"></i> Verified on Blockchain
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mt-5 p-4 bg-light rounded-4 border">
+                <h4 class="fw-bold mb-4 border-start border-4 border-primary ps-3">
+                    🚀 Nhà hảo tâm vừa đóng góp
+                </h4>
+
+                <div class="table-responsive">
+                    <table class="table table-borderless align-middle">
+                        <tbody>
+                            {% for donate in donations %}
+                            <tr class="border-bottom">
+                                <td style="width: 50px;">
+                                    <div class="bg-white border rounded-circle d-flex align-items-center justify-content-center text-primary fw-bold" 
+                                         style="width: 40px; height: 40px;">
+                                        {{ donate.donor_name|slice:":1"|upper }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">
+                                        {% if donate.is_anonymous %}Mạnh thường quân{% else %}{{ donate.donor_name }}{% endif %}
+                                    </div>
+                                    <div class="small text-muted">{{ donate.created_at|timesince }} trước</div>
+                                </td>
+                                <td class="text-end">
+                                    <div class="fw-bold text-success">+{{ donate.amount|intcomma }}đ</div>
+                                    {% if donate.gas_fee_vnd %}
+                                    <div class="small text-warning">⛽ -{{ donate.gas_fee_vnd|intcomma }}đ gas</div>
+                                    <div class="small text-muted fw-bold">→ {{ donate.net_amount|intcomma }}đ</div>
+                                    {% endif %}
+                                    {% if donate.eth_tx_hash %}
+                                    <a href="https://sepolia.etherscan.io/tx/{{ donate.eth_tx_hash }}" target="_blank" 
+                                       class="badge bg-success-subtle text-success border border-success text-decoration-none"
+                                       title="Xem chứng thực trên Blockchain">
+                                        <i class="bi bi-shield-check"></i> Verified
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">Chưa có lượt ủng hộ nào. Hãy là người đầu tiên!</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 p-4 sticky-top" style="top: 20px; z-index: 10;">
+                <h5 class="fw-bold text-secondary mb-3">Tiến độ quyên góp</h5>
+                
+                <h2 class="fw-bold text-primary mb-1">{{ campaign.current_amount|intcomma }} đ</h2>
+                <div class="text-muted small mb-3">
+                    mục tiêu <strong>{{ campaign.target_amount|intcomma }} đ</strong>
+                </div>
+
+                <div class="progress mb-4" style="height: 10px;">
+                    <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: {% widthratio campaign.current_amount campaign.target_amount 100 %}%;" 
+                         aria-valuenow="{{ campaign.current_amount }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="{{ campaign.target_amount }}">
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between text-muted small mb-4">
+                    <span><i class="bi bi-people-fill"></i> <strong>{{ donations.count }}</strong> lượt ủng hộ</span>
+                    <span><i class="bi bi-clock-history"></i> Còn <strong>{{ campaign.end_date|timeuntil }}</strong></span>
+                </div>
+
+                {% if total_gas_vnd or campaign.disbursed_amount > 0 or campaign.locked_amount > 0 %}
+                <div class="border-top pt-3 mb-3">
+                    <small class="fw-bold text-uppercase text-muted d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">
+                        ⛽ Minh bạch tài chính
+                    </small>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Tổng ủng hộ:</span>
+                        <span class="fw-bold text-dark">{{ campaign.current_amount|intcomma }}đ</span>
+                    </div>
+                    {% if total_gas_vnd %}
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Phí Gas Blockchain:</span>
+                        <span class="fw-bold text-warning">-{{ total_gas_vnd|intcomma }}đ</span>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed #dee2e6;">
+                        <span class="text-muted fw-bold">Thực nhận:</span>
+                        <span class="fw-bold text-success">{{ net_receivable|intcomma }}đ</span>
+                    </div>
+                    {% endif %}
+                    {% if campaign.disbursed_amount > 0 %}
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Đã giải ngân:</span>
+                        <span class="fw-bold text-danger">-{{ campaign.disbursed_amount|intcomma }}đ</span>
+                    </div>
+                    {% endif %}
+                    {% if campaign.locked_amount > 0 %}
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Đang chờ vote:</span>
+                        <span class="fw-bold text-warning">{{ campaign.locked_amount|intcomma }}đ</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="d-grid gap-2">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-primary btn-lg fw-bold rounded-pill shadow-sm">
+                        <i class="bi bi-heart-fill me-2"></i> ỦNG HỘ NGAY
+                    </a>
+                    {% else %}
+                    <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để ủng hộ
+                    </a>
+                    {% endif %}
+                    <button class="btn btn-outline-secondary rounded-pill">
+                        <i class="bi bi-share-fill me-2"></i> Chia sẻ
+                    </button>
+                </div>
+                
+                <div class="mt-4 pt-3 border-top">
+                    <div class="d-flex gap-3 mb-2">
+                        <i class="bi bi-shield-lock text-success fs-4"></i>
+                        <div>
+                            <small class="fw-bold d-block">Minh bạch Blockchain</small>
+                            <small class="text-muted" style="font-size: 12px;">Mọi khoản đóng góp được ghi nhận vĩnh viễn trên mạng lưới Blockchain.</small>
+                        </div>
+                    </div>
+                    {% if active_proposals %}
+                    <div class="d-flex gap-3 mb-2">
+                        <i class="bi bi-people-fill text-primary fs-4"></i>
+                        <div>
+                            <small class="fw-bold d-block">Bỏ phiếu giải ngân</small>
+                            <small class="text-muted" style="font-size: 12px;">Nhà hảo tâm có quyền quyết định việc chi tiêu qua hệ thống bỏ phiếu minh bạch.</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-success-subtle { background-color: #d1e7dd !important; }
+    .bg-danger-subtle { background-color: #f8d7da !important; }
+    .object-fit-cover { object-fit: cover; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateCountdowns() {
+        document.querySelectorAll('.countdown').forEach(function(el) {
+            var endStr = el.getAttribute('data-end');
+            if (!endStr) return;
+            var end = new Date(endStr);
+            var now = new Date();
+            var diff = end - now;
+            if (diff <= 0) {
+                el.textContent = 'Đã hết hạn';
+                el.classList.add('text-danger');
+                return;
+            }
+            var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            var parts = [];
+            if (days > 0) parts.push(days + ' ngày');
+            if (hours > 0) parts.push(hours + ' giờ');
+            parts.push(minutes + ' phút');
+            el.textContent = parts.join(' ');
+        });
+    }
+    updateCountdowns();
+    setInterval(updateCountdowns, 60000);
+});
+</script>
+
+{% endblock %}

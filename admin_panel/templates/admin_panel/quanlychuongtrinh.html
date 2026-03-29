@@ -1,0 +1,362 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+{% load humanize %} 
+
+{% block content %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Sửa lỗi xung đột ảnh của Bootstrap làm vỡ bản đồ */
+    .leaflet-container img.leaflet-tile {
+        max-width: none !important;
+        max-height: none !important;
+        width: 256px !important;
+        height: 256px !important;
+    }
+    /* Đảm bảo bản đồ nằm đúng lớp */
+    #map_add, #map_edit {
+        z-index: 1; 
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+</style>
+
+<div class="container-fluid px-4">
+    <h2 class="mt-4">Quản lý Chương trình Mục tiêu</h2>
+    
+    <div class="card mb-4 mt-3 shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="text" name="q" class="form-control me-2" 
+                               placeholder="Tìm tên chương trình hoặc tên tổ chức..." 
+                               value="{{ query }}">
+                        <button type="submit" class="btn btn-primary">Tìm</button>
+                        {% if query %}
+                        <a href="{% url 'admin_panel:quanlychuongtrinh' %}" class="btn btn-secondary ms-2">X</a>
+                        {% endif %}
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+                        <i class="fas fa-plus-circle"></i> Tạo Chương trình mới
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header">
+            <i class="fas fa-list me-1"></i> Danh sách Chương trình
+        </div>
+        <div class="card-body">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="5%">ID</th>
+                        <th width="10%">Ảnh</th>
+                        <th width="25%">Tên Chương trình</th>
+                        <th width="20%">Thuộc Tổ chức</th>
+                        <th width="15%">Mục tiêu (VNĐ)</th>
+                        <th width="10%">Trạng thái</th>
+                        <th width="15%">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in programs %}
+                    <tr class="{% if not p.is_active %}table-secondary{% endif %}">
+                        <td>{{ p.id }}</td>
+                        <td class="text-center">
+                            {% if p.image %}
+                            <img src="{{ p.image.url }}" class="rounded border" style="height: 50px; width: 80px; object-fit: cover;">
+                            {% else %}
+                            <span class="badge bg-secondary">No img</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ p.name }}</strong><br>
+                            {% if p.beneficiary_address %}
+                            <small class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ p.beneficiary_address|truncatechars:30 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info text-dark">{{ p.organization.name }}</span>
+                        </td>
+                        <td class="text-end fw-bold text-success">
+                            {{ p.total_target_amount|intcomma }} đ
+                        </td>
+                        <td class="text-center">
+                            {% if p.is_active %}
+                            <span class="badge bg-success">Hoạt động</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Tạm ẩn</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" 
+                                title="Chỉnh sửa"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#editModal"
+                                onclick="fillEditForm(
+                                    '{{ p.id }}', 
+                                    '{{ p.organization.id }}', 
+                                    '{{ p.name|escapejs }}', 
+                                    '{{ p.total_target_amount|default_if_none:0 }}', 
+                                    '{{ p.beneficiary_address|default_if_none:''|escapejs }}',
+                                    '{{ p.beneficiary_lat|default_if_none:'' }}',
+                                    '{{ p.beneficiary_lng|default_if_none:'' }}',
+                                    '{{ p.description|default_if_none:''|escapejs }}'
+                                )">
+                                <i class="fas fa-edit"></i>
+                            </button>
+
+                            <a href="{% url 'admin_panel:khoa_chuongtrinh' p.id %}" 
+                               class="btn btn-sm {% if p.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                               title="{% if p.is_active %}Tạm ẩn{% else %}Kích hoạt{% endif %}"
+                               onclick="return confirm('Bạn có muốn thay đổi trạng thái hiển thị của chương trình này?')">
+                                {% if p.is_active %}
+                                    <i class="fas fa-eye-slash"></i>
+                                {% else %}
+                                    <i class="fas fa-eye"></i>
+                                {% endif %}
+                            </a>
+
+                            <a href="{% url 'admin_panel:xoa_chuongtrinh' p.id %}" 
+                               class="btn btn-sm btn-danger"
+                               title="Xóa vĩnh viễn"
+                               onclick="return confirm('CẢNH BÁO: Xóa chương trình này sẽ xóa luôn TẤT CẢ các chiến dịch con! Bạn chắc chắn chứ?')">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Chưa có chương trình nào.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{% url 'admin_panel:them_chuongtrinh' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Chương trình Mục tiêu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="fw-bold">Thuộc Tổ chức nào? <span class="text-danger">*</span></label>
+                            <select name="organization_id" class="form-select" required>
+                                <option value="">-- Chọn Tổ chức --</option>
+                                {% for org in all_orgs %}
+                                <option value="{{ org.id }}">{{ org.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-8 mb-3">
+                            <label>Tên Chương trình <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required placeholder="VD: Góp Cơm Có Thịt">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Tổng tiền mục tiêu (VNĐ)</label>
+                            <input type="number" name="total_target_amount" class="form-control" value="0" min="0">
+                        </div>
+                        
+                        <div class="col-md-12 mb-3">
+                            <label>Ảnh bìa / Banner</label>
+                            <input type="file" name="image" class="form-control">
+                        </div>
+
+                        <h6 class="text-primary mt-3 border-top pt-2">Thông tin Địa điểm (GIS)</h6>
+                        <div class="col-md-12 mb-2">
+                            <label>Địa chỉ hiển thị (Text)</label>
+                            <input type="text" name="beneficiary_address" class="form-control" placeholder="VD: Trường tiểu học bản X...">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label>Vĩ độ (Latitude)</label>
+                            <input type="number" step="any" name="beneficiary_lat" id="add_lat" class="form-control" placeholder="VD: 21.xxxxxx">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Kinh độ (Longitude)</label>
+                            <input type="number" step="any" name="beneficiary_lng" id="add_lng" class="form-control" placeholder="VD: 105.xxxxxx">
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="text-muted small"><em>Click trên bản đồ để chọn vị trí tự động:</em></label>
+                            <div id="map_add" style="height: 300px; width: 100%;"></div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label>Mô tả chi tiết</label>
+                            <textarea name="description" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-success">Lưu dữ liệu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="editForm" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Chương trình</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="fw-bold">Thuộc Tổ chức</label>
+                            <select name="organization_id" id="e_org_id" class="form-select" required>
+                                {% for org in all_orgs %}
+                                <option value="{{ org.id }}">{{ org.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-8 mb-3">
+                            <label>Tên Chương trình</label>
+                            <input type="text" name="name" id="e_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Tổng tiền mục tiêu (VNĐ)</label>
+                            <input type="number" name="total_target_amount" id="e_amount" class="form-control" min="0">
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label>Ảnh bìa (Chọn nếu muốn đổi)</label>
+                            <input type="file" name="image" class="form-control">
+                        </div>
+
+                        <h6 class="text-primary mt-3 border-top pt-2">Thông tin GIS</h6>
+                        <div class="col-md-12 mb-2">
+                            <label>Địa chỉ</label>
+                            <input type="text" name="beneficiary_address" id="e_address" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Vĩ độ (Lat)</label>
+                            <input type="number" step="any" name="beneficiary_lat" id="e_lat" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Kinh độ (Lng)</label>
+                            <input type="number" step="any" name="beneficiary_lng" id="e_lng" class="form-control">
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <div id="map_edit" style="height: 300px; width: 100%;"></div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label>Mô tả</label>
+                            <textarea name="description" id="e_desc" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // --- CẤU HÌNH ---
+    const DEFAULT_LAT = 21.0285; 
+    const DEFAULT_LNG = 105.8542;
+    var mapAdd = null, mapEdit = null;
+
+    // --- HÀM TẠO MAP & RESET ---
+    function initMap(mapId, latId, lngId) {
+        // Hủy map cũ nếu tồn tại (để tránh lỗi xám màn hình)
+        var container = L.DomUtil.get(mapId);
+        if (container != null) {
+            container._leaflet_id = null;
+            container.innerHTML = "";
+        }
+
+        // Tạo map mới
+        var map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'OpenStreetMap'
+        }).addTo(map);
+
+        // Hiển thị marker nếu input đã có dữ liệu (lúc Sửa)
+        var latVal = parseFloat(document.getElementById(latId).value);
+        var lngVal = parseFloat(document.getElementById(lngId).value);
+        var marker = null;
+
+        if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0) {
+            var loc = new L.LatLng(latVal, lngVal);
+            map.setView(loc, 13);
+            marker = L.marker(loc).addTo(map);
+        }
+
+        // Sự kiện Click chọn điểm
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            
+            document.getElementById(latId).value = lat.toFixed(6);
+            document.getElementById(lngId).value = lng.toFixed(6);
+
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng]).addTo(map);
+        });
+
+        // "Mẹo" invalidateSize để map hiển thị đúng trong modal
+        setTimeout(function() { 
+            map.invalidateSize(); 
+        }, 300);
+
+        return map;
+    }
+
+    // --- SỰ KIỆN KHI MỞ MODAL THÊM ---
+    var addModal = document.getElementById('addModal');
+    addModal.addEventListener('shown.bs.modal', function () {
+        if (mapAdd) mapAdd.remove(); // Xóa sạch sẽ
+        mapAdd = initMap('map_add', 'add_lat', 'add_lng');
+    });
+
+    // --- SỰ KIỆN KHI MỞ MODAL SỬA ---
+    var editModal = document.getElementById('editModal');
+    editModal.addEventListener('shown.bs.modal', function () {
+        if (mapEdit) mapEdit.remove(); // Xóa sạch sẽ
+        mapEdit = initMap('map_edit', 'e_lat', 'e_lng');
+    });
+
+    // --- HÀM ĐỔ DỮ LIỆU VÀO FORM SỬA ---
+    function fillEditForm(id, orgId, name, amount, address, lat, lng, desc) {
+        document.getElementById('editForm').action = "/admin_panel/chuongtrinh/sua/" + id + "/";
+        document.getElementById('e_name').value = name;
+        document.getElementById('e_amount').value = amount;
+        document.getElementById('e_address').value = address;
+        document.getElementById('e_lat').value = lat;
+        document.getElementById('e_lng').value = lng;
+        document.getElementById('e_desc').value = desc;
+        document.getElementById('e_org_id').value = orgId;
+    }
+</script>
+
+{% endblock %}

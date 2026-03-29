@@ -1,0 +1,413 @@
+{% extends 'client/base_client.html' %}
+{% load humanize %}
+
+{% block title %}Biến động số dư - Minh bạch tài chính{% endblock %}
+
+{% block extra_css %}
+<style>
+    .finance-hero {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        padding: 60px 0 80px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+    .finance-hero::before {
+        content: '';
+        position: absolute;
+        top: -50%; left: -50%;
+        width: 200%; height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 60%);
+        animation: pulse-bg 8s ease-in-out infinite;
+    }
+    @keyframes pulse-bg {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    .stat-card {
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        background: rgba(255,255,255,0.15);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .stat-card .stat-icon {
+        width: 50px; height: 50px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px;
+        margin: 0 auto 12px;
+    }
+    .stat-card h3 { font-size: 1.8rem; font-weight: 800; margin: 0; }
+    .stat-card p { font-size: 0.85rem; opacity: 0.7; margin: 4px 0 0; text-transform: uppercase; letter-spacing: 1px; }
+
+    .filter-bar {
+        background: white;
+        border-radius: 16px;
+        padding: 20px 28px;
+        margin-top: -40px;
+        position: relative;
+        z-index: 10;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        border: 1px solid #eee;
+    }
+
+    .campaign-summary-card {
+        background: white;
+        border-radius: 14px;
+        padding: 20px;
+        border: 1px solid #eee;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    .campaign-summary-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        transform: translateY(-3px);
+        border-color: transparent;
+    }
+
+    .txn-table {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+    }
+    .txn-table thead th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #eee;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+        padding: 14px 16px;
+    }
+    .txn-table tbody td {
+        padding: 14px 16px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .txn-table tbody tr {
+        transition: background 0.2s;
+    }
+    .txn-table tbody tr:hover {
+        background: #fafbfc;
+    }
+
+    .badge-in {
+        background: #d4edda;
+        color: #155724;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+    }
+    .badge-out {
+        background: #f8d7da;
+        color: #721c24;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+    }
+    .amount-in { color: #28a745; font-weight: 700; }
+    .amount-out { color: #dc3545; font-weight: 700; }
+
+    .source-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .source-vnpay { background: #e3f2fd; color: #1565c0; }
+    .source-casso { background: #fff3e0; color: #e65100; }
+    .source-mock { background: #f3e5f5; color: #7b1fa2; }
+    .source-manual { background: #e8eaf6; color: #283593; }
+
+    .progress-thin { height: 6px; border-radius: 3px; }
+    .live-dot {
+        width: 8px; height: 8px;
+        background: #28a745;
+        border-radius: 50%;
+        display: inline-block;
+        animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- HERO SECTION -->
+<section class="finance-hero">
+    <div class="container position-relative">
+        <div class="text-center mb-5">
+            <div class="d-inline-flex align-items-center gap-2 mb-3 px-3 py-2 rounded-pill" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">
+                <span class="live-dot"></span>
+                <span class="small fw-bold" style="letter-spacing: 1px;">REALTIME TRACKING</span>
+            </div>
+            <h1 class="fw-bold display-5 mb-3">Biến động số dư</h1>
+            <p class="opacity-75 fs-6 mb-0" style="max-width: 600px; margin: 0 auto;">
+                Minh bạch 100% mọi khoản tiền VÀO và RA. Ai cũng có thể kiểm tra, không thể sửa đổi hay xóa bỏ.
+            </p>
+        </div>
+
+        <div class="row g-3 justify-content-center">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(40,167,69,0.2);">
+                        <i class="fas fa-arrow-down" style="color: #28a745;"></i>
+                    </div>
+                    <h3>{{ total_in|intcomma }} đ</h3>
+                    <p>Tổng tiền vào</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(220,53,69,0.2);">
+                        <i class="fas fa-arrow-up" style="color: #dc3545;"></i>
+                    </div>
+                    <h3>{{ total_out|intcomma }} đ</h3>
+                    <p>Tổng tiền ra</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(0,123,255,0.2);">
+                        <i class="fas fa-wallet" style="color: #007bff;"></i>
+                    </div>
+                    <h3>{{ total_balance|intcomma }} đ</h3>
+                    <p>Số dư hiện tại</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(255,193,7,0.2);">
+                        <i class="fas fa-exchange-alt" style="color: #ffc107;"></i>
+                    </div>
+                    <h3>{{ total_transactions|intcomma }}</h3>
+                    <p>Tổng giao dịch</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FILTER BAR -->
+<div class="container">
+    <div class="filter-bar">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label fw-bold small text-muted">LỌC THEO CHIẾN DỊCH</label>
+                <select name="campaign" class="form-select">
+                    <option value="">— Tất cả chiến dịch —</option>
+                    {% for c in all_campaigns %}
+                    <option value="{{ c.id }}" {% if selected_campaign == c.id|stringformat:"d" %}selected{% endif %}>{{ c.title|truncatechars:50 }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold small text-muted">LOẠI GIAO DỊCH</label>
+                <select name="type" class="form-select">
+                    <option value="">Tất cả (Vào + Ra)</option>
+                    <option value="in" {% if selected_type == "in" %}selected{% endif %}>💰 Tiền VÀO</option>
+                    <option value="out" {% if selected_type == "out" %}selected{% endif %}>💸 Tiền RA (Giải ngân)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-dark w-100 fw-bold py-2">
+                    <i class="fas fa-filter me-2"></i> Lọc
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- CAMPAIGN SUMMARY -->
+{% if campaigns_summary %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h6 class="text-uppercase fw-bold text-danger small mb-1">Tổng hợp</h6>
+            <h4 class="fw-bold m-0">Tài chính theo chiến dịch</h4>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        {% for item in campaigns_summary %}
+        <div class="col-md-6 col-lg-4">
+            <div class="campaign-summary-card">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div style="flex: 1; min-width: 0;">
+                        <h6 class="fw-bold mb-1 text-truncate" title="{{ item.campaign.title }}">{{ item.campaign.title|truncatechars:35 }}</h6>
+                        <span class="small text-muted">{{ item.count }} giao dịch</span>
+                    </div>
+                    <a href="?campaign={{ item.campaign.id }}" class="btn btn-sm btn-outline-dark rounded-pill" title="Xem chi tiết">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                </div>
+
+                <div class="d-flex justify-content-between mb-2">
+                    <div>
+                        <div class="small text-muted">Tiền vào</div>
+                        <div class="fw-bold text-success">+{{ item.total_in|intcomma }}đ</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">Tiền ra</div>
+                        <div class="fw-bold text-danger">-{{ item.total_out|intcomma }}đ</div>
+                    </div>
+                </div>
+
+                {% if item.total_in %}
+                <div class="progress progress-thin mb-2">
+                    <div class="progress-bar bg-success" style="width: {% widthratio item.total_in item.total_in 100 %}%"></div>
+                    {% if item.total_out %}
+                    <div class="progress-bar bg-danger" style="width: {% widthratio item.total_out item.total_in 100 %}%"></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="text-center pt-2 border-top">
+                    <span class="small fw-bold" style="color: #0f3460;">Còn lại: {{ item.balance|intcomma }}đ</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- TRANSACTION TABLE -->
+<div class="container mt-5 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h6 class="text-uppercase fw-bold text-danger small mb-1">Chi tiết</h6>
+            <h4 class="fw-bold m-0">Lịch sử giao dịch</h4>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge-in"><i class="fas fa-arrow-down me-1"></i> Tiền vào</span>
+            <span class="badge-out"><i class="fas fa-arrow-up me-1"></i> Tiền ra</span>
+        </div>
+    </div>
+
+    <div class="txn-table">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Thời gian</th>
+                        <th>Loại</th>
+                        <th>Số tiền</th>
+                        <th>Chiến dịch</th>
+                        <th>Nội dung</th>
+                        <th>Nguồn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in statements %}
+                    <tr>
+                        <td class="text-muted small">{{ s.id }}</td>
+                        <td>
+                            <div class="fw-bold small">{{ s.transaction_date|date:"H:i" }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ s.transaction_date|date:"d/m/Y" }}</div>
+                        </td>
+                        <td>
+                            {% if s.transaction_type == 'in' %}
+                                <span class="badge-in"><i class="fas fa-arrow-down me-1"></i> Tiền vào</span>
+                            {% else %}
+                                <span class="badge-out"><i class="fas fa-arrow-up me-1"></i> Tiền ra</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if s.transaction_type == 'in' %}
+                                <span class="amount-in">+{{ s.amount|intcomma }}đ</span>
+                            {% else %}
+                                <span class="amount-out">-{{ s.amount|intcomma }}đ</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'client:chitiet_chiendich' s.campaign.id %}" class="text-decoration-none">
+                                <span class="fw-bold text-dark small">{{ s.campaign.title|truncatechars:30 }}</span>
+                            </a>
+                        </td>
+                        <td>
+                            <span class="small text-muted">{{ s.description|default:"—"|truncatechars:50 }}</span>
+                        </td>
+                        <td>
+                            {% if s.source == 'vnpay' %}
+                                <span class="source-badge source-vnpay"><i class="fas fa-credit-card"></i> VNPay</span>
+                            {% elif s.source == 'casso' %}
+                                <span class="source-badge source-casso"><i class="fas fa-university"></i> Casso</span>
+                            {% elif s.source == 'mock' %}
+                                <span class="source-badge source-mock"><i class="fas fa-flask"></i> Mock</span>
+                            {% else %}
+                                <span class="source-badge source-manual"><i class="fas fa-pen"></i> Thủ công</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="mb-3">
+                                <i class="fas fa-inbox fa-3x text-muted opacity-50"></i>
+                            </div>
+                            <h5 class="text-muted fw-bold">Chưa có giao dịch nào</h5>
+                            <p class="text-muted small">Khi có người ủng hộ hoặc tổ chức giải ngân, giao dịch sẽ hiển thị ở đây.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- INFO SECTION -->
+<div class="container mb-5">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="d-flex gap-3 p-4 rounded-4" style="background: #e8f5e9;">
+                <i class="fas fa-shield-alt fa-2x" style="color: #2e7d32;"></i>
+                <div>
+                    <h6 class="fw-bold mb-1" style="color: #2e7d32;">Không thể sửa đổi</h6>
+                    <small class="text-muted">Mọi bản ghi sao kê đã tạo không thể chỉnh sửa hoặc xóa bỏ.</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex gap-3 p-4 rounded-4" style="background: #e3f2fd;">
+                <i class="fas fa-eye fa-2x" style="color: #1565c0;"></i>
+                <div>
+                    <h6 class="fw-bold mb-1" style="color: #1565c0;">Ai cũng xem được</h6>
+                    <small class="text-muted">Trang này không yêu cầu đăng nhập. Bất kỳ ai cũng có thể kiểm tra.</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex gap-3 p-4 rounded-4" style="background: #fff3e0;">
+                <i class="fas fa-sync-alt fa-2x" style="color: #e65100;"></i>
+                <div>
+                    <h6 class="fw-bold mb-1" style="color: #e65100;">Cập nhật tự động</h6>
+                    <small class="text-muted">Dữ liệu được ghi nhận tự động từ VNPay & ngân hàng qua webhook.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

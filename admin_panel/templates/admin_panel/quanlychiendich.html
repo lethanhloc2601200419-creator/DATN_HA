@@ -1,0 +1,424 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mt-4">Quản lý Chiến dịch Gây quỹ</h2>
+
+    <div class="card mb-4 mt-3 shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="text" name="q" class="form-control me-2" placeholder="Tìm tên chiến dịch...">
+                        <button type="submit" class="btn btn-primary">Tìm</button>
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+                        <i class="fas fa-plus-circle"></i> Tạo Chiến dịch mới
+                    </button>
+                    {% if role == 'admin' %}
+                    <button type="button" class="btn btn-outline-dark ms-2" data-bs-toggle="modal" data-bs-target="#depositPoolModal">
+                        <i class="fas fa-coins"></i> Nạp ETH vào Pool
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header">
+            <i class="fas fa-list me-1"></i> Danh sách Chiến dịch
+        </div>
+        <div class="card-body">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="5%">ID</th>
+                        <th width="10%">Ảnh</th>
+                        <th width="30%">Tên Chiến dịch</th>
+                        <th width="15%">Tiến độ</th>
+                        <th width="10%">Trạng thái</th>
+                        <th width="20%">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in campaigns %}
+                    <tr>
+                        <td>{{ c.id }}</td>
+                        <td class="text-center">
+                            {% if c.avatar_image_url %}
+                            <img src="{{ c.avatar_image_url }}" class="rounded border"
+                                style="height: 50px; width: 50px; object-fit: cover;">
+                            {% else %}
+                            <span class="badge bg-secondary">No img</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ c.title }}</strong><br>
+                            <small class="text-muted">
+                                <i class="fas fa-calendar"></i> {{ c.end_date|date:"d/m/Y" }}
+                                {% if c.target_program %} | Thuộc: {{ c.target_program.name }} {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>{{ c.current_amount|intcomma }}</span>
+                                <span class="text-muted">/ {{ c.target_amount|intcomma }}</span>
+                            </div>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar bg-success" style="width: {{ c.get_percentage }}%"></div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if c.status == 'active' %} <span class="badge bg-success">Đang chạy</span>
+                            {% elif c.status == 'pending' %} <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                            {% elif c.status == 'rejected' %} <span class="badge bg-danger">Từ chối</span>
+                            {% else %} <span class="badge bg-secondary">{{ c.status }}</span> {% endif %}
+                        </td>
+                        <td>
+                           <button class="btn btn-sm btn-primary" 
+        title="Chỉnh sửa"
+        data-bs-toggle="modal" 
+        data-bs-target="#editModal"
+        
+        data-id="{{ c.id }}"
+        
+        data-avatar="{{ c.avatar_image_url|default:'' }}"
+        data-cover="{{ c.cover_image_url|default:'' }}"
+
+        data-title="{{ c.title }}"
+        data-amount="{{ c.target_amount|stringformat:'d' }}" 
+        data-start="{{ c.start_date|date:'Y-m-d' }}"
+        data-end="{{ c.end_date|date:'Y-m-d' }}"
+        data-short="{{ c.short_description }}"
+        data-full="{{ c.full_description }}"
+        
+        data-org="{{ c.organization.id }}"
+        data-prog="{{ c.target_program.id|default_if_none:'' }}"
+        data-cat="{{ c.category.id|default_if_none:'' }}"
+        data-occ="{{ c.occasion.id|default_if_none:'' }}"
+
+        onclick="fillDataToModal(this)">
+    <i class="fas fa-edit"></i>
+</button>
+
+                            {% if role == 'admin' and c.status == 'pending' %}
+                            <a href="{% url 'admin_panel:duyet_chiendich' c.id %}" class="btn btn-sm btn-success"><i
+                                    class="fas fa-check"></i></a>
+                            <a href="{% url 'admin_panel:huy_chiendich' c.id %}" class="btn btn-sm btn-warning"><i
+                                    class="fas fa-times"></i></a>
+                            {% endif %}
+
+                            <a href="{% url 'admin_panel:xoa_chiendich' c.id %}" class="btn btn-sm btn-danger"
+                                onclick="return confirm('Xóa vĩnh viễn?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">Chưa có dữ liệu.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if role == 'admin' %}
+<div class="modal fade" id="depositPoolModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{% url 'admin_panel:nap_pool' %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-coins"></i> Nạp ETH vào Exchange Pool</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="fw-bold">Số ETH nạp</label>
+                        <input type="number" name="amount_eth" class="form-control" step="0.000001" min="0.000001" required>
+                        <div class="small text-muted mt-1">ETH sẽ được nạp vào Pool để cấp cho user sau VNPay.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-dark">Nạp Pool</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{% url 'admin_panel:them_chiendich' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Khởi tạo Chiến dịch</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        {% if role == 'admin' %}
+                        <div class="col-md-12 mb-3">
+                            <label class="fw-bold">Tổ chức *</label>
+                            <select name="org_id" class="form-select" required>
+                                {% for org in orgs %}
+                                <option value="{{ org.id }}">{{ org.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <div class="col-md-6 mb-3">
+                            <label>Tên Chiến dịch *</label>
+                            <input type="text" name="title" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Mục tiêu (VNĐ) *</label>
+                            <input type="number" name="target_amount" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Ngày bắt đầu</label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Ngày kết thúc</label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label>Chương trình (GIS)</label>
+                            <select name="program_id" class="form-select">
+                                <option value="">-- Tự do --</option>
+                                {% for p in programs %}
+                                <option value="{{ p.id }}">{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Danh mục</label>
+                            <select name="category_id" class="form-select">
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Dịp</label>
+                            <select name="occasion_id" class="form-select">
+                                <option value="">-- Không --</option>
+                                {% for occ in occasions %}
+                                <option value="{{ occ.id }}">{{ occ.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Ảnh đại diện</label>
+                            <input type="file" name="avatar" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Ảnh bìa</label>
+                            <input type="file" name="cover" class="form-control">
+                        </div>
+
+                        <div class="col-12">
+                            <label>Mô tả ngắn</label>
+                            <textarea name="short_description" class="form-control" rows="2"></textarea>
+                            <label class="mt-2">Nội dung đầy đủ</label>
+                            <textarea name="full_description" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-success">Tạo mới</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="editForm" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Chiến dịch</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        {% if role == 'admin' %}
+                        <div class="col-md-12 mb-3">
+                            <label class="fw-bold">Tổ chức</label>
+                            <select name="org_id" id="e_org_id" class="form-select">
+                                {% for org in orgs %}
+                                <option value="{{ org.id }}">{{ org.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <div class="col-md-6 mb-3">
+                            <label>Tên Chiến dịch</label>
+                            <input type="text" name="title" id="e_title" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Mục tiêu (VNĐ)</label>
+                            <input type="number" name="target_amount" id="e_amount" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Ngày bắt đầu</label>
+                            <input type="date" name="start_date" id="e_start" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Ngày kết thúc</label>
+                            <input type="date" name="end_date" id="e_end" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label>Chương trình</label>
+                            <select name="program_id" id="e_program_id" class="form-select">
+                                <option value="">-- Tự do --</option>
+                                {% for p in programs %}
+                                <option value="{{ p.id }}">{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Danh mục</label>
+                            <select name="category_id" id="e_category_id" class="form-select">
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Dịp</label>
+                            <select name="occasion_id" id="e_occasion_id" class="form-select">
+                                <option value="">-- Không --</option>
+                                {% for occ in occasions %}
+                                <option value="{{ occ.id }}">{{ occ.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                       <div class="col-md-6 mb-3">
+    <label class="fw-bold small">Ảnh đại diện</label>
+    
+    <div class="mb-2">
+        <img id="preview_avatar" src="" style="width: 80px; height: 80px; object-fit: cover; display: none;" class="rounded border">
+        <span id="no_avatar" class="text-muted small" style="display: none;">Chưa có ảnh</span>
+    </div>
+    
+    <input type="file" name="avatar" class="form-control form-control-sm">
+    <small class="text-muted fst-italic" style="font-size: 11px;">Chỉ chọn nếu muốn thay ảnh mới</small>
+</div>
+
+<div class="col-md-6 mb-3">
+    <label class="fw-bold small">Ảnh bìa</label>
+    
+    <div class="mb-2">
+        <img id="preview_cover" src="" style="width: 120px; height: 80px; object-fit: cover; display: none;" class="rounded border">
+        <span id="no_cover" class="text-muted small" style="display: none;">Chưa có ảnh</span>
+    </div>
+
+    <input type="file" name="cover" class="form-control form-control-sm">
+    <small class="text-muted fst-italic" style="font-size: 11px;">Chỉ chọn nếu muốn thay ảnh mới</small>
+</div>
+
+                        <div class="col-12">
+                            <label>Mô tả ngắn</label>
+                            <textarea name="short_description" id="e_short" class="form-control" rows="2"></textarea>
+                            <label class="mt-2">Nội dung đầy đủ</label>
+                            <textarea name="full_description" id="e_full" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fillDataToModal(btn) {
+    // 1. Lấy dữ liệu cơ bản (Giữ nguyên code cũ)
+    var id = btn.getAttribute('data-id');
+    var title = btn.getAttribute('data-title');
+    var amount = btn.getAttribute('data-amount');
+    var start = btn.getAttribute('data-start');
+    var end = btn.getAttribute('data-end');
+    var short = btn.getAttribute('data-short');
+    var full = btn.getAttribute('data-full');
+    var orgId = btn.getAttribute('data-org');
+    var progId = btn.getAttribute('data-prog');
+    var catId = btn.getAttribute('data-cat');
+    var occId = btn.getAttribute('data-occ');
+
+    // 2. LẤY LINK ẢNH (MỚI)
+    var avatarUrl = btn.getAttribute('data-avatar');
+    var coverUrl = btn.getAttribute('data-cover');
+
+    // 3. Cập nhật Action Form
+    document.getElementById('editForm').action = "/admin_panel/chiendich/sua/" + id + "/";
+
+    // 4. Điền dữ liệu Text
+    document.getElementById('e_title').value = title;
+    document.getElementById('e_amount').value = amount; 
+    document.getElementById('e_start').value = start;
+    document.getElementById('e_end').value = end;
+    document.getElementById('e_short').value = short;
+    document.getElementById('e_full').value = full;
+
+    // 5. XỬ LÝ HIỂN THỊ ẢNH (LOGIC MỚI)
+    
+    // --- Xử lý Avatar ---
+    var imgAvatar = document.getElementById('preview_avatar');
+    var txtNoAvatar = document.getElementById('no_avatar');
+    if (avatarUrl && avatarUrl !== 'None' && avatarUrl !== '') {
+        imgAvatar.src = avatarUrl;
+        imgAvatar.style.display = 'block'; // Hiện ảnh
+        txtNoAvatar.style.display = 'none';
+    } else {
+        imgAvatar.style.display = 'none'; // Ẩn ảnh
+        txtNoAvatar.style.display = 'block'; // Hiện chữ "Chưa có ảnh"
+    }
+
+    // --- Xử lý Cover ---
+    var imgCover = document.getElementById('preview_cover');
+    var txtNoCover = document.getElementById('no_cover');
+    if (coverUrl && coverUrl !== 'None' && coverUrl !== '') {
+        imgCover.src = coverUrl;
+        imgCover.style.display = 'block';
+        txtNoCover.style.display = 'none';
+    } else {
+        imgCover.style.display = 'none';
+        txtNoCover.style.display = 'block';
+    }
+
+    // 6. Dropdown (Giữ nguyên)
+    if(document.getElementById('e_org_id')) document.getElementById('e_org_id').value = orgId;
+    if(document.getElementById('e_program_id')) document.getElementById('e_program_id').value = progId;
+    if(document.getElementById('e_category_id')) document.getElementById('e_category_id').value = catId;
+    if(document.getElementById('e_occasion_id')) document.getElementById('e_occasion_id').value = occId;
+}
+</script>
+{% endblock %}

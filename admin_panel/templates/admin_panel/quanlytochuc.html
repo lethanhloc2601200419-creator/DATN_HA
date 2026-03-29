@@ -1,0 +1,281 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mt-4">Quản lý Tổ chức từ thiện</h2>
+
+    <div class="card mb-4 mt-3 shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex">
+                        <input type="text" name="q" class="form-control me-2" 
+                               placeholder="Tìm theo tên, SĐT hoặc người quản lý..." 
+                               value="{{ query }}">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Tìm
+                        </button>
+                        {% if query %}
+                        <a href="{% url 'admin_panel:quanlytochuc' %}" class="btn btn-secondary ms-2">X</a>
+                        {% endif %}
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+                        <i class="fas fa-plus-circle"></i> Thêm Tổ chức mới
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header">
+            <i class="fas fa-building me-1"></i> Danh sách Tổ chức
+        </div>
+        <div class="card-body">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="5%">ID</th>
+                        <th width="10%">Logo</th>
+                        <th width="25%">Tên Tổ chức / Quản lý</th>
+                        <th width="25%">Thông tin Ngân hàng</th>
+                        <th width="15%">Trạng thái</th>
+                        <th width="20%">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in orgs %}
+                    <tr class="{% if not org.is_verified %}table-secondary{% endif %}">
+                        <td>{{ org.id }}</td>
+                        <td class="text-center">
+                            {% if org.logo_url %}
+                                <img src="/media/{{ org.logo_url }}" onerror="this.src='{{ org.logo_url }}'" class="rounded border" style="height: 50px; width: 50px; object-fit: cover;">
+                            {% else %}
+                                <span class="badge bg-secondary">No img</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ org.name }}</strong><br>
+                            
+                            {% if org.manager %}
+                                <span class="badge bg-info text-dark mt-1">
+                                    <i class="fas fa-user-shield"></i> {{ org.manager.username }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark mt-1">Chưa có quản lý</span>
+                            {% endif %}
+                            <br>
+                            <small class="text-muted"><i class="fas fa-phone"></i> {{ org.contact_phone }}</small>
+                        </td>
+                        <td>
+                            <small>
+                                <strong>NH:</strong> {{ org.bank_name }}<br>
+                                <strong>STK:</strong> {{ org.bank_account_number }}<br>
+                                <strong>Chủ TK:</strong> {{ org.bank_account_name }}
+                            </small>
+                        </td>
+                        <td class="text-center">
+                            {% if org.is_verified %}
+                                <span class="badge bg-success"><i class="fas fa-check-circle"></i> Đang hoạt động</span>
+                            {% else %}
+                                <span class="badge bg-secondary"><i class="fas fa-lock"></i> Đang khóa</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" 
+                                    title="Sửa thông tin"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editModal"
+                                    onclick="fillEditForm(
+                                        '{{ org.id }}', 
+                                        '{{ org.name|escapejs }}', 
+                                        '{{ org.contact_phone|default_if_none:'' }}', 
+                                        '{{ org.bank_name|default_if_none:''|escapejs }}',
+                                        '{{ org.bank_account_number|default_if_none:'' }}',
+                                        '{{ org.bank_account_name|default_if_none:''|escapejs }}',
+                                        '{{ org.description|default_if_none:''|escapejs }}',
+                                        '{{ org.wallet_address|default_if_none:'' }}'
+                                    )">
+                                <i class="fas fa-edit"></i>
+                            </button>
+
+                            <a href="{% url 'admin_panel:khoa_tochuc' org.id %}" 
+                               class="btn btn-sm {% if org.is_verified %}btn-warning{% else %}btn-success{% endif %}"
+                               title="{% if org.is_verified %}Khóa tổ chức này{% else %}Kích hoạt lại{% endif %}"
+                               onclick="return confirm('Thay đổi trạng thái hoạt động của {{ org.name }}?')">
+                                {% if org.is_verified %}
+                                    <i class="fas fa-lock"></i> 
+                                {% else %}
+                                    <i class="fas fa-unlock"></i> 
+                                {% endif %}
+                            </a>
+
+                            <a href="{% url 'admin_panel:xoa_tochuc' org.id %}" 
+                               class="btn btn-sm btn-danger"
+                               title="Xóa vĩnh viễn"
+                               onclick="return confirm('CẢNH BÁO: Xóa tổ chức sẽ xóa luôn các chương trình liên quan! Bạn có chắc không?')">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            Không tìm thấy tổ chức nào.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{% url 'admin_panel:them_tochuc' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Tổ chức & Cấp tài khoản</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body">
+                            <h6 class="text-primary fw-bold mb-2"><i class="fas fa-user-lock"></i> Cấp tài khoản quản trị (Cho Tổ chức tự đăng nhập)</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="fw-bold">Tên đăng nhập (Username) *</label>
+                                    <input type="text" name="org_username" class="form-control" placeholder="VD: quytrongheo" required autocomplete="off">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="fw-bold">Mật khẩu *</label>
+                                    <input type="text" name="org_password" class="form-control" placeholder="VD: 123456" required autocomplete="off">
+                                </div>
+                                <div class="col-md-12">
+                                    <small class="text-muted fst-italic">Tài khoản này sẽ được tự động tạo và gán quyền quản lý tổ chức.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-success border-bottom pb-2">Thông tin Tổ chức</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label>Tên Tổ chức *</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Hotline (SĐT)</label>
+                            <input type="text" name="phone" class="form-control">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label>Logo</label>
+                            <input type="file" name="logo" class="form-control">
+                        </div>
+                        
+                        <div class="col-md-12 mb-3">
+                            <label>Thông tin Ngân hàng (Để tạo QR)</label>
+                            <div class="input-group">
+                                <input type="text" name="bank_name" class="form-control" placeholder="Tên NH (VD: MBBank)" required>
+                                <input type="text" name="bank_account" class="form-control" placeholder="Số TK" required>
+                                <input type="text" name="account_holder" class="form-control" placeholder="Tên chủ TK" required>
+                            </div>
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label>Địa chỉ ví Crypto (MetaMask) *</label>
+                            <input type="text" name="wallet_address" class="form-control" placeholder="0x..." required>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label>Mô tả / Giới thiệu</label>
+                            <textarea name="description" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-success">Lưu & Tạo User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="editForm" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Thông tin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2">
+                        <small><i class="fas fa-info-circle"></i> Lưu ý: Không thể thay đổi tài khoản quản lý tại đây. Vui lòng vào mục Quản lý Người dùng nếu cần.</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label>Tên Tổ chức *</label>
+                            <input type="text" name="name" id="e_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Hotline (SĐT)</label>
+                            <input type="text" name="phone" id="e_phone" class="form-control">
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label>Logo Mới (Bỏ qua nếu không đổi)</label>
+                            <input type="file" name="logo" class="form-control">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label>Ngân hàng</label>
+                            <input type="text" name="bank_name" id="e_bank_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Số Tài khoản</label>
+                            <input type="text" name="bank_account" id="e_bank_account" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Chủ Tài khoản</label>
+                            <input type="text" name="account_holder" id="e_account_holder" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label>Mô tả</label>
+                            <textarea name="description" id="e_description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-12 mt-3">
+                            <label>Địa chỉ ví Crypto (MetaMask) *</label>
+                            <input type="text" name="wallet_address" id="e_wallet_address" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fillEditForm(id, name, phone, bankName, bankAccount, accHolder, desc, walletAddress) {
+        document.getElementById('editForm').action = "/admin_panel/tochuc/sua/" + id + "/";
+        document.getElementById('e_name').value = name;
+        document.getElementById('e_phone').value = phone;
+        document.getElementById('e_bank_name').value = bankName;
+        document.getElementById('e_bank_account').value = bankAccount;
+        document.getElementById('e_account_holder').value = accHolder;
+        document.getElementById('e_description').value = desc;
+        document.getElementById('e_wallet_address').value = walletAddress;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đăng ký tài khoản</title>
+  <style>
+    /* ... Copy toàn bộ CSS từ file dangnhap.html ở trên dán vào đây ... */
+    /* Thêm CSS cho phần strength meter nếu cần */
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #f4f6f8; }
+    .auth-container { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 400px; max-width: 90%; }
+    .auth-header { text-align: center; margin-bottom: 20px; }
+    .auth-header h2 { color: #333; font-weight: 700; font-size: 24px; margin-bottom: 8px; }
+    .form-group { margin-bottom: 15px; position: relative; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 5px; }
+    .input-wrapper { position: relative; }
+    .form-group input { width: 100%; padding: 12px 16px; border: 1px solid #e1e4e8; border-radius: 8px; font-size: 15px; transition: all 0.3s; background: #f9f9f9; }
+    .form-group input:focus { outline: none; border-color: #ff6b35; background: #fff; box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1); }
+    .error-msg { color: #dc3545; font-size: 12px; margin-top: 5px; display: none; }
+    .form-group.error input { border-color: #dc3545; background-color: #fff8f8; }
+    .form-group.error .error-msg { display: block; }
+    .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #888; }
+    .btn-submit { width: 100%; padding: 14px; background: #ff6b35; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px;}
+    .btn-submit:hover { background: #e55a2b; }
+    .auth-footer { text-align: center; margin-top: 25px; font-size: 14px; color: #666; }
+    .auth-footer a { color: #ff6b35; text-decoration: none; font-weight: 600; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-container">
+    <div class="auth-header">
+      <h2>Đăng ký</h2>
+      <p style="color:#666; font-size:14px;">Tạo tài khoản để tham gia cùng chúng tôi</p>
+    </div>
+    {% if messages %}
+      {% for message in messages %}
+        <div style="
+          {% if 'success' in message.tags %}
+            background:#e8f5e9; color:#2e7d32; border-left:4px solid #2e7d32;
+          {% elif 'warning' in message.tags %}
+            background:#fff8e1; color:#e65100; border-left:4px solid #ff9800;
+          {% elif 'info' in message.tags %}
+            background:#e3f2fd; color:#0d47a1; border-left:4px solid #2196f3;
+          {% else %}
+            background:#ffebee; color:#c62828; border-left:4px solid #dc3545;
+          {% endif %}
+          padding:12px 16px; border-radius:8px; margin-bottom:15px; font-size:14px;
+          display:flex; align-items:center; gap:10px; animation: slideIn 0.3s ease;">
+          {% if 'success' in message.tags %}
+            <span style="font-size:18px;">✅</span>
+          {% elif 'warning' in message.tags %}
+            <span style="font-size:18px;">⚠️</span>
+          {% elif 'info' in message.tags %}
+            <span style="font-size:18px;">ℹ️</span>
+          {% else %}
+            <span style="font-size:18px;">❌</span>
+          {% endif %}
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+
+    <form id="registerForm" method="post" action="{% url 'admin_panel:dangky' %}"> 
+      {% csrf_token %}
+
+      <div class="form-group" id="group-fullname">
+        <label>Họ và tên</label>
+        <input type="text" id="fullname" name="fullname" placeholder="VD: Nguyễn Văn A" required>
+        <span class="error-msg">Vui lòng nhập họ tên.</span>
+      </div>
+      <div class="form-group" id="group-username">
+  <label>Username (Dùng để đăng nhập)</label>
+  <input type="text" id="username" name="username" placeholder="VD: locwara" required>
+  <span class="error-msg">Username không hợp lệ.</span>
+</div>
+
+      <div class="form-group" id="group-email">
+        <label>Email (Dùng để đăng nhập)</label>
+        <input type="email" id="email" name="email" placeholder="email@example.com" required>
+        <span class="error-msg">Email không hợp lệ.</span>
+      </div>
+
+      <div class="form-group" id="group-pass">
+        <label>Mật khẩu</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" name="password" placeholder="Tối thiểu 6 ký tự" required>
+          <span class="toggle-password" onclick="togglePass('password')">👁️</span>
+        </div>
+        <span class="error-msg">Mật khẩu quá ngắn.</span>
+      </div>
+
+      <div class="form-group" id="group-confirm">
+        <label>Nhập lại mật khẩu</label>
+        <div class="input-wrapper">
+          <input type="password" id="confirm_password" name="confirm_password" placeholder="Nhập lại mật khẩu trên" required>
+        </div>
+        <span class="error-msg">Mật khẩu không khớp.</span>
+      </div>
+
+      <button type="submit" class="btn-submit">Đăng ký tài khoản</button>
+    </form>
+
+    <div class="auth-footer">
+      Đã có tài khoản? <a href="{% url 'admin_panel:dangnhap' %}">Đăng nhập</a>
+    </div>
+  </div>
+
+  <script>
+    const username = document.getElementById('username');
+
+username.addEventListener('input', () => {
+  if(username.value.trim().length < 4) 
+      setError('group-username', "Username tối thiểu 4 ký tự");
+  else 
+      setSuccess('group-username');
+});
+
+    // --- Utils ---
+    function togglePass(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === "password" ? "text" : "password";
+    }
+    function setError(id, msg) {
+        const group = document.getElementById(id);
+        group.classList.add('error');
+        group.querySelector('.error-msg').innerText = msg;
+    }
+    function setSuccess(id) {
+        document.getElementById(id).classList.remove('error');
+    }
+
+    // --- Validation Logic ---
+    const fullname = document.getElementById('fullname');
+    const email = document.getElementById('email');
+    const pass = document.getElementById('password');
+    const confirmPass = document.getElementById('confirm_password');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    fullname.addEventListener('input', () => {
+        if(fullname.value.trim().length < 2) setError('group-fullname', "Tên quá ngắn");
+        else setSuccess('group-fullname');
+    });
+
+    email.addEventListener('input', () => {
+        if(!emailRegex.test(email.value)) setError('group-email', "Email sai định dạng");
+        else setSuccess('group-email');
+    });
+
+    pass.addEventListener('input', () => {
+        if(pass.value.length < 6) setError('group-pass', "Mật khẩu phải từ 6 ký tự trở lên");
+        else {
+            setSuccess('group-pass');
+            // Kiểm tra lại confirm pass nếu đang có giá trị
+            if(confirmPass.value !== '') triggerEvent(confirmPass, 'input');
+        }
+    });
+
+    confirmPass.addEventListener('input', () => {
+        if(confirmPass.value !== pass.value) setError('group-confirm', "Mật khẩu nhập lại không khớp");
+        else setSuccess('group-confirm');
+    });
+
+    // Helper trigger
+    function triggerEvent(el, type) {
+        if ('createEvent' in document) {
+            var e = document.createEvent('HTMLEvents');
+            e.initEvent(type, false, true);
+            el.dispatchEvent(e);
+        }
+    }
+    
+    // Prevent submit on error
+    document.getElementById('registerForm').addEventListener('submit', (e) => {
+        if(document.querySelectorAll('.form-group.error').length > 0) {
+            e.preventDefault();
+            alert("Vui lòng sửa các lỗi màu đỏ trước khi đăng ký");
+        }
+    });
+  </script>
+</body>
+</html>

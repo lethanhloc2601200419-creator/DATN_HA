@@ -1,0 +1,209 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Ủng hộ: {{ campaign.title }} - Quỹ Nhân Ái{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold m-0 text-danger"><i class="fas fa-heart me-2"></i>Ủng hộ Chiến dịch</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="fw-bold mb-2">Bạn muốn ủng hộ bao nhiêu?</label>
+                            <div class="input-group input-group-lg">
+                                <input type="number" name="amount" class="form-control fw-bold text-danger" placeholder="Nhập số tiền (VD: 100000)" required min="10000">
+                                <span class="input-group-text fw-bold">VNĐ</span>
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(50000)">50k</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(100000)">100k</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(200000)">200k</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="setAmount(500000)">500k</button>
+                            </div>
+                        </div>
+
+                        {% if not user.is_authenticated %}
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="small fw-bold">Họ và tên</label>
+                                <input type="text" name="donor_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="small fw-bold">Email (nhận thư cảm ơn)</label>
+                                <input type="email" name="donor_email" class="form-control">
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info py-2 small rounded-3">
+                            <i class="fas fa-user-check me-1"></i> Bạn đang ủng hộ với tài khoản: <strong>{{ user.username }}</strong>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label class="fw-bold mb-2">Lời nhắn yêu thương</label>
+                            <textarea name="message" class="form-control" rows="3" placeholder="Gửi lời chúc đến hoàn cảnh..."></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="fw-bold mb-2">Hình thức thanh toán</label>
+                            <div class="border rounded p-3 mb-2 bg-light">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="bank" value="bank_transfer" checked>
+                                    <label class="form-check-label fw-bold" for="bank">
+                                        <i class="fas fa-university me-2 text-primary"></i> Chuyển khoản Ngân hàng
+                                    </label>
+                                    <div class="small text-muted ms-4 mt-1">Hệ thống sẽ tạo mã QR tự động ở bước tiếp theo.</div>
+                                </div>
+                            </div>
+                            <div class="border rounded p-3 mb-2 bg-light">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="vnpay" value="vnpay">
+                                    <label class="form-check-label fw-bold" for="vnpay">
+                                        <i class="fas fa-credit-card me-2 text-danger"></i> Thanh toán qua VNPay
+                                    </label>
+                                    <div class="small text-muted ms-4 mt-1">Thanh toán trực tuyến qua thẻ ATM, Visa, MasterCard, QR Pay.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="fw-bold mb-2">Kết nối MetaMask</label>
+                            <div class="border rounded p-3 bg-light">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="fw-bold">Ví nhận ETH (bắt buộc khi thanh toán VNPay)</div>
+                                        <div id="walletStatus" class="small text-muted">Chưa kết nối</div>
+                                    </div>
+                                    <button type="button" id="btnConnectWallet" class="btn btn-outline-dark btn-sm">
+                                        Kết nối MetaMask
+                                    </button>
+                                </div>
+                                <div id="walletAddressBox" class="mt-2 small text-success d-none"></div>
+                                <div id="walletWarning" class="mt-2 small text-danger d-none"></div>
+                                <input type="hidden" name="donor_wallet_address" id="donor_wallet_address">
+                            </div>
+                            <div id="metamaskMissing" class="small text-danger mt-2 d-none">
+                                Trình duyệt chưa có MetaMask. Vui lòng cài MetaMask để tiếp tục.
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger w-100 py-3 fw-bold fs-5 shadow-sm rounded-pill">
+                            TIẾP TỤC ỦNG HỘ <i class="fas fa-arrow-right ms-2"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 100px;">
+               <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
+         class="w-100 object-fit-cover" 
+         style="height: 400px;" 
+         alt="{{ campaign.title }}"
+         onerror="this.src='https://placehold.co/800x400?text=Chiến+dịch';">
+    
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3 lh-base">{{ campaign.title }}</h6>
+                    
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Tiến độ</span>
+                        <span class="fw-bold text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress-bar bg-danger" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                    </div>
+
+                    <ul class="list-unstyled small text-muted bg-light p-3 rounded mb-0">
+                        <li class="mb-2 d-flex justify-content-between">
+                            <span>Mục tiêu:</span> 
+                            <span class="fw-bold text-dark">{{ campaign.target_amount|intcomma }} đ</span>
+                        </li>
+                        <li class="d-flex justify-content-between">
+                            <span>Đã quyên góp:</span> 
+                            <span class="fw-bold text-danger">{{ campaign.current_amount|intcomma }} đ</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function setAmount(val) {
+        document.querySelector('input[name="amount"]').value = val;
+    }
+
+    const walletStatus = document.getElementById('walletStatus');
+    const walletAddressBox = document.getElementById('walletAddressBox');
+    const btnConnectWallet = document.getElementById('btnConnectWallet');
+    const walletInput = document.getElementById('donor_wallet_address');
+    const metamaskMissing = document.getElementById('metamaskMissing');
+    const walletWarning = document.getElementById('walletWarning');
+    const adminWallet = "{{ admin_wallet_address|default:'' }}";
+
+    function setWalletAddress(addr) {
+        walletInput.value = addr;
+        walletStatus.textContent = 'Đã kết nối';
+        walletAddressBox.textContent = addr;
+        walletAddressBox.classList.remove('d-none');
+        if (adminWallet && addr.toLowerCase() === adminWallet.toLowerCase()) {
+            walletWarning.textContent = 'Bạn đang dùng ví Admin. Vui lòng đổi sang ví người dùng.';
+            walletWarning.classList.remove('d-none');
+        } else {
+            walletWarning.classList.add('d-none');
+            walletWarning.textContent = '';
+        }
+    }
+
+    async function connectWallet() {
+        if (!window.ethereum) {
+            metamaskMissing.classList.remove('d-none');
+            return;
+        }
+        try {
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            if (accounts && accounts.length > 0) {
+                setWalletAddress(accounts[0]);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    btnConnectWallet?.addEventListener('click', connectWallet);
+
+    if (window.ethereum) {
+        window.ethereum.request({ method: 'eth_accounts' }).then((accounts) => {
+            if (accounts && accounts.length > 0) {
+                setWalletAddress(accounts[0]);
+            }
+        });
+    }
+
+    document.querySelector('form')?.addEventListener('submit', (e) => {
+        const isVnPay = document.getElementById('vnpay')?.checked;
+        if (isVnPay && !walletInput.value) {
+            e.preventDefault();
+            alert('Vui lòng kết nối MetaMask trước khi thanh toán VNPay.');
+            connectWallet();
+            return;
+        }
+        if (isVnPay && adminWallet && walletInput.value && walletInput.value.toLowerCase() === adminWallet.toLowerCase()) {
+            e.preventDefault();
+            alert('Ví MetaMask đang là ví Admin. Vui lòng đổi sang ví người dùng.');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Trang chủ - Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* CSS RIÊNG CHO BANNER (CHỈ TRANG CHỦ MỚI CÓ) */
+    .hero-section {
+        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url("{% static 'client/img/bg_trangchu.jpg' %}");
+        background-size: cover;
+        background-position: center;
+        height: 520px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        position: relative;
+    }
+    .hero-title { font-size: 3.5rem; font-weight: 800; text-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; line-height: 1.2; }
+    
+    /* Box thống kê nổi */
+    .stats-container { margin-top: -60px; position: relative; z-index: 10; }
+    .stats-box {
+        background: white; border-radius: 16px; padding: 40px; 
+        box-shadow: 0 15px 40px rgba(0,0,0,0.1); 
+        display: flex; justify-content: space-around; align-items: center;
+    }
+    .stat-item h3 { color: var(--primary-color); font-weight: 800; font-size: 2.2rem; margin: 0; }
+    .stat-item p { color: #757575; margin: 0; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; }
+
+    /* Card chiến dịch */
+    .campaign-card {
+        background: white; border-radius: 16px; overflow: hidden; border: 1px solid #f0f0f0; 
+        transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+    }
+    .campaign-card:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); border-color: transparent; }
+    
+    .card-thumb { height: 220px; overflow: hidden; position: relative; }
+    .card-thumb img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+    .campaign-card:hover .card-thumb img { transform: scale(1.1); }
+    
+    .card-body { padding: 25px; flex: 1; display: flex; flex-direction: column; }
+    .card-title a { color: var(--text-dark); text-decoration: none; transition: 0.2s; }
+    .card-title a:hover { color: var(--primary-color); }
+    
+    .btn-donate-card {
+        margin-top: 20px; width: 100%; background: #fff5f8; color: var(--primary-color); 
+        border: 1px solid #ffdeeb; font-weight: 700; padding: 12px; border-radius: 10px; transition: 0.3s;
+    }
+    .btn-donate-card:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+    <header class="hero-section">
+        <div class="container">
+            <h1 class="hero-title animate__animated animate__fadeInDown">Trao yêu thương,<br>Nhận niềm vui</h1>
+            <p class="fs-5 mb-5 opacity-75 w-75 mx-auto">Nền tảng gây quỹ từ thiện minh bạch, ứng dụng công nghệ Blockchain để đảm bảo niềm tin cho cộng đồng.</p>
+            
+            <div class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg" style="max-width: 600px; width: 100%;">
+                <input type="text" class="form-control border-0 rounded-pill px-4 py-2" placeholder="Tìm chiến dịch, hoàn cảnh..." style="box-shadow: none;">
+                <button class="btn btn-danger rounded-pill px-4 py-2 fw-bold">Tìm kiếm</button>
+            </div>
+        </div>
+    </header>
+
+    <section class="stats-container container mb-5">
+        <div class="stats-box">
+            <div class="stat-item text-center">
+                <h3>{{ total_donated|intcomma }} đ</h3>
+                <p>Đã quyên góp</p>
+            </div>
+            <div class="vr mx-3 text-muted opacity-25"></div>
+            <div class="stat-item text-center">
+                <h3>{{ total_campaigns|intcomma }}</h3>
+                <p>Chiến dịch</p>
+            </div>
+            <div class="vr mx-3 text-muted opacity-25"></div>
+            <div class="stat-item text-center">
+                <h3>100%</h3>
+                <p>Minh bạch Sao kê</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-5">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-end mb-5">
+                <div>
+                    <h6 class="text-uppercase fw-bold text-danger small mb-1">Vì cộng đồng</h6>
+                    <h2 class="fw-bold m-0 display-6">Chiến dịch nổi bật</h2>
+                </div>
+                <a href="#" class="text-decoration-none fw-bold text-dark hover-primary">
+                    Xem tất cả <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+
+            <div class="row g-4">
+                
+                {% for campaign in active_campaigns %}
+                <div class="col-md-4">
+                    <div class="campaign-card">
+                        <div class="card-thumb">
+                            <a href="{% url 'client:chitiet_chiendich' campaign.id %}">
+                                <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
+     alt="{{ campaign.title }}"
+     class="card-img-top object-fit-cover" height="200"
+     onerror="this.src='https://placehold.co/600x400?text=Chiến+dịch';">
+                            </a>
+                            <span class="position-absolute bottom-0 end-0 m-3 badge bg-dark bg-opacity-75 backdrop-blur rounded-pill px-3 py-2">
+                                <i class="far fa-clock me-1"></i> Còn {{ campaign.days_left|default:"30" }} ngày
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="{{ campaign.creator.profile.avatar_url|default:'https://ui-avatars.com/api/?name=Admin' }}" 
+                                     class="rounded-circle me-2" width="30" height="30" style="object-fit: cover;">
+                                <span class="small fw-bold text-secondary">{{ campaign.creator.profile.display_name|default:campaign.creator.username }}</span>
+                                <i class="fas fa-check-circle text-primary ms-1 small" title="Đã xác minh"></i>
+                            </div>
+
+                            <h5 class="card-title mb-3 fw-bold" style="min-height: 3rem;">
+                                <a href="{% url 'client:chitiet_chiendich' campaign.id %}" class="text-decoration-none text-dark">
+                                    {{ campaign.title|truncatechars:50 }}
+                                </a>
+                            </h5>
+
+                            <div class="mt-auto">
+                                <div class="d-flex justify-content-between small fw-bold mb-2">
+                                    <span class="text-dark">{{ campaign.current_amount|intcomma }} đ</span>
+                                    <span class="text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted mt-2">
+                                    <span>MT: {{ campaign.target_amount|intcomma }} đ</span>
+                                    <span>{{ campaign.donations.count }} lượt</span>
+                                </div>
+
+                                {% if user.is_authenticated %}
+                                <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-donate-card d-block text-center mt-3">
+                                    Ủng hộ ngay
+                                </a>
+                                {% else %}
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-donate-card d-block text-center mt-3">
+                                    <i class="fas fa-sign-in-alt me-1"></i> Vui lòng đăng nhập để ủng hộ
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% empty %}
+                <div class="col-12 text-center py-5">
+                    <img src="https://cdni.iconscout.com/illustration/premium/thumb/empty-box-4085812-3385481.png" width="200" alt="Empty">
+                    <p class="text-muted mt-3">Chưa có chiến dịch nào đang hoạt động.</p>
+                </div>
+                {% endfor %}
+
+            </div> </div>
+    </section>
+{% endblock %}
+
+
+

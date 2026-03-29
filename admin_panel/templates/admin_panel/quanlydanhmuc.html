@@ -1,0 +1,94 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+
+<body>
+    {% block content %}
+    <style>
+
+    </style>
+    <div class="container mt-4">
+  <h4>QUẢN LÝ DANH MỤC CHIẾN DỊCH</h4>
+
+  <!-- FORM -->
+  <form method="post" class="card p-3 mb-4">
+    {% csrf_token %}
+    <input type="hidden" name="id" id="cat-id">
+
+    <div class="row">
+      <div class="col-md-3">
+        <input name="name" id="cat-name" class="form-control" placeholder="Tên danh mục" required>
+      </div>
+      <div class="col-md-3">
+        <input name="slug" id="cat-slug" class="form-control" placeholder="slug-danh-muc" required>
+      </div>
+      
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100">Lưu</button>
+      </div>
+    </div>
+
+    <textarea name="description" id="cat-desc"
+      class="form-control mt-2" placeholder="Mô tả"></textarea>
+  </form>
+
+  <!-- DANH SÁCH -->
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Tên</th>
+        <th>Slug</th>
+        <th>Trạng thái</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in categories %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.slug }}</td>
+        <td>
+          {% if c.is_active %}
+            <span class="badge bg-success">Hiện</span>
+          {% else %}
+            <span class="badge bg-secondary">Ẩn</span>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-warning btn-sm"
+            onclick="editCategory('{{ c.id }}','{{ c.name }}','{{ c.slug }}','{{ c.description }}')">
+            Sửa
+          </button>
+          <a href="{% url 'admin_panel:toggle_category' c.id %}"
+             class="btn btn-danger btn-sm">
+             Ẩn/Hiện
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function editCategory(id, name, slug, desc, icon, order) {
+  document.getElementById('cat-id').value = id;
+  document.getElementById('cat-name').value = name;
+  document.getElementById('cat-slug').value = slug;
+  document.getElementById('cat-desc').value = desc;
+ 
+ 
+}
+</script>
+
+
+
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+    {% endblock %}
+</body>
+
+</html>

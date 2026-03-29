@@ -1,0 +1,316 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="mt-4">Quản lý Giải ngân</h2>
+
+    <!-- Stats Cards -->
+    <div class="row g-3 mt-2 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-warning fs-2 fw-bold">{{ stats.pending }}</div>
+                    <div class="small text-muted">Chờ duyệt</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-primary fs-2 fw-bold">{{ stats.voting }}</div>
+                    <div class="small text-muted">Đang bỏ phiếu</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-success fs-2 fw-bold">{{ stats.executed }}</div>
+                    <div class="small text-muted">Đã giải ngân</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-danger fs-2 fw-bold">{{ stats.total_disbursed|intcomma }}đ</div>
+                    <div class="small text-muted">Tổng đã giải ngân</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter + Actions -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <form method="GET" class="d-flex gap-2">
+                        <select name="campaign" class="form-select" style="max-width: 300px;">
+                            <option value="">-- Tất cả chiến dịch --</option>
+                            {% for c in campaigns %}
+                            <option value="{{ c.id }}" {% if selected_campaign == c.id|stringformat:'d' %}selected{% endif %}>{{ c.title|truncatechars:40 }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Lọc</button>
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
+                        <i class="fas fa-plus-circle"></i> Tạo yêu cầu giải ngân
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proposals Table -->
+    <div class="card shadow">
+        <div class="card-header">
+            <i class="fas fa-money-check-alt me-1"></i> Danh sách đề xuất giải ngân
+        </div>
+        <div class="card-body">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="5%">ID</th>
+                        <th width="20%">Chiến dịch</th>
+                        <th width="15%">Tiêu đề</th>
+                        <th width="12%">Số tiền</th>
+                        <th width="12%">Trạng thái</th>
+                        <th width="16%">Bỏ phiếu</th>
+                        <th width="20%">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in proposals %}
+                    <tr>
+                        <td>{{ item.obj.id }}</td>
+                        <td>
+                            <strong>{{ item.obj.campaign.title|truncatechars:30 }}</strong>
+                            {% if item.obj.campaign.organization %}
+                            <br><small class="text-muted">{{ item.obj.campaign.organization.name }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ item.obj.title }}</strong>
+                            {% if item.obj.purpose %}
+                            <br><small class="text-muted">{{ item.obj.purpose|truncatechars:40 }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-danger">{{ item.obj.amount_requested|intcomma }}đ</td>
+                        <td class="text-center">
+                            {% if item.obj.status == 'pending' %}
+                                <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                            {% elif item.obj.status == 'voting' %}
+                                <span class="badge bg-primary">Đang bỏ phiếu</span>
+                                {% if item.obj.end_date %}
+                                <br><small class="text-muted">Hạn: {{ item.obj.end_date|date:"d/m H:i" }}</small>
+                                {% endif %}
+                            {% elif item.obj.status == 'approved' %}
+                                <span class="badge bg-info">Đã thông qua</span>
+                            {% elif item.obj.status == 'executed' %}
+                                <span class="badge bg-success">Đã giải ngân</span>
+                                {% if item.obj.executed_at %}
+                                <br><small class="text-muted">{{ item.obj.executed_at|date:"d/m/Y" }}</small>
+                                {% endif %}
+                            {% elif item.obj.status == 'rejected' %}
+                                <span class="badge bg-danger">Từ chối</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.obj.status == 'voting' %}
+                            <div class="small mb-1">
+                                <span class="text-success">Đồng ý: {{ item.yes_pct|floatformat:0 }}%</span>
+                                <span class="text-muted">({{ item.votes_count }} phiếu)</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-success" style="width: {{ item.yes_pct }}%"></div>
+                                <div class="progress-bar bg-danger" style="width: {{ item.no_pct }}%"></div>
+                            </div>
+                            {% elif item.obj.status == 'executed' %}
+                            <span class="text-success small"><i class="fas fa-check-circle"></i> {{ item.yes_pct|floatformat:0 }}% đồng ý ({{ item.votes_count }} phiếu)</span>
+                            {% elif item.obj.status == 'rejected' and item.votes_count > 0 %}
+                            <span class="text-danger small"><i class="fas fa-times-circle"></i> {{ item.yes_pct|floatformat:0 }}% đồng ý ({{ item.votes_count }} phiếu)</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if role == 'admin' and item.obj.status == 'pending' %}
+                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal"
+                                onclick="document.getElementById('approve_form').action='/admin_panel/giaingan/duyet/{{ item.obj.id }}/';
+                                         document.getElementById('approve_title').textContent='{{ item.obj.title }}';
+                                         document.getElementById('approve_amount').textContent='{{ item.obj.amount_requested|intcomma }}đ';">
+                                <i class="fas fa-check"></i> Duyệt
+                            </button>
+                            <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-danger"
+                               onclick="return confirm('Từ chối yêu cầu này?')">
+                                <i class="fas fa-times"></i> Từ chối
+                            </a>
+                            {% endif %}
+
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
+                                <i class="fas fa-eye"></i> Chi tiết
+                            </button>
+
+                            {% if item.obj.disbursement_eth_tx_hash %}
+                            <a href="https://sepolia.etherscan.io/tx/{{ item.obj.disbursement_eth_tx_hash }}" target="_blank"
+                               class="btn btn-sm btn-outline-success" title="Xem trên Blockchain">
+                                <i class="fas fa-link"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Detail Modal -->
+                    <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header bg-light">
+                                    <h5 class="modal-title"><i class="fas fa-info-circle"></i> Chi tiết đề xuất #{{ item.obj.id }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Chiến dịch:</strong> {{ item.obj.campaign.title }}</p>
+                                            <p><strong>Tiêu đề:</strong> {{ item.obj.title }}</p>
+                                            <p><strong>Số tiền:</strong> <span class="text-danger fw-bold">{{ item.obj.amount_requested|intcomma }}đ</span></p>
+                                            <p><strong>Mục đích:</strong> {{ item.obj.purpose|default:"—" }}</p>
+                                            <p><strong>Đơn vị thụ hưởng:</strong> {{ item.obj.recipient_name|default:"—" }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Người tạo:</strong> {{ item.obj.created_by.get_full_name|default:item.obj.created_by.username }}</p>
+                                            <p><strong>Ngày tạo:</strong> {{ item.obj.created_at|date:"d/m/Y H:i" }}</p>
+                                            {% if item.obj.approved_by %}
+                                            <p><strong>Người duyệt:</strong> {{ item.obj.approved_by.get_full_name|default:item.obj.approved_by.username }}</p>
+                                            <p><strong>Ngày duyệt:</strong> {{ item.obj.approved_at|date:"d/m/Y H:i" }}</p>
+                                            {% endif %}
+                                            {% if item.obj.end_date %}
+                                            <p><strong>Hạn bỏ phiếu:</strong> {{ item.obj.end_date|date:"d/m/Y H:i" }}</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <p><strong>Mô tả chi tiết:</strong></p>
+                                    <p>{{ item.obj.description|linebreaks }}</p>
+                                    {% if item.obj.proof_images %}
+                                    <p><strong>Ảnh minh chứng:</strong></p>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        {% for img in item.obj.proof_images %}
+                                        <a href="{{ img }}" target="_blank">
+                                            <img src="{{ img }}" style="height: 80px; border-radius: 8px;" class="border">
+                                        </a>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">Chưa có đề xuất giải ngân nào.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{% url 'admin_panel:tao_yeucau_giaingan' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Tạo yêu cầu giải ngân</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Chiến dịch *</label>
+                            <select name="campaign_id" class="form-select" required>
+                                <option value="">-- Chọn chiến dịch --</option>
+                                {% for c in campaigns_available %}
+                                <option value="{{ c.obj.id }}">{{ c.obj.title }} (Khả dụng: {{ c.net_available|intcomma }}đ — đã trừ gas: {{ c.total_gas_vnd|intcomma }}đ)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Số tiền giải ngân (VNĐ) *</label>
+                            <input type="number" name="amount_requested" class="form-control" required min="1000">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Tiêu đề *</label>
+                            <input type="text" name="title" class="form-control" required placeholder="VD: Mua 100 bao gạo">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Mục đích</label>
+                            <input type="text" name="purpose" class="form-control" placeholder="VD: Hỗ trợ bà con vùng lũ">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Đơn vị thụ hưởng</label>
+                            <input type="text" name="recipient_name" class="form-control" placeholder="VD: Hội Chữ thập đỏ">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="fw-bold">Link minh chứng</label>
+                            <input type="url" name="evidence_url" class="form-control" placeholder="https://...">
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="fw-bold">Mô tả chi tiết *</label>
+                            <textarea name="description" class="form-control" rows="3" required placeholder="Mô tả kế hoạch chi tiêu, danh sách vật tư..."></textarea>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="fw-bold">Ảnh minh chứng (hóa đơn, báo giá...)</label>
+                            <input type="file" name="proof_files" class="form-control" multiple accept="image/*">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Gửi yêu cầu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="approve_form" method="POST">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-gavel"></i> Duyệt & Mở bỏ phiếu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>Đề xuất:</strong> <span id="approve_title"></span><br>
+                        <strong>Số tiền:</strong> <span id="approve_amount" class="text-danger fw-bold"></span>
+                    </div>
+                    <p>Sau khi duyệt, hệ thống sẽ mở bỏ phiếu cho tất cả nhà hảo tâm đã ủng hộ chiến dịch. Số tiền sẽ được khóa tạm thời.</p>
+                    <div class="mb-3">
+                        <label class="fw-bold">Số ngày bỏ phiếu *</label>
+                        <input type="number" name="voting_days" class="form-control" value="7" min="1" max="30" required>
+                        <small class="text-muted">Từ 1 đến 30 ngày. Sau thời gian này hệ thống sẽ tự chốt kết quả.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Duyệt & Mở bỏ phiếu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

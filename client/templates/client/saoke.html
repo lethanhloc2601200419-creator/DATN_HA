@@ -1,0 +1,132 @@
+{% extends 'client/base_client.html' %}
+{% load humanize %} {% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold text-primary">SAO KÊ MINH BẠCH - BLOCKCHAIN</h1>
+        <p class="text-muted">
+            Mọi khoản đóng góp đều được ghi nhận vĩnh viễn trên mạng lưới Blockchain Sepolia. 
+            <br>Không ai có thể sửa đổi hoặc xóa bỏ.
+        </p>
+        <div class="row justify-content-center g-3 mt-2">
+            <div class="col-auto">
+                <div class="card px-4 py-2 shadow-sm border-primary">
+                    <span class="small text-muted">💰 Tổng ủng hộ</span>
+                    <span class="h4 text-danger fw-bold mb-0">{{ total_system_amount|intcomma }} VNĐ</span>
+                </div>
+            </div>
+            {% if total_gas_vnd %}
+            <div class="col-auto">
+                <div class="card px-4 py-2 shadow-sm border-warning">
+                    <span class="small text-muted">⛽ Tổng phí Gas Blockchain</span>
+                    <span class="h4 text-warning fw-bold mb-0">-{{ total_gas_vnd|intcomma }} VNĐ</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="card px-4 py-2 shadow-sm border-success">
+                    <span class="small text-muted">💎 Thực nhận (giải ngân tối đa)</span>
+                    <span class="h4 text-success fw-bold mb-0">{{ total_net_amount|intcomma }} VNĐ</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow border-0 rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th class="py-3 ps-4">Thời gian</th>
+                            <th class="py-3">Người ủng hộ</th>
+                            <th class="py-3">Số tiền</th>
+                            <th class="py-3">Chiến dịch</th>
+                            <th class="py-3">Lời nhắn</th>
+                            <th class="py-3 text-center">Chứng thực Blockchain (Proof)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in donations %}
+                        <tr>
+                            <td class="ps-4 text-muted small">
+                                {{ item.created_at|date:"H:i d/m/Y" }}
+                            </td>
+
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded-circle d-flex justify-content-center align-items-center me-2 fw-bold text-primary" 
+                                         style="width: 35px; height: 35px; font-size: 14px;">
+                                        {{ item.donor_name|slice:":1"|upper }}
+                                    </div>
+                                    <span class="fw-bold text-dark">
+                                        {% if item.is_anonymous %}
+                                            Mạnh thường quân
+                                        {% else %}
+                                            {{ item.donor_name }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="fw-bold text-success">+{{ item.amount|intcomma }} đ</div>
+                                {% if item.gas_fee_vnd %}
+                                <div class="small text-warning" title="Phí gas blockchain đã trừ">
+                                    ⛽ -{{ item.gas_fee_vnd|intcomma }} đ
+                                </div>
+                                <div class="small text-muted fw-bold" title="Số tiền thực nhận sau phí gas">
+                                    → {{ item.net_amount|intcomma }} đ
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <a href="{% url 'client:chitiet_chiendich' item.campaign.id %}" class="text-decoration-none text-secondary small fw-bold">
+                                    {{ item.campaign.title|truncatechars:30 }}
+                                </a>
+                            </td>
+
+                            <td class="small fst-italic text-muted">
+                                "{{ item.message|default:"Không có lời nhắn"|truncatechars:40 }}"
+                            </td>
+
+                            <td class="text-center">
+                                {% if item.eth_tx_hash %}
+                                    <a href="https://sepolia.etherscan.io/tx/{{ item.eth_tx_hash }}" target="_blank" class="text-decoration-none">
+                                        <div class="badge bg-success-subtle text-success border border-success px-3 py-2 rounded-pill d-inline-flex align-items-center gap-2" title="Bấm để kiểm tra trên Etherscan">
+                                            <i class="bi bi-shield-fill-check"></i>
+                                            <span>Đã xác thực</span>
+                                            <small class="font-monospace text-dark ms-1 opacity-75">
+                                                {{ item.eth_tx_hash|slice:":6" }}...{{ item.eth_tx_hash|slice:"-4:" }}
+                                                <i class="bi bi-box-arrow-up-right ms-1" style="font-size: 10px;"></i>
+                                            </small>
+                                        </div>
+                                    </a>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary px-3 py-2 rounded-pill">
+                                        <i class="bi bi-hourglass-split"></i> Đang đồng bộ...
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                Chưa có giao dịch nào. Hãy là người đầu tiên ủng hộ!
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-success-subtle { background-color: #d1e7dd !important; }
+    .table-hover tbody tr:hover { background-color: #f8f9fa; }
+    .badge:hover { transform: translateY(-1px); transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+</style>
+{% endblock %}

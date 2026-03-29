@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đăng nhập hệ thống</title>
+  <style>
+    /* --- CSS CHUNG --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    
+    body {
+      display: flex; align-items: center; justify-content: center; height: 100vh;
+      background-color: #f4f6f8; /* Màu nền nhẹ nhàng */
+    }
+
+    .auth-container {
+      background: #fff;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      width: 400px;
+      max-width: 90%;
+    }
+
+    .auth-header { text-align: center; margin-bottom: 30px; }
+    .auth-header h2 { color: #333; font-weight: 700; font-size: 24px; margin-bottom: 8px; }
+    .auth-header p { color: #666; font-size: 14px; }
+
+    .form-group { margin-bottom: 20px; position: relative; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+    
+    .input-wrapper { position: relative; }
+    
+    .form-group input {
+      width: 100%; padding: 12px 16px;
+      border: 1px solid #e1e4e8; border-radius: 8px;
+      font-size: 15px; transition: all 0.3s;
+      background: #f9f9f9;
+    }
+
+    .form-group input:focus {
+      outline: none; border-color: #ff6b35; background: #fff;
+      box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+    }
+
+    /* Báo lỗi validation */
+    .error-msg {
+      color: #dc3545; font-size: 12px; margin-top: 5px;
+      display: none; /* Ẩn mặc định */
+    }
+    .form-group.error input { border-color: #dc3545; background-color: #fff8f8; }
+    .form-group.error .error-msg { display: block; }
+
+    /* Nút con mắt ẩn hiện pass */
+    .toggle-password {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      cursor: pointer; color: #888; user-select: none;
+    }
+
+    /* Button chính */
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: #ff6b35; /* Màu cam chủ đạo */
+      border: none; border-radius: 8px;
+      color: white; font-weight: 600; font-size: 16px;
+      cursor: pointer; transition: background 0.3s;
+    }
+    .btn-submit:hover { background: #e55a2b; }
+    .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* Button Google */
+    .btn-google {
+      width: 100%; padding: 12px;
+      background: #fff; border: 1px solid #ddd;
+      border-radius: 8px; margin-top: 15px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      color: #333; font-weight: 500; cursor: pointer; text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-google:hover { background: #f1f1f1; }
+    .btn-google img { width: 20px; height: 20px; }
+
+    /* Footer links */
+    .auth-footer { text-align: center; margin-top: 25px; font-size: 14px; color: #666; }
+    .auth-footer a { color: #ff6b35; text-decoration: none; font-weight: 600; }
+    .auth-footer a:hover { text-decoration: underline; }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .divider {
+        display: flex; align-items: center; text-align: center; margin: 20px 0; color: #999; font-size: 13px;
+    }
+    .divider::before, .divider::after {
+        content: ''; flex: 1; border-bottom: 1px solid #eee;
+    }
+    .divider:not(:empty)::before { margin-right: .5em; }
+    .divider:not(:empty)::after { margin-left: .5em; }
+
+  </style>
+</head>
+<body>
+
+  <div class="auth-container">
+    <div class="auth-header">
+      <h2>Đăng nhập</h2>
+      <p>Chào mừng bạn quay trở lại!</p>
+    </div>
+    {% if messages %}
+      {% for message in messages %}
+        <div style="
+          {% if 'success' in message.tags %}
+            background:#e8f5e9; color:#2e7d32; border-left:4px solid #2e7d32;
+          {% elif 'warning' in message.tags %}
+            background:#fff8e1; color:#e65100; border-left:4px solid #ff9800;
+          {% elif 'info' in message.tags %}
+            background:#e3f2fd; color:#0d47a1; border-left:4px solid #2196f3;
+          {% else %}
+            background:#ffebee; color:#c62828; border-left:4px solid #dc3545;
+          {% endif %}
+          padding:12px 16px; border-radius:8px; margin-bottom:15px; font-size:14px;
+          display:flex; align-items:center; gap:10px; animation: slideIn 0.3s ease;">
+          {% if 'success' in message.tags %}
+            <span style="font-size:18px;">✅</span>
+          {% elif 'warning' in message.tags %}
+            <span style="font-size:18px;">⚠️</span>
+          {% elif 'info' in message.tags %}
+            <span style="font-size:18px;">ℹ️</span>
+          {% else %}
+            <span style="font-size:18px;">❌</span>
+          {% endif %}
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+
+    <form id="loginForm" method="post" action="{% url 'admin_panel:dangnhap' %}">
+      {% csrf_token %}
+      
+      <div class="form-group" id="group-username">
+        <label for="username">Tên đăng nhập hoặc Email</label>
+        <div class="input-wrapper">
+          <input type="text" id="username" name="username" placeholder="Nhập email hoặc username" required>
+        </div>
+        <span class="error-msg">Vui lòng nhập tên đăng nhập hoặc email hợp lệ.</span>
+      </div>
+
+      <div class="form-group" id="group-password">
+        <label for="password">Mật khẩu</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" name="password" placeholder="Nhập mật khẩu" required>
+          <span class="toggle-password" onclick="togglePass('password')">👁️</span>
+        </div>
+        <span class="error-msg">Mật khẩu không được để trống.</span>
+        <div style="text-align: right; margin-top: 5px;">
+           <a href="http://127.0.0.1:8000/quenmatkhau/" style="font-size: 13px; color: #666; text-decoration: none;">Quên mật khẩu?</a>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Đăng nhập</button>
+    </form>
+
+    <div class="divider">Hoặc</div>
+
+    <a href="#" onclick="loginWithGoogle()" class="btn-google">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google">
+      Đăng nhập bằng Google
+    </a>
+
+    <div class="auth-footer">
+      Bạn chưa có tài khoản? <a href="{% url 'admin_panel:dangky' %}">Đăng ký ngay</a>
+      </div>
+  </div>
+
+  <script>
+  // Google login
+  function loginWithGoogle() {
+    const clientId = '{{ google_client_id }}';
+    const redirectUri = 'http://localhost:8000/accounts/google/login/callback/';
+    const scope = 'openid email profile';
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${clientId}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=${encodeURIComponent(scope)}&` +
+      `response_type=code&` +
+      `access_type=offline`;
+    window.location.href = url;
+  }
+
+  // 1️⃣ Toggle hiện/ẩn mật khẩu
+  function togglePass(id) {
+    const input = document.getElementById(id);
+    input.type = input.type === "password" ? "text" : "password";
+  }
+
+  // 2️⃣ Kiểm tra rỗng khi submit
+  document.getElementById('loginForm').addEventListener('submit', function(e) {
+    const user = document.getElementById('username').value.trim();
+    const pass = document.getElementById('password').value.trim();
+
+    if (!user || !pass) {
+      e.preventDefault();
+      alert("Vui lòng nhập đầy đủ thông tin!");
+    }
+  });
+</script>
+
+</body>
+</html>
