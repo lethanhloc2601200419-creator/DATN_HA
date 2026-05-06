@@ -1,24 +1,40 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giới thiệu - Nền tảng Gây quỹ Cộng đồng</title>
-    <style>
-        /* Palette màu mới: Hồng Đậm (#FF4D6D), Xám Sáng (#E9ECEF), Chữ Đen Xám (#212529) */
+{% extends 'client/base_client.html' %}
+
+{% block title %}Giới thiệu - Nền tảng Gây quỹ Cộng đồng{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+            --primary-950: #0a1628;
+            --primary-900: #0f2044;
+            --primary-800: #1e3a8a;
+            --primary-700: #2a4fa3;
+            --primary-600: #3b6ac7;
+            --primary-500: #4f84e0;
+            --primary-300: #a8c5f8;
+            --primary-200: #d0e2fd;
+            --primary-100: #e8f1fe;
+            --primary-50: #f3f7ff;
+            --neutral-900: #111827;
+            --neutral-700: #374151;
+            --neutral-500: #6b7280;
+            --neutral-100: #f9fafb;
+            --white: #ffffff;
+        }
+        /* Palette chuẩn theo design system charity */
         body { 
-            font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
+            font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; 
             line-height: 1.6; 
-            color: #212529; 
+            color: var(--primary-950); 
             margin: 0; 
             padding: 0; 
-            background-color: #FFFFFF; 
+            background-color: var(--white); 
         }
         
         /* Header nổi bật */
         header { 
-            background: linear-gradient(120deg, #FF4D6D 0%, #FF758F 100%);
-            color: #FFFFFF; 
+            background: linear-gradient(120deg, var(--primary-800) 0%, var(--primary-700) 100%);
+            color: var(--white); 
             padding: 80px 0; 
             text-align: center;
             clip-path: ellipse(100% 100% at 50% 0%); /* Tạo đường cong nhẹ phía dưới */
@@ -36,7 +52,7 @@
             padding: 40px 0; 
         }
         .mission-text h2 { 
-            color: #FF4D6D; 
+            color: var(--primary-800); 
             font-size: 2.2em;
             margin-bottom: 20px;
             position: relative;
@@ -46,32 +62,32 @@
             display: block;
             width: 60px;
             height: 4px;
-            background: #FF4D6D;
+            background: var(--primary-800);
             margin-top: 10px;
         }
 
         /* Giá trị cốt lõi với màu sắc đậm đà */
         .core-values { 
-            background: #F8F9FA; 
+            background: var(--neutral-100); 
             padding: 60px 30px; 
             text-align: center;
             border-radius: 30px;
-            border: 1px solid #DEE2E6;
+            border: 1px solid var(--primary-200);
         }
         .value-box { 
             display: inline-block; 
             width: 30%; 
             padding: 35px 20px; 
             margin: 1%; 
-            background: #ffffff; 
+            background: var(--white); 
             border-radius: 20px; 
-            border-bottom: 5px solid #FF4D6D; /* Viền đậm phía dưới */
+            border-bottom: 5px solid var(--primary-800); /* Viền đậm phía dưới */
             box-shadow: 0 10px 30px rgba(0,0,0,0.08);
             transition: all 0.3s ease;
             vertical-align: top;
         }
-        .value-box:hover { transform: translateY(-10px); background: #FFF0F3; }
-        .value-box h3 { color: #C9184A; font-size: 1.5em; margin-bottom: 15px; }
+        .value-box:hover { transform: translateY(-10px); background: var(--primary-50); }
+        .value-box h3 { color: var(--primary-900); font-size: 1.5em; margin-bottom: 15px; }
 
         /* Nút kêu gọi hành động đậm chất */
         .cta { 
@@ -80,38 +96,38 @@
         }
         .btn { 
             display: inline-block; 
-            background: #FF4D6D; 
-            color: #ffffff; 
+            background: var(--primary-800); 
+            color: var(--white); 
             padding: 18px 45px; 
             text-decoration: none; 
             border-radius: 50px; 
             font-size: 1.1em;
             font-weight: bold;
-            box-shadow: 0 10px 20px rgba(255, 77, 109, 0.3);
+            box-shadow: 0 10px 20px rgba(30, 58, 138, 0.22);
             transition: 0.3s;
         }
         .btn:hover { 
-            background: #C9184A; 
-            box-shadow: 0 15px 25px rgba(201, 24, 74, 0.4);
+            background: var(--primary-900); 
+            box-shadow: 0 15px 25px rgba(15, 32, 68, 0.28);
             transform: scale(1.05);
         }
 
         footer { 
             text-align: center; 
             padding: 40px; 
-            background: #343A40; /* Xám đậm gần đen để nổi bật nội dung trên */
-            color: #ADB5BD; 
+            background: var(--primary-950); /* Xám đậm gần đen để nổi bật nội dung trên */
+            color: var(--primary-300); 
         }
-        strong { color: #FF4D6D; font-weight: 700; }
+        strong { color: var(--primary-800); font-weight: 700; }
 
         @media (max-width: 768px) {
             .value-box { width: 90%; margin-bottom: 20px; }
             .mission-section { flex-direction: column; text-align: center; }
         }
-    </style>
-</head>
-<body>
+</style>
+{% endblock %}
 
+{% block content %}
 <header>
     <h1>CHÚNG TÔI LÀ AI?</h1>
     <p>Nơi sức mạnh cộng đồng được lan tỏa mạnh mẽ nhất</p>
@@ -135,7 +151,7 @@
     </section>
 
     <section class="core-values">
-        <h2 style="color: #343A40; margin-bottom: 50px; font-size: 2.5em;">Tại sao tin tưởng chúng tôi?</h2>
+        <h2 style="color: var(--primary-950); margin-bottom: 50px; font-size: 2.5em;">Tại sao tin tưởng chúng tôi?</h2>
         <div class="value-box">
             <h3>Công Nghệ Dẫn Đầu</h3>
             <p>Hệ thống xử lý giao dịch tức thì, tích hợp mã QR cá nhân hóa cho từng chiến dịch.</p>
@@ -152,15 +168,8 @@
 
     <section class="cta">
         <h2 style="font-size: 2.5em; margin-bottom: 20px;">Bạn đã sẵn sàng đồng hành?</h2>
-        <p style="font-size: 1.2em; color: #6C757D; margin-bottom: 40px;">Hàng ngàn hoàn cảnh đang chờ đợi sự tiếp sức từ phía bạn.</p>
+        <p style="font-size: 1.2em; color: var(--neutral-500); margin-bottom: 40px;">Hàng ngàn hoàn cảnh đang chờ đợi sự tiếp sức từ phía bạn.</p>
         <a href="{% url 'client:trangchu' %}" class="btn">Bắt đầu ngay bây giờ</a>
     </section>
 </div>
-
-<footer>
-    <p>&copy; 2025 Quỹ nhân ái. Đồng hành cùng cộng đồng Việt.<br>
-    Địa chỉ: Mậu thân, Ninh kiều, Thành phố Cần Thơ | Email: ngocha@gmail.com</p>
-</footer>
-
-</body>
-</html>
+{% endblock %}

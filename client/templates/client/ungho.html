@@ -15,11 +15,12 @@
                 <div class="card-body p-4">
                     <form method="POST">
                         {% csrf_token %}
+                        <input type="hidden" name="device_fingerprint" id="deviceFingerprintInput">
                         
                         <div class="mb-4">
                             <label class="fw-bold mb-2">Bạn muốn ủng hộ bao nhiêu?</label>
                             <div class="input-group input-group-lg">
-                                <input type="number" name="amount" class="form-control fw-bold text-danger" placeholder="Nhập số tiền (VD: 100000)" required min="10000">
+                                <input type="number" name="amount" class="form-control fw-bold text-danger" placeholder="Nhập số tiền (VD: 100000)" required min="2000">
                                 <span class="input-group-text fw-bold">VNĐ</span>
                             </div>
                             <div class="mt-2">
@@ -54,7 +55,7 @@
 
                         <div class="mb-4">
                             <label class="fw-bold mb-2">Hình thức thanh toán</label>
-                            <div class="border rounded p-3 mb-2 bg-light">
+                            <!-- <div class="border rounded p-3 mb-2 bg-light">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="payment_method" id="bank" value="bank_transfer" checked>
                                     <label class="form-check-label fw-bold" for="bank">
@@ -62,38 +63,19 @@
                                     </label>
                                     <div class="small text-muted ms-4 mt-1">Hệ thống sẽ tạo mã QR tự động ở bước tiếp theo.</div>
                                 </div>
-                            </div>
+                            </div> -->
                             <div class="border rounded p-3 mb-2 bg-light">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment_method" id="vnpay" value="vnpay">
-                                    <label class="form-check-label fw-bold" for="vnpay">
-                                        <i class="fas fa-credit-card me-2 text-danger"></i> Thanh toán qua VNPay
+                                    <input class="form-check-input" type="radio" name="payment_method" id="payos" value="payos" checked>
+                                    <label class="form-check-label fw-bold" for="payos">
+                                        <i class="fas fa-qrcode me-2 text-danger"></i> Thanh toán qua PayOS
                                     </label>
-                                    <div class="small text-muted ms-4 mt-1">Thanh toán trực tuyến qua thẻ ATM, Visa, MasterCard, QR Pay.</div>
+                                    <div class="small text-muted ms-4 mt-1">Hệ thống tạo checkout URL và VietQR để bạn thanh toán trực tuyến.</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="fw-bold mb-2">Kết nối MetaMask</label>
-                            <div class="border rounded p-3 bg-light">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div>
-                                        <div class="fw-bold">Ví nhận ETH (bắt buộc khi thanh toán VNPay)</div>
-                                        <div id="walletStatus" class="small text-muted">Chưa kết nối</div>
-                                    </div>
-                                    <button type="button" id="btnConnectWallet" class="btn btn-outline-dark btn-sm">
-                                        Kết nối MetaMask
-                                    </button>
-                                </div>
-                                <div id="walletAddressBox" class="mt-2 small text-success d-none"></div>
-                                <div id="walletWarning" class="mt-2 small text-danger d-none"></div>
-                                <input type="hidden" name="donor_wallet_address" id="donor_wallet_address">
-                            </div>
-                            <div id="metamaskMissing" class="small text-danger mt-2 d-none">
-                                Trình duyệt chưa có MetaMask. Vui lòng cài MetaMask để tiếp tục.
-                            </div>
-                        </div>
+                        
 
                         <button type="submit" class="btn btn-danger w-100 py-3 fw-bold fs-5 shadow-sm rounded-pill">
                             TIẾP TỤC ỦNG HỘ <i class="fas fa-arrow-right ms-2"></i>
@@ -119,7 +101,7 @@
                         <span class="fw-bold text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
                     </div>
                     <div class="progress mb-3" style="height: 6px;">
-                        <div class="progress-bar bg-danger" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                        <div class="progress-bar bg-primary" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
                     </div>
 
                     <ul class="list-unstyled small text-muted bg-light p-3 rounded mb-0">
@@ -140,70 +122,41 @@
 {% endblock %}
 
 {% block extra_js %}
+<script async src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
 <script>
     function setAmount(val) {
         document.querySelector('input[name="amount"]').value = val;
     }
 
-    const walletStatus = document.getElementById('walletStatus');
-    const walletAddressBox = document.getElementById('walletAddressBox');
-    const btnConnectWallet = document.getElementById('btnConnectWallet');
-    const walletInput = document.getElementById('donor_wallet_address');
-    const metamaskMissing = document.getElementById('metamaskMissing');
-    const walletWarning = document.getElementById('walletWarning');
-    const adminWallet = "{{ admin_wallet_address|default:'' }}";
+    (async function initFingerprint() {
+        const fingerprintInput = document.getElementById('deviceFingerprintInput');
+        if (!fingerprintInput) return;
 
-    function setWalletAddress(addr) {
-        walletInput.value = addr;
-        walletStatus.textContent = 'Đã kết nối';
-        walletAddressBox.textContent = addr;
-        walletAddressBox.classList.remove('d-none');
-        if (adminWallet && addr.toLowerCase() === adminWallet.toLowerCase()) {
-            walletWarning.textContent = 'Bạn đang dùng ví Admin. Vui lòng đổi sang ví người dùng.';
-            walletWarning.classList.remove('d-none');
-        } else {
-            walletWarning.classList.add('d-none');
-            walletWarning.textContent = '';
+        function waitForFingerprintLibrary() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 50;
+                const timer = setInterval(() => {
+                    attempts += 1;
+                    if (window.FingerprintJS) {
+                        clearInterval(timer);
+                        resolve(window.FingerprintJS);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(timer);
+                        reject(new Error('FingerprintJS library not loaded'));
+                    }
+                }, 100);
+            });
         }
-    }
 
-    async function connectWallet() {
-        if (!window.ethereum) {
-            metamaskMissing.classList.remove('d-none');
-            return;
-        }
         try {
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            if (accounts && accounts.length > 0) {
-                setWalletAddress(accounts[0]);
-            }
-        } catch (e) {
-            console.error(e);
+            const FingerprintJS = await waitForFingerprintLibrary();
+            const fp = await FingerprintJS.load();
+            const result = await fp.get();
+            fingerprintInput.value = result.visitorId || '';
+        } catch (error) {
+            console.warn('FingerprintJS init failed:', error);
         }
-    }
-
-    btnConnectWallet?.addEventListener('click', connectWallet);
-
-    if (window.ethereum) {
-        window.ethereum.request({ method: 'eth_accounts' }).then((accounts) => {
-            if (accounts && accounts.length > 0) {
-                setWalletAddress(accounts[0]);
-            }
-        });
-    }
-
-    document.querySelector('form')?.addEventListener('submit', (e) => {
-        const isVnPay = document.getElementById('vnpay')?.checked;
-        if (isVnPay && !walletInput.value) {
-            e.preventDefault();
-            alert('Vui lòng kết nối MetaMask trước khi thanh toán VNPay.');
-            connectWallet();
-            return;
-        }
-        if (isVnPay && adminWallet && walletInput.value && walletInput.value.toLowerCase() === adminWallet.toLowerCase()) {
-            e.preventDefault();
-            alert('Ví MetaMask đang là ví Admin. Vui lòng đổi sang ví người dùng.');
-        }
-    });
+    })();
 </script>
 {% endblock %}

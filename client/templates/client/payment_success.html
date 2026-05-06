@@ -1,254 +1,454 @@
+{% extends 'client/base_client.html' %}
 {% load static %}
 {% load humanize %}
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thanh toán thành công - Quỹ Nhân Ái</title>
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <style>
-        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #f4f6f8; }
+{% block title %}Thanh toán thành công - Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+            --primary-950: #0a1628;
+            --primary-900: #0f2044;
+            --primary-800: #1e3a8a;
+            --primary-700: #2a4fa3;
+            --primary-600: #3b6ac7;
+            --primary-500: #4f84e0;
+            --primary-300: #a8c5f8;
+            --primary-200: #d0e2fd;
+            --primary-100: #e8f1fe;
+            --primary-50: #f3f7ff;
+            --neutral-900: #111827;
+            --neutral-700: #374151;
+            --neutral-500: #6b7280;
+            --neutral-300: #d1d5db;
+            --neutral-100: #f9fafb;
+            --danger-600: #dc2626;
+            --danger-100: #fef2f2;
+            --success-600: #16a34a;
+            --success-100: #f0fdf4;
+            --white: #ffffff;
+        }
+        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: var(--primary-50); }
         .card-receipt { border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; }
-        .receipt-header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 40px 20px; text-align: center; position: relative; }
+        .receipt-header { background: linear-gradient(135deg, var(--success-600) 0%, var(--primary-500) 100%); color: white; padding: 40px 20px; text-align: center; position: relative; }
         .receipt-header::after {
             content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
-            background: radial-gradient(circle, transparent 10px, #fff 11px); background-size: 20px 20px;
+            background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
         }
-        .hash-box { background: #f8f9fa; border: 1px dashed #ccc; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; word-break: break-all; color: #555; }
-        .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: #999; }
-        .badge-vnpay { background: #d11252; color: white; font-size: 11px; padding: 4px 10px; border-radius: 20px; }
-    </style>
-</head>
-<body>
+        .hash-box { background: var(--neutral-100); border: 1px dashed var(--neutral-300); padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.78rem; word-break: break-all; color: var(--neutral-700); }
+        .hash-box a { color: var(--primary-600); text-decoration: none; }
+        .hash-box a:hover { text-decoration: underline; }
+        .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: var(--neutral-500); }
+        .badge-provider { background: var(--primary-800); color: white; font-size: 11px; padding: 4px 10px; border-radius: 20px; }
 
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card card-receipt">
-                    <div class="receipt-header">
-                        <div class="mb-3">
-                            <i class="fas fa-check-circle fa-4x text-white"></i>
-                        </div>
-                        <h4 class="fw-bold mb-1">Thanh toán thành công!</h4>
-                        <p class="opacity-75 m-0 small">Giao dịch VNPay đã được xác nhận và ghi nhận vào hệ thống.</p>
+        /* Blockchain status card */
+        .bc-card {
+            border-radius: 12px; padding: 18px; margin-bottom: 16px;
+            border: 1px solid var(--primary-200); transition: all 0.3s;
+        }
+        .bc-card.processing { background: linear-gradient(135deg, var(--primary-100), var(--primary-50)); border-color: var(--primary-600); }
+        .bc-card.confirmed { background: linear-gradient(135deg, var(--success-100), var(--success-100)); border-color: var(--success-600); }
+        .bc-card.failed { background: linear-gradient(135deg, var(--danger-100), var(--danger-100)); border-color: var(--danger-600); }
+
+        .tx-row { padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+        .tx-row:last-child { border-bottom: none; }
+        .tx-icon {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 14px; margin-right: 10px; color: white;
+        }
+        .tx-icon.waiting { background: var(--primary-300); }
+        .tx-icon.pending { background: var(--primary-600); animation: pulse 1.5s infinite; }
+        .tx-icon.done { background: var(--success-600); }
+        .tx-icon.error { background: var(--danger-600); }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 106, 199, 0.45); }
+            50% { box-shadow: 0 0 0 8px rgba(59, 106, 199, 0); }
+        }
+
+        .spinner-dot {
+            display: inline-block; width: 6px; height: 6px; background: var(--primary-600);
+            border-radius: 50%; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .spinner-dot:nth-child(1) { animation-delay: -0.32s; }
+        .spinner-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .tx-status-badge {
+            font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 10px;
+            text-transform: uppercase;
+        }
+        .tx-status-badge.waiting { background: var(--neutral-100); color: var(--neutral-500); }
+        .tx-status-badge.pending { background: var(--primary-100); color: var(--primary-900); }
+        .tx-status-badge.done { background: var(--success-100); color: var(--success-600); }
+        .tx-status-badge.error { background: var(--danger-100); color: var(--danger-600); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card card-receipt">
+                <div class="receipt-header">
+                    <div class="mb-3">
+                        <i class="fas fa-check-circle fa-4x text-white"></i>
+                    </div>
+                    <h4 class="fw-bold mb-1">Ủng hộ thành công!</h4>
+                    <p class="opacity-75 m-0 small">
+                        {% if show_blockchain_status %}
+                        Cảm ơn bạn đã đóng góp. Giao dịch đang được ghi lên blockchain để minh bạch.
+                        {% else %}
+                        Cảm ơn bạn đã đóng góp. Hệ thống đang chờ xác nhận cuối cùng từ PayOS webhook.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="card-body p-4 pt-5">
+                    <div class="text-center mb-4">
+                        <span class="badge-provider">
+                            <i class="fas fa-credit-card me-1"></i> Đã tạo thanh toán qua {{ payment_provider|default:"PayOS" }}
+                        </span>
                     </div>
 
-                    <div class="card-body p-4 pt-5">
-                        <div class="text-center mb-4">
-                            <span class="badge-vnpay">
-                                <i class="fas fa-credit-card me-1"></i> Đã thanh toán qua VNPay
-                            </span>
+                    <div class="row mb-2">
+                        <div class="col-5 text-muted small">Người ủng hộ:</div>
+                        <div class="col-7 fw-bold text-end">{{ donation.donor_name|default:"Nhà hảo tâm ẩn danh" }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-5 text-muted small">Chiến dịch:</div>
+                        <div class="col-7 fw-bold text-end text-primary">{{ donation.campaign.title|truncatechars:32 }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-5 text-muted small">Số tiền:</div>
+                        <div class="col-7 fw-bold text-end text-danger fs-5">{{ donation.amount|intcomma }} đ</div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-5 text-muted small">Thời gian:</div>
+                        <div class="col-7 text-end small">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
+                    </div>
+                    {% if payos_order_code %}
+                    <div class="row mb-4">
+                        <div class="col-5 text-muted small">Mã đơn PayOS:</div>
+                        <div class="col-7 text-end small fw-bold">{{ payos_order_code }}</div>
+                    </div>
+                    {% endif %}
+                    {% if message %}
+                    <div class="alert alert-info small">
+                        <i class="fas fa-info-circle me-2"></i>{{ message }}
+                    </div>
+                    {% endif %}
+
+                    {% if show_blockchain_status %}
+                    <!-- BLOCKCHAIN STATUS CARD -->
+                    <div id="bcCard" class="bc-card processing">
+                        <div class="d-flex align-items-center mb-3">
+                            <i id="bcIcon" class="fas fa-spinner fa-spin text-primary me-2 fs-5"></i>
+                            <strong id="bcTitle" class="small text-uppercase">Đang ghi giao dịch lên blockchain...</strong>
                         </div>
 
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Người ủng hộ:</div>
-                            <div class="col-7 fw-bold text-end">{{ donation.donor_name|default:"Nhà hảo tâm ẩn danh" }}</div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Chiến dịch:</div>
-                            <div class="col-7 fw-bold text-end text-primary">{{ donation.campaign.title|truncatechars:30 }}</div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Số tiền:</div>
-                            <div class="col-7 fw-bold text-end text-danger fs-5">{{ donation.amount|intcomma }} đ</div>
-                        </div>
-                        <div class="row mb-4">
-                            <div class="col-5 text-muted small">Thời gian:</div>
-                            <div class="col-7 text-end small">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
+                        <div class="small text-muted mb-3">
+                            Hệ thống đang tự động ghi 2 giao dịch lên blockchain Sepolia để đảm bảo minh bạch.
+                            <strong>Bạn không cần làm gì thêm.</strong>
                         </div>
 
-                        {% if send_eth_tx_hash %}
-                        <div class="alert alert-light border">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="fas fa-wallet text-success me-2"></i>
-                                <strong class="small text-uppercase">Hệ thống đã cấp ETH + Gas</strong>
-                            </div>
-                            <div class="mb-2">
-                                <div class="label-hash">TxHash (Admin chuyển ETH cho bạn)</div>
-                                <div class="hash-box text-primary">
-                                    <a href="https://sepolia.etherscan.io/tx/{{ send_eth_tx_hash }}" target="_blank" class="text-decoration-none">
-                                        {{ send_eth_tx_hash }}
-                                    </a>
+                        <!-- GIAO DỊCH A -->
+                        <div class="tx-row" id="txRowA">
+                            <div class="d-flex align-items-start">
+                                <div class="tx-icon waiting" id="txIconA">
+                                    <i class="fas fa-file-invoice"></i>
                                 </div>
-                            </div>
-                            <div class="text-center mt-2">
-                                <small class="text-success fst-italic" style="font-size: 11px;">
-                                    <i class="fas fa-shield-alt"></i> ETH đã được chuyển vào ví MetaMask của bạn.
-                                </small>
-                            </div>
-                        </div>
-                        {% endif %}
-
-                        <div class="alert alert-warning border">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="fas fa-pen-nib text-warning me-2"></i>
-                                <strong class="small text-uppercase">Bước xác nhận ủng hộ</strong>
-                            </div>
-                            <div class="small text-muted mb-2">
-                                Vui lòng mở MetaMask và ký xác nhận để chuyển ETH vào quỹ chiến dịch.
-                            </div>
-                            <div class="small text-muted mb-2">
-                                Mạng yêu cầu: Sepolia. Ví liên kết: <span class="fw-bold">{{ wallet_address|default:"(chưa có)" }}</span>
-                            </div>
-                            {% if blockchain_error %}
-                            <div class="small text-danger mb-2">
-                                Lỗi blockchain: {{ blockchain_error }}
-                            </div>
-                            {% endif %}
-                            <div class="d-grid gap-2">
-                                <button id="btnConfirmDonate" class="btn btn-dark fw-bold" {% if tx_hash or blockchain_error or not amount_e_wei %}disabled{% endif %}>
-                                    Xác nhận ủng hộ trên MetaMask
-                                </button>
-                                <div id="confirmStatus" class="small text-muted text-center"></div>
-                            </div>
-                        </div>
-
-                        {% if tx_hash %}
-                        <div class="alert alert-light border">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="fas fa-link text-success me-2"></i>
-                                <strong class="small text-uppercase">Chứng thực Blockchain</strong>
-                            </div>
-                            <div class="mb-2">
-                                <div class="label-hash">TxHash xác nhận ủng hộ</div>
-                                <div class="hash-box text-primary">
-                                    <a href="https://sepolia.etherscan.io/tx/{{ tx_hash }}" target="_blank" class="text-decoration-none">
-                                        {{ tx_hash }}
-                                    </a>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong class="small">Giao dịch A: Ghi sao kê ngân hàng</strong>
+                                        <span class="tx-status-badge waiting" id="txBadgeA">Chờ...</span>
+                                    </div>
+                                    <div class="small text-muted mb-2" id="txDescA">
+                                        Lưu thông tin VNPay lên blockchain (minh bạch không thể sửa)
+                                    </div>
+                                    <div id="txHashBoxA" style="display: none;">
+                                        <div class="label-hash mb-1">Tx hash A</div>
+                                        <div class="hash-box">
+                                            <a id="txHashLinkA" href="#" target="_blank" rel="noopener">
+                                                <i class="fas fa-external-link-alt me-1"></i>
+                                                <span id="txHashTextA"></span>
+                                            </a>
+                                        </div>
+                                        <div class="small text-muted mt-1" id="txGasA"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        {% endif %}
 
-                        {% if donation.hash %}
-                        <div class="alert alert-light border">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="fas fa-fingerprint text-info me-2"></i>
-                                <strong class="small text-uppercase">Hash chống giả mạo</strong>
-                            </div>
-                            <div class="mb-2">
-                                <div class="label-hash">Mã Hash giao dịch (Current Hash)</div>
-                                <div class="hash-box text-primary">{{ donation.hash }}</div>
-                            </div>
-                            <div>
-                                <div class="label-hash">Mã Hash giao dịch trước (Previous Hash)</div>
-                                <div class="hash-box text-muted">{{ donation.previous_hash }}</div>
+                        <!-- GIAO DỊCH B -->
+                        <div class="tx-row" id="txRowB">
+                            <div class="d-flex align-items-start">
+                                <div class="tx-icon waiting" id="txIconB">
+                                    <i class="fab fa-ethereum"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong class="small">Giao dịch B: Admin tự động nạp ETH</strong>
+                                        <span class="tx-status-badge waiting" id="txBadgeB">Chờ...</span>
+                                    </div>
+                                    <div class="small text-muted mb-2" id="txDescB">
+                                        Admin gửi ETH tương ứng vào smart contract của chiến dịch
+                                    </div>
+                                    <div id="txHashBoxB" style="display: none;">
+                                        <div class="label-hash mb-1">Tx hash B</div>
+                                        <div class="hash-box">
+                                            <a id="txHashLinkB" href="#" target="_blank" rel="noopener">
+                                                <i class="fas fa-external-link-alt me-1"></i>
+                                                <span id="txHashTextB"></span>
+                                            </a>
+                                        </div>
+                                        <div class="small text-muted mt-1" id="txGasB"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        {% endif %}
 
-                        <div class="d-grid gap-2 mt-4">
-                            <a href="/" class="btn btn-outline-dark fw-bold">
-                                <i class="fas fa-home me-2"></i> Về trang chủ
-                            </a>
+                        <!-- TỔNG PHÍ GAS -->
+                        <div id="gasSummary" class="mt-3 p-2 small" style="display: none; background: rgba(255,255,255,0.6); border-radius: 6px;">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Tổng phí gas admin đã chi:</span>
+                                <strong id="totalGasVnd">—</strong>
+                            </div>
+                            <div class="text-muted" style="font-size: 0.75rem;">
+                                Phí gas này sẽ được trừ tự động khi chiến dịch giải ngân (minh bạch trên blockchain).
+                            </div>
                         </div>
+
+                        <div id="bcHint" class="small text-muted mt-3 fst-italic">
+                            <span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span>
+                            Giao dịch blockchain có thể mất vài phút tùy mạng Sepolia. Bạn có thể đóng trang, chúng tôi vẫn xử lý ngầm.
+                        </div>
+
+                        <div id="bcErrorBox" class="mt-3 small text-danger" style="display: none;"></div>
+
+                        <div id="bcRetryBox" class="mt-3" style="display: none;">
+                            <button id="btnRetryBlockchain" class="btn btn-outline-primary btn-sm w-100">
+                                <i class="fas fa-redo me-1"></i> Thử lại blockchain
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="bg-light rounded-4 p-4 small text-muted">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-clock text-primary me-2"></i>
+                            <strong class="text-dark">Trạng thái hiện tại: {{ payment_status|default:"PENDING" }}</strong>
+                        </div>
+                        Nếu bạn vừa hoàn tất chuyển khoản/quét mã, PayOS sẽ gửi webhook xác nhận về hệ thống.
+                        Chúng tôi chỉ ghi nhận thanh toán thành công khi webhook hợp lệ được xác minh bằng checksum.
+                    </div>
+                    {% endif %}
+
+
+                    <div class="d-grid gap-2 mt-4">
+                        <a href="/" class="btn btn-outline-primary fw-bold">
+                            <i class="fas fa-home me-2"></i> Về trang chủ
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+{% block extra_js %}
+{% if show_blockchain_status %}
 <script>
     const donationId = "{{ donation.id }}";
-    const campaignId = "{{ donation.campaign.id }}";
-    const amountEWei = "{{ amount_e_wei|default:'' }}";
-    const walletAddress = "{{ wallet_address|default:'' }}";
-    const contractAddress = "{{ contract_address }}";
-    const contractAbi = {{ contract_abi|safe }};
-    const existingTxHash = "{{ tx_hash|default:'' }}";
+    const statusUrl = "{% url 'client:api_donation_blockchain_status' donation.id %}";
+    const retryUrl = "{% url 'client:api_retry_donation_blockchain' donation.id %}";
+    const ETHERSCAN_BASE = "https://sepolia.etherscan.io/tx/";
 
-    if (existingTxHash) {
-        const status = document.getElementById('confirmStatus');
-        if (status) status.textContent = 'Đã xác nhận ủng hộ trước đó.';
-    }
+    let pollingInterval = null;
+    let pollingAttempts = 0;
+    const MAX_POLLING_ATTEMPTS = 240;  // ~20 minutes at 5s interval
 
-    async function ensureWallet() {
-        if (!window.ethereum) {
-            alert('Bạn chưa cài MetaMask. Vui lòng cài đặt và thử lại.');
-            return null;
-        }
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        return accounts && accounts.length > 0 ? accounts[0] : null;
-    }
+    const bcCard = document.getElementById('bcCard');
+    const bcIcon = document.getElementById('bcIcon');
+    const bcTitle = document.getElementById('bcTitle');
+    const bcHint = document.getElementById('bcHint');
+    const errorBox = document.getElementById('bcErrorBox');
+    const retryBox = document.getElementById('bcRetryBox');
+    const gasSummary = document.getElementById('gasSummary');
+    const totalGasVndEl = document.getElementById('totalGasVnd');
 
-    document.getElementById('btnConfirmDonate')?.addEventListener('click', async () => {
-        const status = document.getElementById('confirmStatus');
-        status.textContent = 'Đang mở MetaMask...';
+    function fmt(n) { return (Number(n) || 0).toLocaleString('vi-VN'); }
 
-        const account = await ensureWallet();
-        if (!account) {
-            status.textContent = 'Chưa kết nối MetaMask.';
-            return;
-        }
+    function setTxState(which, state, iconCls, badgeText, desc, gasVnd) {
+        const iconEl = document.getElementById('txIcon' + which);
+        const badgeEl = document.getElementById('txBadge' + which);
+        const descEl = document.getElementById('txDesc' + which);
+        const gasEl = document.getElementById('txGas' + which);
 
-        if (walletAddress && account.toLowerCase() !== walletAddress.toLowerCase()) {
-            status.textContent = 'Vui lòng dùng đúng ví đã liên kết khi thanh toán.';
-            return;
-        }
-
-        if (!amountEWei) {
-            status.textContent = 'Không tìm thấy số ETH để xác nhận.';
-            return;
-        }
-
-        try {
-            const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-            const signer = provider.getSigner();
-            let chainId = null;
-            try {
-                const chainHex = await window.ethereum.request({ method: 'eth_chainId' });
-                chainId = parseInt(chainHex, 16);
-            } catch (e) {
-                const network = await provider.getNetwork();
-                chainId = network.chainId;
+        iconEl.className = 'tx-icon ' + state;
+        iconEl.innerHTML = '<i class="fas ' + iconCls + '"></i>';
+        badgeEl.className = 'tx-status-badge ' + state;
+        badgeEl.textContent = badgeText;
+        if (desc) descEl.textContent = desc;
+        if (gasEl) {
+            if (gasVnd && gasVnd > 0) {
+                gasEl.innerHTML = '<i class="fas fa-gas-pump me-1"></i>Phí gas: <strong>' + fmt(gasVnd) + 'đ</strong>';
+            } else {
+                gasEl.textContent = '';
             }
-            if (chainId !== 11155111) {
-                try {
-                    await window.ethereum.request({
-                        method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: '0xaa36a7' }],
-                    });
-                } catch (e) {
-                    status.textContent = 'Vui lòng chuyển MetaMask sang mạng Sepolia (chainId 11155111).';
-                    return;
+        }
+    }
+
+    function showTxHash(which, hash) {
+        if (!hash) return;
+        const box = document.getElementById('txHashBox' + which);
+        const link = document.getElementById('txHashLink' + which);
+        const text = document.getElementById('txHashText' + which);
+        link.href = ETHERSCAN_BASE + hash;
+        text.textContent = hash;
+        box.style.display = 'block';
+    }
+
+    function updateUI(data) {
+        const status = data.blockchain_status;
+
+        // Show tx hashes as soon as they're available (even while pending)
+        if (data.bank_record_tx_hash) showTxHash('A', data.bank_record_tx_hash);
+        if (data.donate_onbehalf_tx_hash) showTxHash('B', data.donate_onbehalf_tx_hash);
+
+        bcCard.classList.remove('processing', 'confirmed', 'failed');
+
+        if (status === 'pending') {
+            bcCard.classList.add('processing');
+            bcIcon.className = 'fas fa-spinner fa-spin text-primary me-2 fs-5';
+            bcTitle.textContent = 'Đang chờ xử lý...';
+            setTxState('A', 'waiting', 'fa-hourglass-half', 'Chờ...', null, 0);
+            setTxState('B', 'waiting', 'fa-hourglass-half', 'Chờ...', null, 0);
+        } else if (status === 'processing') {
+            bcCard.classList.add('processing');
+            bcIcon.className = 'fas fa-spinner fa-spin text-primary me-2 fs-5';
+            bcTitle.textContent = 'Đang ghi blockchain...';
+
+            // A state
+            if (data.bank_record_tx_hash) {
+                if (data.bank_record_gas_vnd > 0) {
+                    setTxState('A', 'done', 'fa-check', 'Đã xong', '✓ Đã ghi sao kê NH lên blockchain', data.bank_record_gas_vnd);
+                } else {
+                    setTxState('A', 'pending', 'fa-spinner fa-spin', 'Đang mine...', 'Đang đợi mạng Sepolia xác nhận...', 0);
                 }
+            } else {
+                setTxState('A', 'pending', 'fa-spinner fa-spin', 'Đang gửi...', null, 0);
             }
-            const contract = new ethers.Contract(contractAddress, contractAbi, signer);
 
-            const tx = await contract.donate(campaignId, {
-                value: ethers.BigNumber.from(amountEWei.toString()),
-            });
+            // B state
+            if (data.donate_onbehalf_tx_hash) {
+                if (data.donate_onbehalf_gas_vnd > 0) {
+                    setTxState('B', 'done', 'fa-check', 'Đã xong', '✓ Admin đã nạp ETH vào contract', data.donate_onbehalf_gas_vnd);
+                } else {
+                    setTxState('B', 'pending', 'fa-spinner fa-spin', 'Đang mine...', 'ETH đã broadcast, đợi Sepolia xác nhận...', 0);
+                }
+            } else {
+                setTxState('B', 'waiting', 'fa-hourglass-half', 'Chờ...', 'Sẽ nạp ETH sau khi A được broadcast', 0);
+            }
+        } else if (status === 'confirmed') {
+            bcCard.classList.add('confirmed');
+            bcIcon.className = 'fas fa-check-circle text-success me-2 fs-5';
+            bcTitle.textContent = '✓ Đã ghi blockchain thành công';
+            setTxState('A', 'done', 'fa-check', 'Đã xong', '✓ Đã ghi sao kê NH lên blockchain', data.bank_record_gas_vnd);
+            setTxState('B', 'done', 'fa-check', 'Đã xong', '✓ Admin đã nạp ETH vào contract', data.donate_onbehalf_gas_vnd);
+            bcHint.style.display = 'none';
+            errorBox.style.display = 'none';
+            retryBox.style.display = 'none';
 
-            status.textContent = 'Đã gửi giao dịch, đang lưu hệ thống...';
+            if (data.total_admin_gas_vnd > 0) {
+                gasSummary.style.display = 'block';
+                totalGasVndEl.textContent = fmt(data.total_admin_gas_vnd) + 'đ';
+            }
 
-            const resp = await fetch("{% url 'client:api_confirm_donation' %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    donation_id: donationId,
-                    tx_hash: tx.hash,
-                    from_address: account
-                })
-            });
+            stopPolling();
+        } else if (status === 'failed') {
+            bcCard.classList.add('failed');
+            bcIcon.className = 'fas fa-exclamation-triangle text-danger me-2 fs-5';
+            bcTitle.textContent = 'Blockchain thất bại';
+
+            // Keep A state if A succeeded
+            if (data.bank_record_tx_hash && data.bank_record_gas_vnd > 0) {
+                setTxState('A', 'done', 'fa-check', 'Đã xong', '✓ Đã ghi sao kê NH', data.bank_record_gas_vnd);
+            } else if (data.bank_record_tx_hash) {
+                setTxState('A', 'error', 'fa-times', 'Lỗi', 'Chưa confirm được', 0);
+            } else {
+                setTxState('A', 'error', 'fa-times', 'Lỗi', 'Không gửi được', 0);
+            }
+
+            // B state
+            if (data.donate_onbehalf_tx_hash && data.donate_onbehalf_gas_vnd > 0) {
+                setTxState('B', 'done', 'fa-check', 'Đã xong', '✓ Admin đã nạp ETH', data.donate_onbehalf_gas_vnd);
+            } else if (data.donate_onbehalf_tx_hash) {
+                setTxState('B', 'error', 'fa-times', 'Lỗi', 'Chưa confirm được', 0);
+            } else {
+                setTxState('B', 'error', 'fa-times', 'Lỗi', 'Không gửi được', 0);
+            }
+
+            bcHint.style.display = 'none';
+            errorBox.style.display = 'block';
+            errorBox.textContent = 'Lỗi: ' + (data.blockchain_error || 'Không rõ');
+            retryBox.style.display = 'block';
+            stopPolling();
+        }
+    }
+
+    async function pollStatus() {
+        pollingAttempts++;
+        if (pollingAttempts > MAX_POLLING_ATTEMPTS) {
+            stopPolling();
+            bcHint.textContent = 'Đã quá 20 phút chờ mạng Sepolia. Vui lòng thử lại hoặc liên hệ admin.';
+            return;
+        }
+        try {
+            const resp = await fetch(statusUrl);
+            const data = await resp.json();
+            if (data.ok) updateUI(data);
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+    }
+
+    function startPolling() {
+        pollStatus();
+        pollingInterval = setInterval(pollStatus, 5000);
+    }
+
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+    }
+
+    document.getElementById('btnRetryBlockchain')?.addEventListener('click', async () => {
+        try {
+            const resp = await fetch(retryUrl, { method: 'POST' });
             const data = await resp.json();
             if (data.ok) {
-                status.textContent = 'Xác nhận thành công. Cảm ơn bạn!';
+                pollingAttempts = 0;
+                errorBox.style.display = 'none';
+                retryBox.style.display = 'none';
+                startPolling();
             } else {
-                status.textContent = data.message || 'Lỗi lưu giao dịch.';
+                alert(data.message || 'Lỗi retry');
             }
         } catch (e) {
-            console.error(e);
-            const msg = e && e.message ? e.message : 'Giao dịch bị hủy hoặc lỗi MetaMask.';
-            status.textContent = msg;
+            alert('Lỗi kết nối: ' + e.message);
         }
     });
-</script>
 
-</body>
-</html>
+    document.addEventListener('DOMContentLoaded', () => {
+        startPolling();
+    });
+</script>
+{% endif %}
+{% endblock %}

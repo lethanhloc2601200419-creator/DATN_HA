@@ -1,6 +1,178 @@
 from django.contrib import admin
 from django.db.models import Sum
-from .models import BankStatement, CampaignDisbursement, Campaign
+from django.utils import timezone
+from .models import BankStatement, CampaignDisbursement, Campaign, Donation, Organization
+
+
+@admin.action(description='Chuyển KYC sang đang thẩm định')
+def mark_kyc_under_review(modeladmin, request, queryset):
+    queryset.update(
+        kyc_status='under_review',
+        kyc_reviewed_at=None,
+        kyc_reviewed_by=None,
+        kyc_rejection_reason='',
+    )
+
+
+@admin.action(description='Duyệt KYC tổ chức')
+def approve_kyc(modeladmin, request, queryset):
+    now = timezone.now()
+    queryset.update(
+        kyc_status='approved',
+        is_verified=True,
+        verified_at=now,
+        kyc_reviewed_at=now,
+        kyc_reviewed_by=request.user,
+        kyc_rejection_reason='',
+    )
+
+
+@admin.action(description='Đánh dấu ngân hàng đã xác thực')
+def verify_bank_details(modeladmin, request, queryset):
+    queryset.update(
+        bank_verified_by_admin=True,
+        bank_verified_at=timezone.now(),
+        bank_verified_by=request.user,
+    )
+
+
+@admin.action(description='Đánh dấu ví đã xác thực')
+def verify_wallet_details(modeladmin, request, queryset):
+    queryset.update(
+        wallet_verified_by_admin=True,
+        wallet_verified_at=timezone.now(),
+        wallet_verified_by=request.user,
+    )
+
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'name', 'manager', 'kyc_status', 'bank_verified_by_admin',
+        'wallet_verified_by_admin', 'is_verified', 'verified_at', 'created_at',
+    )
+    list_filter = (
+        'kyc_status', 'bank_verified_by_admin', 'wallet_verified_by_admin',
+        'is_verified', 'created_at',
+    )
+    search_fields = (
+        'name', 'slug', 'manager__username', 'manager__email',
+        'bank_account_number', 'bank_account_name', 'wallet_address',
+    )
+    ordering = ('-created_at',)
+    readonly_fields = (
+        'slug', 'verified_at', 'kyc_submitted_at', 'kyc_reviewed_at', 'kyc_reviewed_by',
+        'bank_verified_at', 'bank_verified_by', 'wallet_verified_at', 'wallet_verified_by',
+        'created_at', 'updated_at',
+    )
+    fieldsets = (
+        ('Thông tin tổ chức', {
+            'fields': (
+                'name', 'slug', 'description', 'logo_url', 'website', 'manager',
+                'contact_person', 'contact_phone',
+            ),
+        }),
+        ('Thông tin nhận tiền', {
+            'fields': (
+                'bank_name', 'bank_branch', 'bank_account_number',
+                'bank_account_name', 'qr_code_url', 'wallet_address',
+            ),
+        }),
+        ('Kiểm soát KYC', {
+            'fields': (
+                'license_document_url', 'kyc_status', 'kyc_rejection_reason',
+                'kyc_submitted_at', 'kyc_reviewed_at', 'kyc_reviewed_by',
+                'is_verified', 'verified_at',
+            ),
+        }),
+        ('Xác thực tài khoản nhận quỹ', {
+            'fields': (
+                'bank_verified_by_admin', 'bank_verified_at', 'bank_verified_by',
+                'wallet_verified_by_admin', 'wallet_verified_at', 'wallet_verified_by',
+            ),
+        }),
+        ('Dấu thời gian', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+    actions = [mark_kyc_under_review, approve_kyc, verify_bank_details, verify_wallet_details]
+
+    def save_model(self, request, obj, form, change):
+        now = timezone.now()
+
+        if obj.kyc_status == 'approved':
+            obj.is_verified = True
+            obj.verified_at = obj.verified_at or now
+            obj.kyc_reviewed_at = now
+            obj.kyc_reviewed_by = request.user
+            obj.kyc_rejection_reason = ''
+        elif obj.kyc_status in {'rejected', 'suspended', 'draft', 'submitted', 'under_review'}:
+            obj.is_verified = False
+            if obj.kyc_status == 'rejected':
+                obj.kyc_reviewed_at = now
+                obj.kyc_reviewed_by = request.user
+            elif obj.kyc_status == 'under_review' and not obj.kyc_submitted_at:
+                obj.kyc_submitted_at = now
+
+        if obj.bank_verified_by_admin and not obj.bank_verified_at:
+            obj.bank_verified_at = now
+            obj.bank_verified_by = request.user
+        if not obj.bank_verified_by_admin:
+            obj.bank_verified_at = None
+            obj.bank_verified_by = None
+
+        if obj.wallet_verified_by_admin and not obj.wallet_verified_at:
+            obj.wallet_verified_at = now
+            obj.wallet_verified_by = request.user
+        if not obj.wallet_verified_by_admin:
+            obj.wallet_verified_at = None
+            obj.wallet_verified_by = None
+
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Donation)
+class DonationAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'campaign', 'amount', 'status', 'payment_method', 'order_code',
+        'payos_transaction_id', 'blockchain_status', 'created_at',
+    )
+    list_filter = ('status', 'payment_method', 'blockchain_status', 'created_at')
+    search_fields = (
+        'campaign__title', 'donor_name', 'donor_email', 'transaction_id',
+        'order_code', 'payos_transaction_id', 'payos_payment_link_id',
+        'payos_reference', 'bank_transaction_no',
+    )
+    ordering = ('-created_at',)
+    readonly_fields = (
+        'hash', 'previous_hash', 'created_at', 'updated_at',
+        'payos_webhook_received_at', 'payos_paid_at',
+    )
+    fieldsets = (
+        ('Thông tin quyên góp', {
+            'fields': (
+                'campaign', 'donor', 'donor_name', 'donor_email', 'donor_phone',
+                'amount', 'message', 'is_anonymous', 'status', 'payment_method',
+            ),
+        }),
+        ('PayOS', {
+            'fields': (
+                'transaction_id', 'order_code', 'payos_transaction_id',
+                'payos_payment_link_id', 'payos_reference', 'payos_checkout_url',
+                'payos_qr_code', 'payos_webhook_received_at', 'payos_paid_at',
+                'bank_transaction_no',
+            ),
+        }),
+        ('Blockchain', {
+            'fields': (
+                'blockchain_status', 'eth_tx_hash', 'is_blockchain_synced',
+                'blockchain_error', 'blockchain_started_at', 'blockchain_completed_at',
+            ),
+        }),
+        ('Audit', {
+            'fields': ('previous_hash', 'hash', 'created_at', 'updated_at'),
+        }),
+    )
 
 
 @admin.register(BankStatement)

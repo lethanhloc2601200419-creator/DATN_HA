@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@biconomy/account": "^4.0.0"
+  }
+}

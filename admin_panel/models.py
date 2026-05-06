@@ -27,6 +27,8 @@ class UserProfile(models.Model):
     province = models.CharField(max_length=100, blank=True, null=True)
     avatar_url = models.TextField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
+    eoa_address = models.CharField(max_length=42, blank=True, null=True)
+    smart_account_address = models.CharField(max_length=42, blank=True, null=True)
     wallet_address = models.CharField(max_length=42, blank=True, null=True)
 
     is_verified = models.BooleanField(default=False)
@@ -80,6 +82,15 @@ class CampaignCategory(models.Model):
 # 1. ORGANIZATION (TỔ CHỨC - QUAN TRỌNG NHẤT)
 # =====================================================
 class Organization(models.Model):
+    KYC_STATUS_CHOICES = [
+        ('draft', 'Nháp'),
+        ('submitted', 'Đã nộp hồ sơ'),
+        ('under_review', 'Đang thẩm định'),
+        ('approved', 'Đã duyệt KYC'),
+        ('rejected', 'Từ chối KYC'),
+        ('suspended', 'Tạm khóa'),
+    ]
+
     # Thông tin hiển thị
     name = models.CharField(max_length=255,verbose_name="Tên tổ chức")
     slug = models.SlugField(unique=True, max_length=255)
@@ -97,8 +108,46 @@ class Organization(models.Model):
 
     # Thông tin pháp lý & Xác minh (Admin duyệt)
     license_document_url = models.TextField(blank=True, null=True) # Ảnh giấy phép
-    is_verified = models.BooleanField(default=False, verbose_name="Đã xác thực") # True mới hiện lên web
+    # Cờ tương thích với code cũ; Phase 2 sẽ dần chuyển toàn bộ logic sang kyc_status.
+    is_verified = models.BooleanField(default=False, verbose_name="Đã xác thực")
     verified_at = models.DateTimeField(blank=True, null=True)
+    kyc_status = models.CharField(
+        max_length=20,
+        choices=KYC_STATUS_CHOICES,
+        default='draft',
+        verbose_name="Trạng thái KYC",
+    )
+    kyc_submitted_at = models.DateTimeField(blank=True, null=True)
+    kyc_reviewed_at = models.DateTimeField(blank=True, null=True)
+    kyc_reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_organization_kyc',
+        verbose_name="Admin duyệt KYC",
+    )
+    kyc_rejection_reason = models.TextField(blank=True, null=True, verbose_name="Lý do từ chối KYC")
+    bank_verified_by_admin = models.BooleanField(default=False, verbose_name="Ngân hàng đã xác thực")
+    bank_verified_at = models.DateTimeField(blank=True, null=True)
+    bank_verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bank_verified_organizations',
+        verbose_name="Admin xác thực ngân hàng",
+    )
+    wallet_verified_by_admin = models.BooleanField(default=False, verbose_name="Ví đã xác thực")
+    wallet_verified_at = models.DateTimeField(blank=True, null=True)
+    wallet_verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='wallet_verified_organizations',
+        verbose_name="Admin xác thực ví",
+    )
 
     # Liên hệ
     contact_person = models.CharField(max_length=255, blank=True, null=True)
@@ -387,7 +436,7 @@ class CampaignUpdate(models.Model):
 # =====================================================
 class Donation(models.Model):
     STATUS_CHOICES = [('pending','Pending'),('completed','Completed'),('failed','Failed'),('refunded','Refunded')]
-    PAYMENT_CHOICES = [('vietqr','VietQR'),('vnpay','VNPay'),('bank_transfer','Bank Transfer')]
+    PAYMENT_CHOICES = [('payos','PayOS'),('vietqr','VietQR'),('bank_transfer','Bank Transfer')]
 
     # --- 1. CÁC TRƯỜNG DỮ LIỆU CŨ CỦA BẠN (GIỮ NGUYÊN) ---
     campaign = models.ForeignKey('Campaign', on_delete=models.CASCADE, related_name='donations')
@@ -399,11 +448,21 @@ class Donation(models.Model):
     # --- MỚI: PHÍ GAS THỰC TẾ TỪ ETHERSCAN ---
     gas_fee_eth = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)
     gas_fee_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True)
+    # Gas tx admin trả khi gọi sendEthToUser
+    admin_send_eth_gas_fee_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
+    admin_send_eth_gas_fee_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True)
     net_amount = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True) # Tiền vào quỹ sau khi trừ gas
 
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default='bank_transfer')
     transaction_id = models.CharField(max_length=255, unique=True, blank=True, null=True)
-    vnpay_transaction_no = models.CharField(max_length=255, blank=True, null=True)
+    order_code = models.BigIntegerField(blank=True, null=True, unique=True, verbose_name="PayOS orderCode")
+    payos_transaction_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS transaction ID")
+    payos_payment_link_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS payment link ID")
+    payos_reference = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS reference")
+    payos_qr_code = models.TextField(blank=True, null=True, verbose_name="PayOS QR code")
+    payos_checkout_url = models.TextField(blank=True, null=True, verbose_name="PayOS checkout URL")
+    payos_webhook_received_at = models.DateTimeField(blank=True, null=True, verbose_name="Thời điểm nhận webhook PayOS")
+    payos_paid_at = models.DateTimeField(blank=True, null=True, verbose_name="Thời điểm PayOS xác nhận thanh toán")
     bank_transaction_no = models.CharField(max_length=255, blank=True, null=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -412,6 +471,9 @@ class Donation(models.Model):
     donor_email = models.EmailField(blank=True, null=True)
     donor_phone = models.CharField(max_length=20, blank=True, null=True)
     donor_wallet_address = models.CharField(max_length=42, blank=True, null=True)
+    device_fingerprint = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    is_sybil = models.BooleanField(default=False)
+    sybil_flag_reason = models.TextField(blank=True, null=True)
 
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True, null=True)
@@ -422,14 +484,46 @@ class Donation(models.Model):
     # --- 2. CÁC TRƯỜNG BLOCKCHAIN ---
     previous_hash = models.CharField(max_length=64, default='0')
     hash = models.CharField(max_length=64, blank=True, null=True)
+    admin_funding_status = models.CharField(max_length=20, default='pending', blank=True)
+    init_campaign_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="TxHash initCampaign")
+
+    # --- TRẠNG THÁI BLOCKCHAIN ASYNC ---
+    # pending: chưa bắt đầu; processing: đang gọi smart contract; confirmed: đã mine; failed: lỗi
+    BLOCKCHAIN_STATUS_CHOICES = [
+        ('pending', 'Chờ xử lý'),
+        ('processing', 'Đang xử lý blockchain'),
+        ('confirmed', 'Đã xác nhận trên blockchain'),
+        ('failed', 'Thất bại'),
+    ]
+    blockchain_status = models.CharField(max_length=20, choices=BLOCKCHAIN_STATUS_CHOICES, default='pending', verbose_name="Trạng thái blockchain")
+    blockchain_error = models.TextField(blank=True, null=True, verbose_name="Lỗi blockchain gần nhất")
+    blockchain_started_at = models.DateTimeField(blank=True, null=True)
+    blockchain_completed_at = models.DateTimeField(blank=True, null=True)
+    blockchain_retry_count = models.IntegerField(default=0)
+
     # --- BỔ SUNG CHO BLOCKCHAIN HYBRID ---
     # Đây là mã hash trả về từ mạng Sepolia (VD: 0xabc...)
     # Dùng để tạo link: https://sepolia.etherscan.io/tx/{eth_tx_hash}
     eth_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Mã giao dịch Blockchain")
-    send_eth_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tx Admin cap ETH")
+    send_eth_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tx Admin cap ETH (legacy)")
     donated_eth_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
     gas_subsidy_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
-    
+
+    # --- LUỒNG MỚI (async v2) ---
+    # Giao dịch A: ghi sao kê ngân hàng lên blockchain
+    bank_record_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tx recordBankDonation")
+    bank_record_gas_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
+    bank_record_gas_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True)
+    # Giao dịch B: admin tự động nạp ETH thay user (donateOnBehalf)
+    donate_onbehalf_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tx donateOnBehalf")
+    donate_onbehalf_gas_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
+    donate_onbehalf_gas_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True)
+    # Giao dịch C1 (trong luồng ủng hộ): ghi gas A+B lên contract để trừ khi giải ngân
+    record_gascost_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tx recordGasCost")
+    # Tổng gas A+B (admin đã chi cho giao dịch này) - để tổng hợp khi giải ngân
+    total_admin_gas_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True)
+    total_admin_gas_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True)
+
     # Trạng thái ghi blockchain (Để nhỡ mạng lag thì chạy job ghi lại sau)
     is_blockchain_synced = models.BooleanField(default=False, verbose_name="Đã ghi lên Etherscan")
 
@@ -513,6 +607,7 @@ class DisbursementProposal(models.Model):
     purpose = models.CharField(max_length=500, blank=True, null=True, verbose_name='Mục đích giải ngân')
     description = models.TextField(verbose_name='Mô tả chi tiết')
     recipient_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Đơn vị thụ hưởng')
+    ipfs_cid = models.CharField(max_length=255, blank=True, null=True, verbose_name='IPFS CID hóa đơn')
     evidence_url = models.TextField(blank=True, null=True, verbose_name='Link minh chứng')
     proof_images = ArrayField(models.TextField(), blank=True, null=True, verbose_name='Ảnh minh chứng')
 
@@ -526,7 +621,15 @@ class DisbursementProposal(models.Model):
 
     blockchain_proposal_id = models.IntegerField(blank=True, null=True)
     eth_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name='TxHash tạo proposal')
+    approval_count = models.PositiveSmallIntegerField(default=0, verbose_name='Số chữ ký đã đồng bộ')
+    supervisor_approved_at = models.DateTimeField(blank=True, null=True)
+    supervisor_approval_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name='TxHash duyệt của Supervisor')
+    admin_approved_at = models.DateTimeField(blank=True, null=True)
+    admin_approval_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name='TxHash duyệt của Admin')
+    last_approval_synced_at = models.DateTimeField(blank=True, null=True)
     disbursement_eth_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name='TxHash giải ngân')
+    disbursement_gas_fee_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True, verbose_name='Gas admin trả cho executeDisbursement')
+    disbursement_gas_fee_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True, verbose_name='Phí gas giải ngân (VNĐ)')
 
     executed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

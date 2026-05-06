@@ -8,7 +8,7 @@
 <style>
     /* CSS RIÊNG CHO BANNER (CHỈ TRANG CHỦ MỚI CÓ) */
     .hero-section {
-        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url("{% static 'client/img/bg_trangchu.jpg' %}");
+        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url("{% static 'client/img/new1.jpg' %}");
         background-size: cover;
         background-position: center;
         height: 520px;
@@ -29,11 +29,11 @@
         display: flex; justify-content: space-around; align-items: center;
     }
     .stat-item h3 { color: var(--primary-color); font-weight: 800; font-size: 2.2rem; margin: 0; }
-    .stat-item p { color: #757575; margin: 0; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; }
+    .stat-item p { color: var(--neutral-500); margin: 0; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; }
 
     /* Card chiến dịch */
     .campaign-card {
-        background: white; border-radius: 16px; overflow: hidden; border: 1px solid #f0f0f0; 
+        background: white; border-radius: 16px; overflow: hidden; border: 1px solid var(--primary-200); 
         transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column;
         box-shadow: 0 5px 15px rgba(0,0,0,0.03);
     }
@@ -48,10 +48,17 @@
     .card-title a:hover { color: var(--primary-color); }
     
     .btn-donate-card {
-        margin-top: 20px; width: 100%; background: #fff5f8; color: var(--primary-color); 
-        border: 1px solid #ffdeeb; font-weight: 700; padding: 12px; border-radius: 10px; transition: 0.3s;
+        margin-top: 20px;
+        width: 100%;
+        background: var(--accent-500);
+        color: var(--white);
+        border: 1px solid var(--accent-500);
+        font-weight: 700;
+        padding: 12px;
+        border-radius: 10px;
+        transition: 0.3s;
     }
-    .btn-donate-card:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+    .btn-donate-card:hover { background: var(--accent-400); color: var(--white); border-color: var(--accent-400); }
 </style>
 {% endblock %}
 
@@ -63,7 +70,7 @@
             
             <div class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg" style="max-width: 600px; width: 100%;">
                 <input type="text" class="form-control border-0 rounded-pill px-4 py-2" placeholder="Tìm chiến dịch, hoàn cảnh..." style="box-shadow: none;">
-                <button class="btn btn-danger rounded-pill px-4 py-2 fw-bold">Tìm kiếm</button>
+                <button class="btn btn-primary rounded-pill px-4 py-2 fw-bold">Tìm kiếm</button>
             </div>
         </div>
     </header>
@@ -136,7 +143,7 @@
                                     <span class="text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
                                 </div>
                                 <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar bg-danger" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
                                 </div>
                                 <div class="d-flex justify-content-between small text-muted mt-2">
                                     <span>MT: {{ campaign.target_amount|intcomma }} đ</span>

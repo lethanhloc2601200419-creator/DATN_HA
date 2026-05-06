@@ -22,7 +22,9 @@ class Command(BaseCommand):
 
         for proposal in expired_proposals:
             self.stdout.write(f'  Đang xử lý #{proposal.id}: {proposal.title}...')
-            executed = check_and_execute_proposal(proposal)
+            executed, error = check_and_execute_proposal(proposal)
+            if error:
+                self.stdout.write(self.style.ERROR(f'  ❌ Blockchain error: {error}'))
             if executed:
                 self.stdout.write(self.style.SUCCESS(f'    ✅ Đã giải ngân: {proposal.amount_requested:,}đ'))
             else:

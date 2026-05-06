@@ -38,7 +38,7 @@
             </div>
 
             {% if active_proposals %}
-            <div class="mt-5 p-4 rounded-4 border" style="background: linear-gradient(135deg, #f0f4ff 0%, #fefefe 100%);">
+            <div class="mt-5 p-4 rounded-4 border" style="background: linear-gradient(135deg, var(--primary-50) 0%, var(--white) 100%);">
                 <h4 class="fw-bold mb-4 border-start border-4 border-primary ps-3">
                     🗳️ Bỏ phiếu giải ngân
                 </h4>
@@ -56,7 +56,7 @@
 
                 {% for item in active_proposals %}
                 <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
-                    <div class="card-header border-0 py-3" style="background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);">
+                    <div class="card-header border-0 py-3" style="background: linear-gradient(90deg, var(--primary-700) 0%, var(--primary-900) 100%);">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-white">
                                 <h5 class="mb-0 fw-bold">{{ item.proposal.title }}</h5>
@@ -111,7 +111,7 @@
                                 <span class="fw-bold text-success"><i class="bi bi-hand-thumbs-up-fill"></i> Đồng ý: {{ item.yes_pct|floatformat:1 }}%</span>
                                 <span class="fw-bold text-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Từ chối: {{ item.no_pct|floatformat:1 }}%</span>
                             </div>
-                            <div class="progress" style="height: 12px; border-radius: 20px; background: #e2e8f0;">
+                            <div class="progress" style="height: 12px; border-radius: 20px; background: var(--primary-200);">
                                 {% if item.total_voted > 0 %}
                                 <div class="progress-bar bg-success" role="progressbar" style="width: {{ item.yes_pct }}%; border-radius: 20px 0 0 20px;" title="Đồng ý"></div>
                                 <div class="progress-bar bg-danger" role="progressbar" style="width: {{ item.no_pct }}%;" title="Từ chối"></div>
@@ -169,7 +169,7 @@
                             {% endif %}
                         {% else %}
                             <div class="text-center">
-                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-warning">
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary">
                                     <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để bỏ phiếu
                                 </a>
                             </div>
@@ -307,40 +307,100 @@
                     </small>
                     <div class="d-flex justify-content-between small mb-1">
                         <span class="text-muted">Tổng ủng hộ:</span>
-                        <span class="fw-bold text-dark">{{ campaign.current_amount|intcomma }}đ</span>
+                        <span class="fw-bold text-dark">
+                            {{ onchain_total_fund_vnd|intcomma }}đ
+                            <span class="text-muted small" title="On-chain: lấy từ smart contract (totalFund).">On-chain</span>
+                        </span>
                     </div>
                     {% if total_gas_vnd %}
                     <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Phí Gas Blockchain:</span>
+                        <span class="text-muted">Tổng phí Gas:</span>
                         <span class="fw-bold text-warning">-{{ total_gas_vnd|intcomma }}đ</span>
                     </div>
-                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed #dee2e6;">
-                        <span class="text-muted fw-bold">Thực nhận:</span>
+                    <div class="ps-3 border-start border-2 border-warning mb-2">
+                        {% if gas_subsidized_vnd %}
+                        <div class="d-flex justify-content-between small mb-1"
+                             title="Tổng gas admin đã chi on-chain (ghi sao kê NH + nạp ETH thay user + ghi gas cost). Lấy từ smart contract totalGasCost.">
+                            <span class="text-muted">① Gas admin đã chi (on-chain):</span>
+                            <span class="text-warning">-{{ gas_subsidized_vnd|intcomma }}đ</span>
+                        </div>
+                        {% if gas_bank_record_vnd or gas_donate_onbehalf_vnd %}
+                        <div class="ps-3 small text-muted" style="font-size: 11px;">
+                            • Ghi sao kê NH: {{ gas_bank_record_vnd|intcomma }}đ<br>
+                            • Nạp ETH thay user: {{ gas_donate_onbehalf_vnd|intcomma }}đ
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if gas_disbursement_vnd %}
+                        <div class="d-flex justify-content-between small mb-1"
+                             title="Gas các lần executeDisbursement đã thực thi.">
+                            <span class="text-muted">② Gas giải ngân (đã thực thi):</span>
+                            <span class="text-warning">-{{ gas_disbursement_vnd|intcomma }}đ</span>
+                        </div>
+                        {% endif %}
+                        {% if est_disbursement_gas_vnd %}
+                        <div class="d-flex justify-content-between small mb-1"
+                             title="Gas dự trù cho 1 lần giải ngân tiếp theo (ước tính từ gas thực tế × 2).">
+                            <span class="text-muted">③ Gas dự trù giải ngân kế:</span>
+                            <span class="text-warning">-{{ est_disbursement_gas_vnd|intcomma }}đ</span>
+                        </div>
+                        {% endif %}
+                        {% if gas_admin_sendeth_vnd %}
+                        <div class="d-flex justify-content-between small mb-1"
+                             title="Gas của donation cũ (legacy - trước khi chuyển sang luồng v2).">
+                            <span class="text-muted">Legacy (cấp ETH cũ):</span>
+                            <span class="text-warning">-{{ gas_admin_sendeth_vnd|intcomma }}đ</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if gas_recovered_vnd %}
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Admin đã thu hồi:</span>
+                        <span class="fw-bold text-info">+{{ gas_recovered_vnd|intcomma }}đ</span>
+                    </div>
+                    {% endif %}
+                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed var(--primary-200);">
+                        <span class="text-muted fw-bold">Thực nhận (tổ chức):</span>
                         <span class="fw-bold text-success">{{ net_receivable|intcomma }}đ</span>
                     </div>
                     {% endif %}
                     {% if campaign.disbursed_amount > 0 %}
                     <div class="d-flex justify-content-between small mb-1">
                         <span class="text-muted">Đã giải ngân:</span>
-                        <span class="fw-bold text-danger">-{{ campaign.disbursed_amount|intcomma }}đ</span>
+                        <span class="fw-bold text-danger">
+                            -{{ onchain_total_disbursed_vnd|intcomma }}đ
+                            <span class="text-muted small" title="On-chain: lấy từ smart contract (totalDisbursed).">On-chain</span>
+                        </span>
                     </div>
                     {% endif %}
                     {% if campaign.locked_amount > 0 %}
                     <div class="d-flex justify-content-between small mb-1">
                         <span class="text-muted">Đang chờ vote:</span>
-                        <span class="fw-bold text-warning">{{ campaign.locked_amount|intcomma }}đ</span>
+                        <span class="fw-bold text-warning">
+                            {{ campaign.locked_amount|intcomma }}đ
+                            <span class="text-muted small" title="Off-chain: số tiền bị khóa trong hệ thống khi đang vote.">Off-chain</span>
+                        </span>
                     </div>
                     {% endif %}
+                    {% if onchain_available_vnd %}
+                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed var(--primary-200);">
+                        <span class="text-muted fw-bold">Khả dụng (on-chain):</span>
+                        <span class="fw-bold text-success">{{ onchain_available_vnd|intcomma }}đ</span>
+                    </div>
+                    {% endif %}
+                    <div class="small text-muted mt-2" title="Khả dụng on-chain = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered - est_disbursement_gas.">
+                        Công thức on-chain minh bạch theo smart contract.
+                    </div>
                 </div>
                 {% endif %}
 
                 <div class="d-grid gap-2">
                     {% if user.is_authenticated %}
-                    <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-primary btn-lg fw-bold rounded-pill shadow-sm">
+                    <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent btn-lg fw-bold rounded-pill shadow-sm">
                         <i class="bi bi-heart-fill me-2"></i> ỦNG HỘ NGAY
                     </a>
                     {% else %}
-                    <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-warning btn-lg fw-bold rounded-pill shadow-sm">
+                    <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary btn-lg fw-bold rounded-pill shadow-sm">
                         <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để ủng hộ
                     </a>
                     {% endif %}
@@ -374,8 +434,8 @@
 </div>
 
 <style>
-    .bg-success-subtle { background-color: #d1e7dd !important; }
-    .bg-danger-subtle { background-color: #f8d7da !important; }
+    .bg-success-subtle { background-color: var(--success-100) !important; }
+    .bg-danger-subtle { background-color: var(--danger-100) !important; }
     .object-fit-cover { object-fit: cover; }
 </style>
 

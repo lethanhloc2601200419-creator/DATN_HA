@@ -37,6 +37,10 @@ urlpatterns = [
     # Giải ngân
     path('giaingan/', admin.quanly_giaingan, name='quanly_giaingan'),
     path('giaingan/them/', admin.tao_yeucau_giaingan, name='tao_yeucau_giaingan'),
+    path('api/ipfs/upload/', admin.ipfs_upload_view, name='ipfs_upload_view'),
+    path('api/disbursement/approve/', admin.sync_disbursement_approval, name='sync_disbursement_approval'),
     path('giaingan/duyet/<int:pk>/', admin.duyet_giaingan, name='duyet_giaingan'),
+    path('giaingan/sync-onchain/<int:pk>/', admin.sync_disbursement_onchain, name='sync_disbursement_onchain'),
     path('giaingan/huy/<int:pk>/', admin.huy_giaingan, name='huy_giaingan'),
+    path('giaingan/thu-hoi-gas/', admin.thu_hoi_gas, name='thu_hoi_gas'),
 ]

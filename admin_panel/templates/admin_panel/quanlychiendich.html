@@ -4,39 +4,130 @@
 
 {% block content %}
 <div class="container-fluid px-4">
-    <h2 class="mt-4">Quản lý Chiến dịch Gây quỹ</h2>
+    <h2 class="page-title">Quản lý Chiến dịch Gây quỹ</h2>
 
-    <div class="card mb-4 mt-3 shadow-sm">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <form method="GET" class="d-flex">
-                        <input type="text" name="q" class="form-control me-2" placeholder="Tìm tên chiến dịch...">
-                        <button type="submit" class="btn btn-primary">Tìm</button>
-                    </form>
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body">
+                    <div class="metric-value text-primary">{{ stats.total }}</div>
+                    <div class="metric-label">Tổng chiến dịch</div>
                 </div>
-                <div class="col-md-6 text-end">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus-circle"></i> Tạo Chiến dịch mới
-                    </button>
-                    {% if role == 'admin' %}
-                    <button type="button" class="btn btn-outline-dark ms-2" data-bs-toggle="modal" data-bs-target="#depositPoolModal">
-                        <i class="fas fa-coins"></i> Nạp ETH vào Pool
-                    </button>
-                    {% endif %}
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body">
+                    <div class="metric-value text-success">{{ stats.active }}</div>
+                    <div class="metric-label">Đang gây quỹ</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body">
+                    <div class="metric-value text-warning">{{ stats.pending }}</div>
+                    <div class="metric-label">Chờ duyệt</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body">
+                    <div class="metric-value text-danger">{{ stats.rejected }}</div>
+                    <div class="metric-label">Bị từ chối</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="card admin-stat-card mt-1">
+                <div class="card-body text-start">
+                    <div class="metric-value text-info">{{ stats.total_raised|intcomma }}đ</div>
+                    <div class="metric-label">Tổng đã huy động của danh sách đang xem</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card shadow">
+    <div class="card admin-toolbar">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <input type="text" name="q" class="form-control" placeholder="Tìm tên chiến dịch..." value="{{ query }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Đang gây quỹ</option>
+                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ duyệt</option>
+                        <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Bị từ chối</option>
+                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Đã hoàn thành</option>
+                        <option value="hidden" {% if selected_status == 'hidden' %}selected{% endif %}>Đã ẩn</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    {% if role == 'admin' %}
+                    <select name="org" class="form-select">
+                        <option value="">Tất cả tổ chức</option>
+                        {% for org in orgs %}
+                        <option value="{{ org.id }}" {% if selected_org == org.id|stringformat:'s' %}selected{% endif %}>{{ org.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <input type="hidden" name="org" value="{{ selected_org }}">
+                    <div class="form-control d-flex align-items-center bg-white text-muted">
+                        {{ orgs.0.name|default:"Tổ chức của bạn" }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Lọc</button>
+                </div>
+                <div class="col-md-12 text-end">
+                    <div class="admin-actions justify-content-end">
+                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
+                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
+                        <a href="{% url 'admin_panel:quanlychiendich' %}" class="btn btn-outline-primary">Xóa lọc</a>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+                            <i class="fas fa-plus-circle"></i> Tạo Chiến dịch mới
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card admin-shell-card">
         <div class="card-header">
             <i class="fas fa-list me-1"></i> Danh sách Chiến dịch
         </div>
-        <div class="card-body">
-            <table class="table table-hover table-bordered align-middle">
-                <thead class="table-light">
+        <div class="card-body p-0">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ current_url }}">
+                <div class="p-3 border-bottom bg-light">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-4">
+                            <select name="bulk_action" class="form-select">
+                                <option value="">-- Bulk action --</option>
+                                {% if role == 'admin' %}
+                                <option value="approve">Duyệt nhiều dòng</option>
+                                <option value="reject">Từ chối nhiều dòng</option>
+                                {% endif %}
+                                <option value="hide">Ẩn nhiều dòng</option>
+                                <option value="delete">Xóa nhiều dòng</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các chiến dịch đã chọn?')">Áp dụng</button>
+                        </div>
+                    </div>
+                </div>
+            <div class="table-responsive">
+            <table class="table admin-table">
+                <thead>
                     <tr>
+                        <th width="4%"><input type="checkbox" id="select-all-campaigns"></th>
                         <th width="5%">ID</th>
                         <th width="10%">Ảnh</th>
                         <th width="30%">Tên Chiến dịch</th>
@@ -48,6 +139,7 @@
                 <tbody>
                     {% for c in campaigns %}
                     <tr>
+                        <td><input type="checkbox" class="row-checkbox-campaign" name="selected_ids" value="{{ c.id }}"></td>
                         <td>{{ c.id }}</td>
                         <td class="text-center">
                             {% if c.avatar_image_url %}
@@ -80,7 +172,8 @@
                             {% else %} <span class="badge bg-secondary">{{ c.status }}</span> {% endif %}
                         </td>
                         <td>
-                           <button class="btn btn-sm btn-primary" 
+                           <div class="admin-actions">
+                           <button type="button" class="btn btn-sm btn-primary"
         title="Chỉnh sửa"
         data-bs-toggle="modal" 
         data-bs-target="#editModal"
@@ -117,15 +210,18 @@
                                 onclick="return confirm('Xóa vĩnh viễn?')">
                                 <i class="fas fa-trash"></i>
                             </a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center py-4">Chưa có dữ liệu.</td>
+                        <td colspan="7" class="admin-empty">Chưa có dữ liệu.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
+            </form>
         </div>
     </div>
 </div>
@@ -136,7 +232,7 @@
         <div class="modal-content">
             <form action="{% url 'admin_panel:nap_pool' %}" method="POST">
                 {% csrf_token %}
-                <div class="modal-header bg-dark text-white">
+                <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-coins"></i> Nạp ETH vào Exchange Pool</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -148,8 +244,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-dark">Nạp Pool</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Nạp Pool</button>
                 </div>
             </form>
         </div>
@@ -162,7 +258,7 @@
         <div class="modal-content">
             <form action="{% url 'admin_panel:them_chiendich' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-plus"></i> Khởi tạo Chiến dịch</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -242,8 +338,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-success">Tạo mới</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary">Tạo mới</button>
                 </div>
             </form>
         </div>
@@ -255,7 +351,7 @@
         <div class="modal-content">
             <form id="editForm" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Chiến dịch</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -350,7 +446,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
                     <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
                 </div>
             </form>
@@ -420,5 +516,11 @@
     if(document.getElementById('e_category_id')) document.getElementById('e_category_id').value = catId;
     if(document.getElementById('e_occasion_id')) document.getElementById('e_occasion_id').value = occId;
 }
+
+document.getElementById('select-all-campaigns')?.addEventListener('change', function() {
+    document.querySelectorAll('.row-checkbox-campaign').forEach(cb => {
+        cb.checked = this.checked;
+    });
+});
 </script>
 {% endblock %}

@@ -4,77 +4,240 @@
 
 {% block content %}
 <div class="container-fluid px-4">
-    <h2 class="mt-4">Quản lý Giải ngân</h2>
+    <h2 class="page-title">Quản lý Giải ngân</h2>
 
-    <!-- Stats Cards -->
     <div class="row g-3 mt-2 mb-4">
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-warning fs-2 fw-bold">{{ stats.pending }}</div>
-                    <div class="small text-muted">Chờ duyệt</div>
+                    <div class="metric-value text-warning">{{ stats.pending }}</div>
+                    <div class="metric-label">Chờ duyệt</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-primary fs-2 fw-bold">{{ stats.voting }}</div>
-                    <div class="small text-muted">Đang bỏ phiếu</div>
+                    <div class="metric-value text-primary">{{ stats.voting }}</div>
+                    <div class="metric-label">Đang bỏ phiếu</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-success fs-2 fw-bold">{{ stats.executed }}</div>
-                    <div class="small text-muted">Đã giải ngân</div>
+                    <div class="metric-value text-success">{{ stats.executed }}</div>
+                    <div class="metric-label">Đã giải ngân</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
+            <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="text-danger fs-2 fw-bold">{{ stats.total_disbursed|intcomma }}đ</div>
-                    <div class="small text-muted">Tổng đã giải ngân</div>
+                    <div class="metric-value text-info">{{ stats.approved }}</div>
+                    <div class="metric-label">Đã thông qua</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body text-center">
+                    <div class="metric-value text-danger">{{ stats.rejected }}</div>
+                    <div class="metric-label">Bị từ chối</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card admin-stat-card">
+                <div class="card-body text-center">
+                    <div class="metric-value text-danger">{{ stats.total_disbursed|intcomma }}đ</div>
+                    <div class="metric-label">Tổng đã giải ngân</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="card admin-stat-card">
+                <div class="card-body text-start">
+                    <div class="metric-value text-primary">{{ stats.total_requested|intcomma }}đ</div>
+                    <div class="metric-label">Tổng tiền yêu cầu của danh sách đang xem</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Filter + Actions -->
-    <div class="card mb-4 shadow-sm">
+    <div class="card admin-toolbar">
         <div class="card-body">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <form method="GET" class="d-flex gap-2">
-                        <select name="campaign" class="form-select" style="max-width: 300px;">
-                            <option value="">-- Tất cả chiến dịch --</option>
-                            {% for c in campaigns %}
-                            <option value="{{ c.id }}" {% if selected_campaign == c.id|stringformat:'d' %}selected{% endif %}>{{ c.title|truncatechars:40 }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Lọc</button>
-                    </form>
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <input type="text" name="q" class="form-control" placeholder="Tìm tiêu đề, mục đích, đơn vị thụ hưởng..." value="{{ query }}">
                 </div>
-                <div class="col-md-6 text-end">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createModal">
-                        <i class="fas fa-plus-circle"></i> Tạo yêu cầu giải ngân
-                    </button>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ duyệt</option>
+                        <option value="voting" {% if selected_status == 'voting' %}selected{% endif %}>Đang bỏ phiếu</option>
+                        <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Đã thông qua</option>
+                        <option value="executed" {% if selected_status == 'executed' %}selected{% endif %}>Đã giải ngân</option>
+                        <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Từ chối</option>
+                    </select>
                 </div>
-            </div>
+                <div class="col-md-3">
+                    <select name="campaign" class="form-select">
+                        <option value="">-- Tất cả chiến dịch --</option>
+                        {% for c in campaigns %}
+                        <option value="{{ c.id }}" {% if selected_campaign == c.id|stringformat:'d' %}selected{% endif %}>{{ c.title|truncatechars:40 }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Lọc</button>
+                </div>
+                <div class="col-md-12 text-end">
+                    <div class="admin-actions justify-content-end">
+                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
+                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
+                        <a href="{% url 'admin_panel:quanly_giaingan' %}" class="btn btn-outline-primary">Xóa lọc</a>
+                        {% if role != 'supervisor' %}
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+                            <i class="fas fa-plus-circle"></i> Tạo yêu cầu giải ngân
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
+    <!-- Gas Recovery Section (Admin Only) -->
+    {% if role == 'admin' and campaigns_available %}
+    <div class="card admin-shell-card mb-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <i class="fas fa-gas-pump me-1"></i> Thu hồi phí Gas cho Admin
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Admin chỉ có thể thu hồi phí gas <strong>MỘT LẦN DUY NHẤT</strong> cho mỗi chiến dịch, khi:
+                <br>① Chiến dịch đã <strong>hết hạn</strong> (quá <code>end_date</code>)
+                <br>② Số tiền trong chiến dịch đã được <strong>giải ngân hết</strong> (on-chain available ≈ 0đ)
+            </p>
+            <div class="text-muted small mb-3">
+                <strong>Giải thích:</strong> Gas tạm ứng là chi phí admin đã trả thay khi ghi donate/giải ngân.
+                Vì chỉ thu hồi 1 lần nên phí dự trù thu hồi chỉ được reserve ở <em>lần tạo giải ngân đầu tiên</em>.
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm admin-table">
+                    <thead>
+                        <tr>
+                            <th>Chiến dịch</th>
+                            <th class="text-end">Tổng phí gas đã tạm ứng</th>
+                            <th class="text-end">Số dư chiến dịch</th>
+                            <th class="text-center" width="15%">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in campaigns_available %}
+                        <tr>
+                            <td><strong>{{ c.obj.title|truncatechars:40 }}</strong></td>
+                            <td class="text-end text-danger fw-bold">
+                                {{ c.total_gas_vnd|intcomma }}đ
+                                <div class="small text-muted mt-1">
+                                    ① Gas on-chain (v2 totalGasCost: A+B+C): {{ c.gas_onchain_total_cost_vnd|intcomma }}đ
+                                </div>
+                                {% if c.gas_bank_record_vnd or c.gas_donate_onbehalf_vnd %}
+                                <div class="small text-muted">
+                                    Breakdown v2: ghi sao kê NH {{ c.gas_bank_record_vnd|intcomma }}đ · nạp ETH thay user {{ c.gas_donate_onbehalf_vnd|intcomma }}đ
+                                </div>
+                                {% endif %}
+                                {% if c.gas_admin_sendeth_vnd or c.gas_disbursement_actual_vnd %}
+                                <div class="small text-muted">
+                                    Legacy: cấp ETH cũ {{ c.gas_admin_sendeth_vnd|intcomma }}đ · giải ngân thực {{ c.gas_disbursement_actual_vnd|intcomma }}đ
+                                </div>
+                                {% endif %}
+                                <div class="small text-muted">
+                                    Dự trù giải ngân (1 tx): {{ c.est_disbursement_gas_vnd|intcomma }}đ
+                                </div>
+                                {% if c.gas_recovered_vnd %}
+                                <div class="small text-success">Đã thu hồi: {{ c.gas_recovered_vnd|intcomma }}đ</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {{ c.onchain_total_fund_vnd|intcomma }}đ
+                                <div class="small text-muted">On-chain</div>
+                            </td>
+                            <td class="text-center">
+                                {% if c.can_recover_gas and c.total_gas_vnd > 0 %}
+                                <form action="{% url 'admin_panel:thu_hoi_gas' %}" method="POST" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="campaign_id" value="{{ c.obj.id }}">
+                                    <button type="submit" class="btn btn-sm btn-warning"
+                                        onclick="return confirm('Thu hồi phí gas cho chiến dịch {{ c.obj.title|truncatechars:20 }}? Thao tác này chỉ có thể thực hiện 1 lần duy nhất!')">
+                                        <i class="fas fa-undo"></i> Thu hồi gas
+                                    </button>
+                                </form>
+                                {% elif c.total_gas_vnd > 0 %}
+                                    {% if not c.is_ended %}
+                                    <span class="badge bg-secondary" title="Chiến dịch chưa hết hạn">
+                                        <i class="fas fa-clock"></i> Chưa hết hạn
+                                    </span>
+                                    <div class="small text-muted mt-1">Hạn: {{ c.obj.end_date|date:"d/m/Y"|default:"chưa đặt" }}</div>
+                                    {% elif not c.fully_disbursed %}
+                                    <span class="badge bg-info text-dark" title="Chưa giải ngân hết">
+                                        <i class="fas fa-coins"></i> Còn quỹ khả dụng
+                                    </span>
+                                    <div class="small text-muted mt-1">Còn: {{ c.onchain_available_vnd|intcomma }}đ</div>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted small">Không có gas</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Proposals Table -->
-    <div class="card shadow">
+    <div class="card admin-shell-card">
         <div class="card-header">
             <i class="fas fa-money-check-alt me-1"></i> Danh sách đề xuất giải ngân
         </div>
-        <div class="card-body">
-            <table class="table table-hover table-bordered align-middle">
-                <thead class="table-light">
+        <div class="card-body p-0">
+            <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ current_url }}">
+            <div class="p-3 border-bottom bg-light">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <select name="bulk_action" class="form-select">
+                            <option value="">-- Bulk action --</option>
+                            {% if role == 'admin' %}
+                            <option value="approve">Duyệt nhiều dòng</option>
+                            {% endif %}
+                            <option value="reject">Từ chối nhiều dòng</option>
+                            <option value="delete">Xóa nhiều dòng</option>
+                        </select>
+                    </div>
+                    {% if role == 'admin' %}
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="bulk_voting_days" min="1" max="30" value="7" title="Số ngày bỏ phiếu cho bulk duyệt">
+                    </div>
+                    {% endif %}
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các đề xuất đã chọn?')">Áp dụng</button>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+            <table class="table admin-table">
+                <thead>
                     <tr>
+                        <th width="4%"><input type="checkbox" id="select-all-proposals"></th>
                         <th width="5%">ID</th>
                         <th width="20%">Chiến dịch</th>
                         <th width="15%">Tiêu đề</th>
@@ -87,6 +250,7 @@
                 <tbody>
                     {% for item in proposals %}
                     <tr>
+                        <td><input type="checkbox" class="row-checkbox-proposal" name="selected_ids" value="{{ item.obj.id }}"></td>
                         <td>{{ item.obj.id }}</td>
                         <td>
                             <strong>{{ item.obj.campaign.title|truncatechars:30 }}</strong>
@@ -104,6 +268,9 @@
                         <td class="text-center">
                             {% if item.obj.status == 'pending' %}
                                 <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                                {% if item.obj.approval_count %}
+                                <br><small class="text-muted">{{ item.obj.approval_count }}/2 chữ ký on-chain</small>
+                                {% endif %}
                             {% elif item.obj.status == 'voting' %}
                                 <span class="badge bg-primary">Đang bỏ phiếu</span>
                                 {% if item.obj.end_date %}
@@ -111,6 +278,7 @@
                                 {% endif %}
                             {% elif item.obj.status == 'approved' %}
                                 <span class="badge bg-info">Đã thông qua</span>
+                                <br><small class="text-muted">{{ item.obj.approval_count }}/2 chữ ký on-chain</small>
                             {% elif item.obj.status == 'executed' %}
                                 <span class="badge bg-success">Đã giải ngân</span>
                                 {% if item.obj.executed_at %}
@@ -139,29 +307,53 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if role == 'admin' and item.obj.status == 'pending' %}
-                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal"
-                                onclick="document.getElementById('approve_form').action='/admin_panel/giaingan/duyet/{{ item.obj.id }}/';
-                                         document.getElementById('approve_title').textContent='{{ item.obj.title }}';
-                                         document.getElementById('approve_amount').textContent='{{ item.obj.amount_requested|intcomma }}đ';">
-                                <i class="fas fa-check"></i> Duyệt
+                            <div class="admin-actions">
+                            {% if item.obj.evidence_url %}
+                            <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Mở hóa đơn IPFS">
+                                <i class="fas fa-file-invoice"></i>
+                            </a>
+                            {% endif %}
+
+                            {% if item.can_approve %}
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-primary js-disbursement-approve"
+                                data-proposal-id="{{ item.obj.id }}"
+                                data-campaign-id="{{ item.obj.campaign_id }}"
+                                data-title="{{ item.obj.title }}"
+                                data-role="{{ approver_context.approver_role }}"
+                                {% if item.already_approved %}disabled title="Bạn đã đồng bộ chữ ký cho đề xuất này"{% endif %}
+                            >
+                                <i class="fas fa-signature"></i>
+                                {% if item.already_approved %}Đã ký{% else %}Phê duyệt{% endif %}
                             </button>
+                            {% endif %}
+
+                            {% if role == 'admin' and item.obj.status == 'pending' %}
                             <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-danger"
                                onclick="return confirm('Từ chối yêu cầu này?')">
                                 <i class="fas fa-times"></i> Từ chối
                             </a>
                             {% endif %}
 
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
                                 <i class="fas fa-eye"></i> Chi tiết
                             </button>
 
                             {% if item.obj.disbursement_eth_tx_hash %}
                             <a href="https://sepolia.etherscan.io/tx/{{ item.obj.disbursement_eth_tx_hash }}" target="_blank"
-                               class="btn btn-sm btn-outline-success" title="Xem trên Blockchain">
+                               class="btn btn-sm btn-outline-primary" title="Xem trên Blockchain">
                                 <i class="fas fa-link"></i>
                             </a>
                             {% endif %}
+
+                            {% if role == 'admin' and item.obj.status == 'approved' %}
+                            <a href="{% url 'admin_panel:sync_disbursement_onchain' item.obj.id %}" class="btn btn-sm btn-outline-warning"
+                               onclick="return confirm('Đồng bộ trạng thái DisbursedAndBurned từ Sepolia cho đề xuất này?')">
+                                <i class="fas fa-sync-alt"></i> Đồng bộ Blockchain
+                            </a>
+                            {% endif %}
+                            </div>
                         </td>
                     </tr>
 
@@ -169,7 +361,7 @@
                     <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
-                                <div class="modal-header bg-light">
+                                <div class="modal-header admin-modal-header">
                                     <h5 class="modal-title"><i class="fas fa-info-circle"></i> Chi tiết đề xuất #{{ item.obj.id }}</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
@@ -181,6 +373,11 @@
                                             <p><strong>Số tiền:</strong> <span class="text-danger fw-bold">{{ item.obj.amount_requested|intcomma }}đ</span></p>
                                             <p><strong>Mục đích:</strong> {{ item.obj.purpose|default:"—" }}</p>
                                             <p><strong>Đơn vị thụ hưởng:</strong> {{ item.obj.recipient_name|default:"—" }}</p>
+                                            {% if item.obj.ipfs_cid %}
+                                            <p><strong>IPFS CID:</strong> <code>{{ item.obj.ipfs_cid }}</code></p>
+                                            {% endif %}
+                                            <p><strong>Chữ ký Supervisor:</strong> {% if item.obj.supervisor_approval_tx_hash %}<span class="text-success">Đã có</span>{% else %}<span class="text-muted">Chưa có</span>{% endif %}</p>
+                                            <p><strong>Chữ ký Admin:</strong> {% if item.obj.admin_approval_tx_hash %}<span class="text-success">Đã có</span>{% else %}<span class="text-muted">Chưa có</span>{% endif %}</p>
                                         </div>
                                         <div class="col-md-6">
                                             <p><strong>Người tạo:</strong> {{ item.obj.created_by.get_full_name|default:item.obj.created_by.username }}</p>
@@ -192,6 +389,10 @@
                                             {% if item.obj.end_date %}
                                             <p><strong>Hạn bỏ phiếu:</strong> {{ item.obj.end_date|date:"d/m/Y H:i" }}</p>
                                             {% endif %}
+                                            {% if item.obj.evidence_url %}
+                                            <p><strong>Hóa đơn / minh chứng:</strong> <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener">Mở tài liệu</a></p>
+                                            {% endif %}
+                                            <p><strong>Approval on-chain:</strong> {{ item.obj.approval_count }}/2</p>
                                         </div>
                                     </div>
                                     <hr>
@@ -214,39 +415,123 @@
 
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">Chưa có đề xuất giải ngân nào.</td>
+                        <td colspan="8" class="admin-empty">Chưa có đề xuất giải ngân nào.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
+            </form>
         </div>
     </div>
 </div>
 
+{% if role != 'supervisor' %}
 <!-- Create Modal -->
 <div class="modal fade" id="createModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form action="{% url 'admin_panel:tao_yeucau_giaingan' %}" method="POST" enctype="multipart/form-data">
+            <form id="disbursementProposalForm" action="{% url 'admin_panel:tao_yeucau_giaingan' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-header bg-success text-white">
+                <input type="hidden" name="campaign_id" value="">
+                <input type="hidden" name="ipfs_cid" value="">
+                <input type="hidden" name="ipfs_gateway_url" value="">
+                <input type="hidden" name="proposal_tx_hash" value="">
+                <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-plus"></i> Tạo yêu cầu giải ngân</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="disbursementStatusBox" class="alert alert-info d-none">
+                        <span id="disbursementStatusText"></span>
+                    </div>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="fw-bold">Chiến dịch *</label>
-                            <select name="campaign_id" class="form-select" required>
-                                <option value="">-- Chọn chiến dịch --</option>
+                        <div class="col-12 mb-3">
+                            <label class="fw-bold mb-2">Chiến dịch *</label>
+                            <div class="campaign-picker" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--primary-200); border-radius: 8px; padding: 8px; background: var(--neutral-100);">
                                 {% for c in campaigns_available %}
-                                <option value="{{ c.obj.id }}">{{ c.obj.title }} (Khả dụng: {{ c.net_available|intcomma }}đ — đã trừ gas: {{ c.total_gas_vnd|intcomma }}đ)</option>
+                                <label class="campaign-card d-block mb-2 p-3 bg-white border rounded position-relative"
+                                       style="cursor: pointer; transition: all 0.15s;">
+                                    <input type="radio" name="campaign_selector" value="{{ c.obj.id }}"
+                                           class="campaign-radio position-absolute" style="top:12px; right:12px;"
+                                           data-net-available="{{ c.net_available|intcomma }}"
+                                           required>
+                                    <div class="d-flex justify-content-between align-items-start pe-4">
+                                        <div class="fw-bold text-dark">{{ c.obj.title }}</div>
+                                        {% if c.is_first_disbursement %}
+                                        <span class="badge bg-warning text-dark ms-2" style="margin-right: 24px;">LẦN ĐẦU</span>
+                                        {% else %}
+                                        <span class="badge bg-info text-dark ms-2" style="margin-right: 24px;">LẦN 2+</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success">
+                                        <div class="small text-muted">Số tiền tối đa có thể giải ngân</div>
+                                        <div class="fw-bold text-success fs-5">{{ c.net_available|intcomma }}đ</div>
+                                    </div>
+                                    <div class="row g-2 mt-1 small">
+                                        <div class="col-6 col-md-3">
+                                            <div class="text-muted">Tổng quỹ</div>
+                                            <div class="fw-bold text-primary">{{ c.onchain_total_fund_vnd|intcomma }}đ</div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="text-muted">On-chain avail</div>
+                                            <div class="fw-bold">{{ c.onchain_available_vnd|intcomma }}đ</div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="text-muted">Gas đã chi</div>
+                                            <div class="text-danger">−{{ c.gas_onchain_total_cost_vnd|intcomma }}đ</div>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <div class="text-muted">Đang khóa</div>
+                                            <div class="text-warning">−{{ c.obj.locked_amount|intcomma }}đ</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 p-2 rounded border border-warning small">
+                                        <div class="text-muted fw-bold mb-1">
+                                            <i class="fas fa-gas-pump text-warning"></i>
+                                            Phí gas dự trù = −{{ c.reserve_gas_vnd|intcomma }}đ
+                                        </div>
+                                        {% if c.is_first_disbursement %}
+                                        <div class="ps-3">
+                                            • Giải ngân (1 tx): <strong>{{ c.est_disbursement_gas_vnd|intcomma }}đ</strong><br>
+                                            • Thu hồi gas cuối chiến dịch: <strong>{{ c.est_recovery_gas_vnd|intcomma }}đ</strong>
+                                            <div class="text-muted" style="font-size: 0.8em;">
+                                                <em>(Thu hồi chỉ reserve 1 lần ở lần đầu này)</em>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="ps-3">
+                                            • Chỉ giải ngân (1 tx): <strong>{{ c.est_disbursement_gas_vnd|intcomma }}đ</strong>
+                                            <div class="text-muted" style="font-size: 0.8em;">
+                                                <em>(Gas thu hồi đã reserve từ lần tạo giải ngân đầu tiên)</em>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </label>
+                                {% empty %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fs-2"></i>
+                                    <div class="mt-2">Không có chiến dịch nào khả dụng</div>
+                                </div>
                                 {% endfor %}
-                            </select>
+                            </div>
+                            <style>
+                                .campaign-card:hover { background: var(--primary-100) !important; border-color: var(--primary-500) !important; }
+                                .campaign-card.selected { background: var(--primary-100) !important; border-color: var(--primary-700) !important; box-shadow: 0 0 0 2px var(--primary-500); }
+                            </style>
+                            <div class="small text-muted mt-2">
+                                <strong>Công thức Khả dụng:</strong>
+                                <br>• <strong>Lần đầu</strong> = onchain_available − gas giải ngân − gas thu hồi − đang khóa (dự trù <strong>2 phí</strong>)
+                                <br>• <strong>Lần 2+</strong> = onchain_available − gas giải ngân − đang khóa (chỉ <strong>1 phí</strong>)
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="fw-bold">Số tiền giải ngân (VNĐ) *</label>
-                            <input type="number" name="amount_requested" class="form-control" required min="1000">
+                            <input type="number" name="amount_requested" id="amount_input" class="form-control" required min="1000">
+                            <div class="small text-muted mt-1" id="amount_hint" style="display:none;">
+                                <i class="fas fa-lightbulb text-warning"></i> Tối đa: <strong id="amount_max"></strong>đ
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="fw-bold">Tiêu đề *</label>
@@ -263,25 +548,113 @@
                         <div class="col-md-6 mb-3">
                             <label class="fw-bold">Link minh chứng</label>
                             <input type="url" name="evidence_url" class="form-control" placeholder="https://...">
+                            <div class="small text-muted mt-1">Nếu để trống, hệ thống sẽ dùng link gateway của file IPFS vừa upload.</div>
                         </div>
                         <div class="col-12 mb-3">
                             <label class="fw-bold">Mô tả chi tiết *</label>
                             <textarea name="description" class="form-control" rows="3" required placeholder="Mô tả kế hoạch chi tiêu, danh sách vật tư..."></textarea>
                         </div>
                         <div class="col-12 mb-3">
-                            <label class="fw-bold">Ảnh minh chứng (hóa đơn, báo giá...)</label>
-                            <input type="file" name="proof_files" class="form-control" multiple accept="image/*">
+                            <label class="fw-bold">Hóa đơn / chứng từ để ghi IPFS *</label>
+                            <input type="file" name="invoice_file" class="form-control" accept=".pdf,image/*" required>
+                            <div class="small text-muted mt-1">File này sẽ được upload lên Pinata trước, sau đó CID được đưa vào giao dịch `proposeDisbursement` gasless.</div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Gửi yêu cầu</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary" {% if not campaigns_available %}disabled title="Không có chiến dịch khả dụng"{% endif %}>
+                        <i class="fas fa-paper-plane"></i> Gửi yêu cầu
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- JS: highlight card khi chọn + update max amount -->
+<script>
+(function() {
+    const modal = document.getElementById('createModal');
+    const amountHint = document.getElementById('amount_hint');
+    const amountMax = document.getElementById('amount_max');
+    const amountInput = document.getElementById('amount_input');
+    const proposalForm = document.getElementById('disbursementProposalForm');
+    if (!modal) return;
+
+    const radios = modal.querySelectorAll('.campaign-radio');
+    radios.forEach(function(r) {
+        r.addEventListener('change', function() {
+            // Bỏ highlight tất cả card, highlight card được chọn
+            modal.querySelectorAll('.campaign-card').forEach(function(card) {
+                card.classList.remove('selected');
+            });
+            r.closest('.campaign-card').classList.add('selected');
+
+            // Update max amount hint + attribute
+            const netAvail = r.dataset.netAvailable || '0';
+            if (amountMax) amountMax.textContent = netAvail;
+            if (amountHint) amountHint.style.display = 'block';
+            if (amountInput) {
+                amountInput.max = netAvail.replace(/,/g, '');
+            }
+        });
+    });
+
+    // Reset state khi đóng modal
+    modal.addEventListener('hidden.bs.modal', function() {
+        radios.forEach(function(r) { r.checked = false; });
+        modal.querySelectorAll('.campaign-card').forEach(function(card) {
+            card.classList.remove('selected');
+        });
+        if (amountHint) amountHint.style.display = 'none';
+        if (amountInput) {
+            amountInput.value = '';
+            amountInput.removeAttribute('max');
+        }
+        if (proposalForm) {
+            proposalForm.reset();
+            proposalForm.querySelector('input[name="campaign_id"]').value = '';
+            proposalForm.querySelector('input[name="ipfs_cid"]').value = '';
+            proposalForm.querySelector('input[name="ipfs_gateway_url"]').value = '';
+            proposalForm.querySelector('input[name="proposal_tx_hash"]').value = '';
+        }
+        const statusBox = document.getElementById('disbursementStatusBox');
+        const statusText = document.getElementById('disbursementStatusText');
+        if (statusBox) {
+            statusBox.className = 'alert alert-info d-none';
+        }
+        if (statusText) {
+            statusText.textContent = '';
+        }
+    });
+})();
+
+document.getElementById('select-all-proposals')?.addEventListener('change', function() {
+    document.querySelectorAll('.row-checkbox-proposal').forEach(cb => {
+        cb.checked = this.checked;
+    });
+});
+</script>
+{{ disbursement_web3_config|json_script:"disbursement-proposal-config" }}
+<script>
+(() => {
+    const node = document.getElementById('disbursement-proposal-config');
+    if (!node) return;
+    const payload = JSON.parse(node.textContent);
+    payload.ipfsUploadUrl = "{% url 'admin_panel:ipfs_upload_view' %}";
+    payload.disbursementApprovalSyncUrl = "{% url 'admin_panel:sync_disbursement_approval' %}";
+    payload.currentApproverRole = "{{ approver_context.approver_role|default:''|escapejs }}";
+    payload.approverWallets = {
+        admin: "{{ approver_context.admin_wallet|default:''|escapejs }}",
+        supervisor: "{{ approver_context.supervisor_wallet|default:''|escapejs }}"
+    };
+    node.textContent = JSON.stringify(payload);
+})();
+</script>
+<script type="module" src="{% static 'admin_panel/js/disbursement-proposal.js' %}"></script>
+<script type="module" src="{% static 'admin_panel/js/disbursement-approval.js' %}"></script>
 
 <!-- Approve Modal -->
 <div class="modal fade" id="approveModal" tabindex="-1">
@@ -289,7 +662,7 @@
         <div class="modal-content">
             <form id="approve_form" method="POST">
                 {% csrf_token %}
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-gavel"></i> Duyệt & Mở bỏ phiếu</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -306,7 +679,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Duyệt & Mở bỏ phiếu</button>
                 </div>
             </form>

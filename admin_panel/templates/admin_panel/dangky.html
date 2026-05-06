@@ -2,28 +2,57 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Đăng ký tài khoản</title>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ... Copy toàn bộ CSS từ file dangnhap.html ở trên dán vào đây ... */
-    /* Thêm CSS cho phần strength meter nếu cần */
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-    body { display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #f4f6f8; }
-    .auth-container { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 400px; max-width: 90%; }
+    :root {
+      --primary-950: #0a1628;
+      --primary-900: #0f2044;
+      --primary-800: #1e3a8a;
+      --primary-700: #2a4fa3;
+      --primary-600: #3b6ac7;
+      --primary-500: #4f84e0;
+      --primary-300: #a8c5f8;
+      --primary-200: #d0e2fd;
+      --primary-100: #e8f1fe;
+      --primary-50: #f3f7ff;
+      --accent-500: #f97316;
+      --accent-400: #fb923c;
+      --success-600: #16a34a;
+      --success-100: #f0fdf4;
+      --danger-600: #dc2626;
+      --danger-100: #fef2f2;
+      --warning-600: #ca8a04;
+      --warning-100: #fefce8;
+      --neutral-900: #111827;
+      --neutral-700: #374151;
+      --neutral-500: #6b7280;
+      --neutral-300: #d1d5db;
+      --neutral-100: #f9fafb;
+      --white: #ffffff;
+      --font-sans: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+      --radius-lg: 16px;
+      --shadow-modal: 0 8px 32px rgba(15, 32, 68, 0.18);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
+    body { display: flex; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(160deg, var(--primary-50) 0%, var(--white) 100%); }
+    .auth-container { background: var(--white); padding: 40px; border-radius: var(--radius-lg); box-shadow: var(--shadow-modal); border: 1px solid var(--primary-200); width: 400px; max-width: 90%; }
     .auth-header { text-align: center; margin-bottom: 20px; }
-    .auth-header h2 { color: #333; font-weight: 700; font-size: 24px; margin-bottom: 8px; }
+    .auth-header h2 { color: var(--primary-900); font-weight: 700; font-size: 24px; margin-bottom: 8px; }
     .form-group { margin-bottom: 15px; position: relative; }
-    .form-group label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 5px; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--neutral-900); margin-bottom: 5px; }
     .input-wrapper { position: relative; }
-    .form-group input { width: 100%; padding: 12px 16px; border: 1px solid #e1e4e8; border-radius: 8px; font-size: 15px; transition: all 0.3s; background: #f9f9f9; }
-    .form-group input:focus { outline: none; border-color: #ff6b35; background: #fff; box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1); }
-    .error-msg { color: #dc3545; font-size: 12px; margin-top: 5px; display: none; }
-    .form-group.error input { border-color: #dc3545; background-color: #fff8f8; }
+    .form-group input { width: 100%; padding: 12px 16px; border: 1px solid var(--neutral-300); border-radius: 8px; font-size: 15px; transition: all 0.3s; background: var(--neutral-100); }
+    .form-group input:focus { outline: none; border-color: var(--primary-600); background: var(--white); box-shadow: 0 0 0 3px var(--primary-100); }
+    .error-msg { color: var(--danger-600); font-size: 12px; margin-top: 5px; display: none; }
+    .form-group.error input { border-color: var(--danger-600); background-color: var(--danger-100); }
     .form-group.error .error-msg { display: block; }
-    .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #888; }
-    .btn-submit { width: 100%; padding: 14px; background: #ff6b35; border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px;}
-    .btn-submit:hover { background: #e55a2b; }
-    .auth-footer { text-align: center; margin-top: 25px; font-size: 14px; color: #666; }
-    .auth-footer a { color: #ff6b35; text-decoration: none; font-weight: 600; }
+    .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--neutral-500); }
+    .btn-submit { width: 100%; padding: 14px; background: var(--primary-800); border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px;}
+    .btn-submit:hover { background: var(--primary-700); }
+    .auth-footer { text-align: center; margin-top: 25px; font-size: 14px; color: var(--neutral-500); }
+    .auth-footer a { color: var(--primary-700); text-decoration: none; font-weight: 600; }
 
     @keyframes slideIn {
       from { opacity: 0; transform: translateY(-10px); }
@@ -36,19 +65,19 @@
   <div class="auth-container">
     <div class="auth-header">
       <h2>Đăng ký</h2>
-      <p style="color:#666; font-size:14px;">Tạo tài khoản để tham gia cùng chúng tôi</p>
+      <p style="color:var(--neutral-500); font-size:14px;">Tạo tài khoản để tham gia cùng chúng tôi</p>
     </div>
     {% if messages %}
       {% for message in messages %}
         <div style="
           {% if 'success' in message.tags %}
-            background:#e8f5e9; color:#2e7d32; border-left:4px solid #2e7d32;
+            background:var(--success-100); color:var(--success-600); border-left:4px solid var(--success-600);
           {% elif 'warning' in message.tags %}
-            background:#fff8e1; color:#e65100; border-left:4px solid #ff9800;
+            background:var(--warning-100); color:var(--warning-600); border-left:4px solid var(--warning-600);
           {% elif 'info' in message.tags %}
-            background:#e3f2fd; color:#0d47a1; border-left:4px solid #2196f3;
+            background:var(--primary-100); color:var(--primary-900); border-left:4px solid var(--primary-500);
           {% else %}
-            background:#ffebee; color:#c62828; border-left:4px solid #dc3545;
+            background:var(--danger-100); color:var(--danger-600); border-left:4px solid var(--danger-600);
           {% endif %}
           padding:12px 16px; border-radius:8px; margin-bottom:15px; font-size:14px;
           display:flex; align-items:center; gap:10px; animation: slideIn 0.3s ease;">

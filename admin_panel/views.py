@@ -9,6 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 import random
 import requests
+import json
 from django.utils.text import slugify
 import time
 from django.db.models import Q, Sum
@@ -23,14 +24,215 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 import re
 import hashlib
+import csv
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.files.storage import FileSystemStorage
+from django.utils.html import escape
 
 # ========================================================
 # 🔥 IMPORT BLOCKCHAIN SERVICE (Thêm dòng này)
 # ========================================================
-from client.blockchain import BlockchainService 
+from client.blockchain import BlockchainService, get_eth_vnd_rate, invalidate_campaign_cache
+from client.blockchain_listener import sync_disbursement_proposal_status
+from admin_panel.disbursement_utils import estimate_gas_per_tx_vnd
+
+WEI_IN_ETH = Decimal('1000000000000000000')
+# Ngưỡng coi chiến dịch đã giải ngân hết (để cho phép thu hồi gas 1 lần cuối)
+FULLY_DISBURSED_THRESHOLD_VND = Decimal('1000')
+
+def _get_user_role(user):
+    if not user or not user.is_authenticated:
+        return 'user'
+    if user.is_superuser:
+        return 'admin'
+    if user.managed_organizations.exists() or Organization.objects.filter(manager=user).exists():
+        return 'partner'
+    return 'user'
+
+def _wei_to_vnd(wei, eth_vnd_rate):
+    return (Decimal(str(wei)) / WEI_IN_ETH) * eth_vnd_rate
+
+def _round_vnd(value):
+    return Decimal(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
+def _normalize_query(value):
+    return (value or '').strip()
+
+
+def _format_export_value(value):
+    if value is None:
+        return ''
+    if isinstance(value, bool):
+        return 'Có' if value else 'Không'
+    if hasattr(value, 'strftime'):
+        try:
+            return timezone.localtime(value).strftime('%d/%m/%Y %H:%M:%S')
+        except Exception:
+            return value.strftime('%d/%m/%Y %H:%M:%S')
+    return str(value)
+
+
+def _export_table_response(filename_prefix, headers, rows, export_format='csv'):
+    ts = timezone.localtime().strftime('%Y%m%d_%H%M%S')
+    normalized_rows = [[_format_export_value(cell) for cell in row] for row in rows]
+
+    if export_format == 'excel':
+        response = HttpResponse(content_type='application/vnd.ms-excel; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename_prefix}_{ts}.xls"'
+        html = ['<table border="1"><thead><tr>']
+        html.extend([f'<th>{escape(col)}</th>' for col in headers])
+        html.append('</tr></thead><tbody>')
+        for row in normalized_rows:
+            html.append('<tr>')
+            html.extend([f'<td>{escape(cell)}</td>' for cell in row])
+            html.append('</tr>')
+        html.append('</tbody></table>')
+        response.write(''.join(html))
+        return response
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename_prefix}_{ts}.csv"'
+    response.write('\ufeff')
+    writer = csv.writer(response)
+    writer.writerow(headers)
+    writer.writerows(normalized_rows)
+    return response
+
+
+def _get_export_format(request):
+    export = (request.GET.get('export') or '').lower()
+    if export in ('csv', 'excel', 'xlsx', 'xls'):
+        return 'excel' if export in ('excel', 'xlsx', 'xls') else 'csv'
+    return ''
+
+
+def _export_links(request):
+    base = request.GET.copy()
+    base.pop('export', None)
+    csv_q = base.copy()
+    excel_q = base.copy()
+    csv_q['export'] = 'csv'
+    excel_q['export'] = 'excel'
+    return f"?{csv_q.urlencode()}", f"?{excel_q.urlencode()}"
+
+
+def _selected_ids(request):
+    ids = []
+    for raw in request.POST.getlist('selected_ids'):
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+def _safe_next_url(request, fallback_name):
+    nxt = (request.POST.get('next') or '').strip()
+    if nxt.startswith('/'):
+        return redirect(nxt)
+    return redirect(fallback_name)
+
+
+def _build_disbursement_web3_config(request):
+    wallet_address = ''
+    eoa_address = ''
+    smart_account_address = ''
+    if request.user.is_authenticated and hasattr(request.user, 'profile'):
+        smart_account_address = request.user.profile.smart_account_address or ''
+        eoa_address = request.user.profile.eoa_address or ''
+        wallet_address = smart_account_address or request.user.profile.wallet_address or ''
+
+    alchemy_api_key = ''
+    if settings.SEPOLIA_RPC_URL and '/v2/' in settings.SEPOLIA_RPC_URL:
+        alchemy_api_key = settings.SEPOLIA_RPC_URL.rsplit('/v2/', 1)[-1].strip()
+
+    return {
+        'clientId': settings.WEB3AUTH_CLIENT_ID,
+        'network': settings.WEB3AUTH_NETWORK,
+        'chainId': '0xaa36a7',
+        'rpcTarget': settings.SEPOLIA_RPC_URL,
+        'displayName': 'Ethereum Sepolia',
+        'ticker': 'ETH',
+        'tickerName': 'Ethereum',
+        'blockExplorerUrl': 'https://sepolia.etherscan.io',
+        'googleClientId': settings.GOOGLE_CLIENT_ID,
+        'syncUrl': '/api/auth/wallet-sync/',
+        'isAuthenticated': request.user.is_authenticated,
+        'walletAddress': wallet_address,
+        'eoaAddress': eoa_address,
+        'smartAccountAddress': smart_account_address,
+        'userEmail': request.user.email if request.user.is_authenticated else '',
+        'userName': request.user.get_username() if request.user.is_authenticated else '',
+        'biconomyBundlerUrl': settings.BICONOMY_BUNDLER_URL,
+        'biconomyPaymasterUrl': settings.BICONOMY_PAYMASTER_URL,
+        'alchemyApiKey': alchemy_api_key,
+        'alchemyPolicyId': settings.ALCHEMY_POLICY_ID,
+        'contractAddress': settings.CONTRACT_ADDRESS,
+    }
+
+
+def _can_manage_campaign_disbursement(user, campaign):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    my_org = user.managed_organizations.first()
+    return bool(my_org and campaign.organization_id == my_org.id)
+
+
+def _get_user_wallet_identity(user):
+    if not user or not user.is_authenticated or not hasattr(user, 'profile'):
+        return ''
+    return (
+        user.profile.smart_account_address
+        or user.profile.wallet_address
+        or user.profile.eoa_address
+        or ''
+    )
+
+
+def _get_disbursement_approver_context(user):
+    context = {
+        'current_wallet': _get_user_wallet_identity(user),
+        'admin_wallet': '',
+        'supervisor_wallet': '',
+        'approver_role': '',
+    }
+    try:
+        bc = BlockchainService()
+        wallets = bc.get_disbursement_approver_wallets()
+        context['admin_wallet'] = wallets['admin_wallet']
+        context['supervisor_wallet'] = wallets['supervisor_wallet']
+        current_wallet = (context['current_wallet'] or '').lower()
+        if current_wallet:
+            if current_wallet == wallets['admin_wallet'].lower() or user.is_superuser:
+                context['approver_role'] = 'admin'
+            elif current_wallet == wallets['supervisor_wallet'].lower():
+                context['approver_role'] = 'supervisor'
+    except Exception:
+        if user.is_superuser:
+            context['approver_role'] = 'admin'
+    return context
+
+
+def _approve_campaign_with_blockchain(campaign, approver):
+    campaign.status = 'active'
+    campaign.approved_by = approver
+    campaign.approved_at = timezone.now()
+    campaign.save()
+
+    try:
+        if not campaign.organization or not campaign.organization.wallet_address:
+            raise Exception("Tổ chức chưa có địa chỉ ví Crypto (MetaMask).")
+        bc = BlockchainService()
+        bc.init_campaign(
+            campaign_id=campaign.id,
+            org_name=campaign.organization.name if campaign.organization else "Unknown",
+            org_address=campaign.organization.wallet_address if campaign.organization else "0x0000000000000000000000000000000000000000",
+        )
+    except Exception as e:
+        print(f"❌ [BLOCKCHAIN ERROR] Lỗi initCampaign #{campaign.id}: {e}")
 
 # --- VIEW TRANG CHỦ ADMIN ---
 @login_required(login_url='admin_panel:dangnhap')
@@ -40,6 +242,7 @@ def trangchu(request):
     total_campaigns = 0
     total_donations_amount = 0
     total_programs = 0
+    total_pending_disbursements = 0
     role = 'user' 
 
     if user.is_superuser:
@@ -47,6 +250,14 @@ def trangchu(request):
         total_campaigns = Campaign.objects.count()
         total_programs = TargetProgram.objects.count()
         total_donations_amount = Donation.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
+        total_pending_disbursements = DisbursementProposal.objects.filter(status='pending').count()
+
+    elif _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
+        role = 'supervisor'
+        total_campaigns = Campaign.objects.filter(status='active').count()
+        total_programs = TargetProgram.objects.count()
+        total_donations_amount = Donation.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
+        total_pending_disbursements = DisbursementProposal.objects.filter(status='pending').count()
 
     elif Organization.objects.filter(manager=user).exists():
         role = 'partner'
@@ -66,13 +277,14 @@ def trangchu(request):
         'total_campaigns': total_campaigns,
         'total_programs': total_programs,
         'total_donations_amount': total_donations_amount,
+        'total_pending_disbursements': total_pending_disbursements,
     }
     return render(request, 'admin_panel/trangchu.html', context)
 
 # --- VIEW ĐĂNG NHẬP ---
 def dangnhap(request):
     if request.user.is_authenticated:
-        if request.user.is_superuser or Organization.objects.filter(manager=request.user).exists():
+        if request.user.is_superuser or Organization.objects.filter(manager=request.user).exists() or _get_disbursement_approver_context(request.user).get('approver_role') == 'supervisor':
             return redirect('admin_panel:trangchu')
         return redirect('client:trangchu')
 
@@ -96,7 +308,7 @@ def dangnhap(request):
 
         if user is not None:
             login(request, user)
-            if user.is_superuser or Organization.objects.filter(manager=user).exists():
+            if user.is_superuser or Organization.objects.filter(manager=user).exists() or _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
                 return redirect('admin_panel:trangchu')
             return redirect('client:trangchu')
 
@@ -217,9 +429,57 @@ def google_callback(request):
 
 # --- QUẢN LÝ DANH MỤC ---
 def quanlydanhmuc(request):
-    categories = CampaignCategory.objects.all().order_by('display_order')
+    q = _normalize_query(request.GET.get('q'))
+    status = request.GET.get('status', '')
+    categories = CampaignCategory.objects.all()
+
+    if q:
+        categories = categories.filter(
+            Q(name__icontains=q) |
+            Q(slug__icontains=q) |
+            Q(description__icontains=q)
+        )
+    if status == 'active':
+        categories = categories.filter(is_active=True)
+    elif status == 'inactive':
+        categories = categories.filter(is_active=False)
+
+    categories = categories.order_by('display_order', 'name')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Tên danh mục', 'Slug', 'Mô tả', 'Hiển thị', 'Thứ tự', 'Ngày tạo']
+        rows = categories.values_list('id', 'name', 'slug', 'description', 'is_active', 'display_order', 'created_at')
+        return _export_table_response('danh_muc', headers, rows, export_format)
+
+    stats = {
+        'total': CampaignCategory.objects.count(),
+        'active': CampaignCategory.objects.filter(is_active=True).count(),
+        'inactive': CampaignCategory.objects.filter(is_active=False).count(),
+    }
 
     if request.method == 'POST':
+        if request.POST.get('bulk_action'):
+            action = request.POST.get('bulk_action')
+            ids = _selected_ids(request)
+            if not ids:
+                messages.warning(request, "Vui lòng chọn ít nhất một dòng để thao tác.")
+                return _safe_next_url(request, 'admin_panel:quanlydanhmuc')
+
+            selected_qs = CampaignCategory.objects.filter(id__in=ids)
+            if action == 'activate':
+                count = selected_qs.update(is_active=True)
+                messages.success(request, f"Đã hiển thị {count} danh mục.")
+            elif action == 'deactivate':
+                count = selected_qs.update(is_active=False)
+                messages.success(request, f"Đã ẩn {count} danh mục.")
+            elif action == 'delete':
+                count = selected_qs.count()
+                selected_qs.delete()
+                messages.success(request, f"Đã xóa {count} danh mục.")
+            else:
+                messages.error(request, "Bulk action không hợp lệ.")
+            return _safe_next_url(request, 'admin_panel:quanlydanhmuc')
+
         cat_id = request.POST.get('id')
         name = request.POST.get('name')
         slug = request.POST.get('slug')
@@ -257,7 +517,14 @@ def quanlydanhmuc(request):
         return redirect('admin_panel:quanlydanhmuc')
 
     return render(request, 'admin_panel/quanlydanhmuc.html', {
-        'categories': categories
+        'categories': categories,
+        'role': _get_user_role(request.user),
+        'query': q,
+        'selected_status': status,
+        'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
     })
 
 def toggle_category(request, id):
@@ -271,19 +538,72 @@ def quanlytochuc(request):
     if not request.user.is_superuser:
         messages.error(request, "Bạn không có quyền truy cập trang Quản lý Tổ chức!")
         return redirect('admin_panel:trangchu')
-    query = request.GET.get('q', '')
+    query = _normalize_query(request.GET.get('q'))
+    status = request.GET.get('status', '')
     if query:
         orgs = Organization.objects.filter(
             Q(name__icontains=query) | 
             Q(contact_phone__icontains=query) |
-            Q(manager__username__icontains=query)
-        ).order_by('-created_at')
+            Q(manager__username__icontains=query) |
+            Q(bank_name__icontains=query) |
+            Q(bank_account_number__icontains=query)
+        )
     else:
-        orgs = Organization.objects.all().order_by('-created_at')
+        orgs = Organization.objects.all()
+
+    if status == 'verified':
+        orgs = orgs.filter(is_verified=True)
+    elif status == 'locked':
+        orgs = orgs.filter(is_verified=False)
+
+    orgs = orgs.order_by('-created_at')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Tên tổ chức', 'Quản lý', 'Số điện thoại', 'Ngân hàng', 'Số tài khoản', 'Ví crypto', 'Đã xác thực', 'Ngày tạo']
+        rows = orgs.values_list(
+            'id', 'name', 'manager__username', 'contact_phone', 'bank_name', 'bank_account_number',
+            'wallet_address', 'is_verified', 'created_at'
+        )
+        return _export_table_response('to_chuc', headers, rows, export_format)
+
+    if request.method == 'POST' and request.POST.get('bulk_action'):
+        action = request.POST.get('bulk_action')
+        ids = _selected_ids(request)
+        if not ids:
+            messages.warning(request, "Vui lòng chọn ít nhất một tổ chức.")
+            return _safe_next_url(request, 'admin_panel:quanlytochuc')
+
+        selected_qs = Organization.objects.filter(id__in=ids)
+        if action == 'verify':
+            count = selected_qs.update(is_verified=True, verified_at=timezone.now())
+            messages.success(request, f"Đã duyệt {count} tổ chức.")
+        elif action == 'lock':
+            count = selected_qs.update(is_verified=False)
+            messages.success(request, f"Đã khóa {count} tổ chức.")
+        elif action == 'delete':
+            count = selected_qs.count()
+            selected_qs.delete()
+            messages.success(request, f"Đã xóa {count} tổ chức.")
+        else:
+            messages.error(request, "Bulk action không hợp lệ.")
+        return _safe_next_url(request, 'admin_panel:quanlytochuc')
+
+    stats = {
+        'total': Organization.objects.count(),
+        'verified': Organization.objects.filter(is_verified=True).count(),
+        'locked': Organization.objects.filter(is_verified=False).count(),
+        'with_wallet': Organization.objects.exclude(wallet_address__isnull=True).exclude(wallet_address='').count(),
+    }
 
     return render(request, 'admin_panel/quanlytochuc.html', {
         'orgs': orgs, 
-        'query': query
+        'query': query,
+        'selected_status': status,
+        'role': _get_user_role(request.user),
+        'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
     })
 
 @transaction.atomic
@@ -372,20 +692,88 @@ def xoa_tochuc(request, pk):
 
 # --- QUẢN LÝ CHƯƠNG TRÌNH ---
 def quanlychuongtrinh(request):
-    query = request.GET.get('q', '')
+    query = _normalize_query(request.GET.get('q'))
+    status = request.GET.get('status', '')
+    org_id = request.GET.get('org', '')
     if query:
         programs = TargetProgram.objects.filter(
-            Q(name__icontains=query) | Q(organization__name__icontains=query)
-        ).order_by('-created_at')
+            Q(name__icontains=query) |
+            Q(organization__name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(beneficiary_address__icontains=query)
+        )
     else:
-        programs = TargetProgram.objects.all().order_by('-created_at')
+        programs = TargetProgram.objects.all()
 
-    all_orgs = Organization.objects.filter(is_verified=True) 
+    if org_id:
+        programs = programs.filter(organization_id=org_id)
+    if status == 'active':
+        programs = programs.filter(is_active=True)
+    elif status == 'inactive':
+        programs = programs.filter(is_active=False)
+    elif status == 'verified':
+        programs = programs.filter(is_verified=True)
+    elif status == 'unverified':
+        programs = programs.filter(is_verified=False)
+
+    programs = programs.order_by('-created_at')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Tên chương trình', 'Tổ chức', 'Mục tiêu', 'Hiển thị', 'Đã duyệt', 'Địa chỉ', 'Ngày tạo']
+        rows = programs.values_list(
+            'id', 'name', 'organization__name', 'total_target_amount',
+            'is_active', 'is_verified', 'beneficiary_address', 'created_at'
+        )
+        return _export_table_response('chuong_trinh', headers, rows, export_format)
+
+    if request.method == 'POST' and request.POST.get('bulk_action'):
+        action = request.POST.get('bulk_action')
+        ids = _selected_ids(request)
+        if not ids:
+            messages.warning(request, "Vui lòng chọn ít nhất một chương trình.")
+            return _safe_next_url(request, 'admin_panel:quanlychuongtrinh')
+
+        selected_qs = TargetProgram.objects.filter(id__in=ids)
+        if action == 'activate':
+            count = selected_qs.update(is_active=True)
+            messages.success(request, f"Đã hiển thị {count} chương trình.")
+        elif action == 'deactivate':
+            count = selected_qs.update(is_active=False)
+            messages.success(request, f"Đã ẩn {count} chương trình.")
+        elif action == 'verify':
+            count = selected_qs.update(is_verified=True)
+            messages.success(request, f"Đã duyệt {count} chương trình.")
+        elif action == 'unverify':
+            count = selected_qs.update(is_verified=False)
+            messages.success(request, f"Đã bỏ duyệt {count} chương trình.")
+        elif action == 'delete':
+            count = selected_qs.count()
+            selected_qs.delete()
+            messages.success(request, f"Đã xóa {count} chương trình.")
+        else:
+            messages.error(request, "Bulk action không hợp lệ.")
+        return _safe_next_url(request, 'admin_panel:quanlychuongtrinh')
+
+    all_orgs = Organization.objects.filter(is_verified=True).order_by('name')
+    stats = {
+        'total': TargetProgram.objects.count(),
+        'active': TargetProgram.objects.filter(is_active=True).count(),
+        'inactive': TargetProgram.objects.filter(is_active=False).count(),
+        'verified': TargetProgram.objects.filter(is_verified=True).count(),
+        'total_target': TargetProgram.objects.aggregate(t=Sum('total_target_amount'))['t'] or 0,
+    }
 
     context = {
         'programs': programs,
         'all_orgs': all_orgs,
-        'query': query
+        'query': query,
+        'selected_status': status,
+        'selected_org': org_id,
+        'role': _get_user_role(request.user),
+        'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
     }
     return render(request, 'admin_panel/quanlychuongtrinh.html', context)
 
@@ -471,23 +859,90 @@ def xoa_chuongtrinh(request, pk):
 @login_required(login_url='admin_panel:dangnhap')
 def quanlychiendich(request):
     user = request.user
+    q = _normalize_query(request.GET.get('q'))
+    status_filter = request.GET.get('status', '')
+    org_filter = request.GET.get('org', '')
     
     if user.is_superuser:
         role = 'admin'
-        campaigns = Campaign.objects.all().order_by('-created_at')
+        campaigns = Campaign.objects.select_related('organization', 'target_program', 'category', 'occasion').all()
         programs = TargetProgram.objects.all()
         orgs = Organization.objects.all()
     elif user.managed_organizations.exists():
         role = 'partner'
         my_org = user.managed_organizations.first()
-        campaigns = Campaign.objects.filter(organization=my_org).order_by('-created_at')
+        campaigns = Campaign.objects.select_related('organization', 'target_program', 'category', 'occasion').filter(organization=my_org)
         programs = TargetProgram.objects.filter(organization=my_org)
         orgs = [my_org]
     else:
         return redirect('client:trangchu')
 
+    if q:
+        campaigns = campaigns.filter(
+            Q(title__icontains=q) |
+            Q(short_description__icontains=q) |
+            Q(full_description__icontains=q) |
+            Q(organization__name__icontains=q) |
+            Q(creator__username__icontains=q)
+        )
+
+    if status_filter:
+        campaigns = campaigns.filter(status=status_filter)
+
+    if user.is_superuser and org_filter:
+        campaigns = campaigns.filter(organization_id=org_filter)
+
+    if request.method == 'POST' and request.POST.get('bulk_action'):
+        action = request.POST.get('bulk_action')
+        ids = _selected_ids(request)
+        if not ids:
+            messages.warning(request, "Vui lòng chọn ít nhất một chiến dịch.")
+            return _safe_next_url(request, 'admin_panel:quanlychiendich')
+
+        selected_qs = campaigns.filter(id__in=ids)
+        if action in ('approve', 'reject') and not user.is_superuser:
+            messages.error(request, "Bạn không có quyền duyệt hoặc từ chối chiến dịch.")
+            return _safe_next_url(request, 'admin_panel:quanlychiendich')
+
+        if action == 'approve':
+            ok = 0
+            for camp in selected_qs:
+                _approve_campaign_with_blockchain(camp, user)
+                ok += 1
+            messages.success(request, f"Đã duyệt {ok} chiến dịch.")
+        elif action == 'reject':
+            count = selected_qs.update(status='rejected')
+            messages.success(request, f"Đã từ chối {count} chiến dịch.")
+        elif action == 'hide':
+            count = selected_qs.update(status='hidden')
+            messages.success(request, f"Đã ẩn {count} chiến dịch.")
+        elif action == 'delete':
+            count = selected_qs.count()
+            selected_qs.delete()
+            messages.success(request, f"Đã xóa {count} chiến dịch.")
+        else:
+            messages.error(request, "Bulk action không hợp lệ.")
+        return _safe_next_url(request, 'admin_panel:quanlychiendich')
+
+    campaigns = campaigns.order_by('-created_at')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Tên chiến dịch', 'Tổ chức', 'Chương trình', 'Mục tiêu', 'Đã huy động', 'Trạng thái', 'Ngày bắt đầu', 'Ngày kết thúc', 'Ngày tạo']
+        rows = campaigns.values_list(
+            'id', 'title', 'organization__name', 'target_program__name', 'target_amount',
+            'current_amount', 'status', 'start_date', 'end_date', 'created_at'
+        )
+        return _export_table_response('chien_dich', headers, rows, export_format)
+
     categories = CampaignCategory.objects.filter(is_active=True)
     occasions = CampaignOccasion.objects.filter(is_active=True)
+    stats = {
+        'total': campaigns.count(),
+        'active': campaigns.filter(status='active').count(),
+        'pending': campaigns.filter(status='pending').count(),
+        'rejected': campaigns.filter(status='rejected').count(),
+        'total_raised': campaigns.aggregate(t=Sum('current_amount'))['t'] or 0,
+    }
 
     context = {
         'campaigns': campaigns,
@@ -495,7 +950,14 @@ def quanlychiendich(request):
         'programs': programs,
         'orgs': orgs,
         'categories': categories,
-        'occasions': occasions
+        'occasions': occasions,
+        'query': q,
+        'selected_status': status_filter,
+        'selected_org': org_filter,
+        'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
     }
     return render(request, 'admin_panel/quanlychiendich.html', context)
 
@@ -606,26 +1068,7 @@ def sua_chiendich(request, pk):
 def duyet_chiendich(request, pk):
     if not request.user.is_superuser: return redirect('admin_panel:quanlychiendich')
     camp = get_object_or_404(Campaign, pk=pk)
-    camp.status = 'active'
-    camp.approved_by = request.user
-    camp.approved_at = timezone.now()
-    camp.save()
-
-    # 🔥 GỌI initCampaign LÊN BLOCKCHAIN KHI DUYỆT
-    try:
-        print(f"🚀 [BLOCKCHAIN] Đang khởi tạo chiến dịch #{camp.id} trên Blockchain...")
-        if not camp.organization or not camp.organization.wallet_address:
-            raise Exception("Tổ chức chưa có địa chỉ ví Crypto (MetaMask).")
-        bc = BlockchainService()
-        tx_hash = bc.init_campaign(
-            campaign_id=camp.id,
-            org_name=camp.organization.name if camp.organization else "Unknown",
-            org_address=camp.organization.wallet_address if camp.organization else "0x0000000000000000000000000000000000000000",
-        )
-        print(f"✅ [BLOCKCHAIN] initCampaign thành công! Hash: {tx_hash}")
-    except Exception as e:
-        print(f"❌ [BLOCKCHAIN ERROR] Lỗi initCampaign: {e}")
-        print("⚠️ Chiến dịch vẫn được duyệt trên SQL, nhưng chưa init trên Blockchain.")
+    _approve_campaign_with_blockchain(camp, request.user)
 
     messages.success(request, "Đã duyệt chiến dịch!")
     return redirect('admin_panel:quanlychiendich')
@@ -664,9 +1107,6 @@ def nap_pool(request):
 
         amount_wei = int(Decimal(str(amount_eth)) * Decimal('1000000000000000000'))
         bc = BlockchainService()
-        if bc.admin_has_pending_tx():
-            messages.error(request, "Ví Admin đang có giao dịch pending. Vui lòng đợi xác nhận hoặc Speed Up trong MetaMask.")
-            return redirect('admin_panel:quanlychiendich')
         try:
             chain_id = bc.w3.eth.chain_id
             balance = bc.w3.eth.get_balance(settings.WALLET_ADDRESS)
@@ -694,8 +1134,90 @@ def nap_pool(request):
 
 # --- QUẢN LÝ QUYÊN GÓP ---
 def quanly_quyengop(request):
-    donations = Donation.objects.all().order_by('-created_at')
-    return render(request, 'admin_panel/quanly_quyengop.html', {'donations': donations})
+    q = _normalize_query(request.GET.get('q'))
+    status = request.GET.get('status', '')
+    payment_method = request.GET.get('payment_method', '')
+    created_from = request.GET.get('from', '')
+    created_to = request.GET.get('to', '')
+
+    donations = Donation.objects.select_related('campaign', 'campaign__organization').all()
+    if q:
+        donations = donations.filter(
+            Q(donor_name__icontains=q) |
+            Q(donor_email__icontains=q) |
+            Q(transaction_id__icontains=q) |
+            Q(campaign__title__icontains=q) |
+            Q(campaign__organization__name__icontains=q)
+        )
+    if status:
+        donations = donations.filter(status=status)
+    if payment_method:
+        donations = donations.filter(payment_method=payment_method)
+    if created_from:
+        donations = donations.filter(created_at__date__gte=created_from)
+    if created_to:
+        donations = donations.filter(created_at__date__lte=created_to)
+
+    if request.method == 'POST' and request.POST.get('bulk_action'):
+        action = request.POST.get('bulk_action')
+        ids = _selected_ids(request)
+        if not ids:
+            messages.warning(request, "Vui lòng chọn ít nhất một giao dịch.")
+            return _safe_next_url(request, 'admin_panel:quanly_quyengop')
+
+        selected_qs = donations.filter(id__in=ids)
+        if action == 'completed':
+            count = selected_qs.update(status='completed')
+            messages.success(request, f"Đã duyệt {count} giao dịch.")
+        elif action == 'pending':
+            count = selected_qs.update(status='pending')
+            messages.success(request, f"Đã chuyển {count} giao dịch về chờ xử lý.")
+        elif action == 'failed':
+            count = selected_qs.update(status='failed')
+            messages.success(request, f"Đã đánh dấu thất bại {count} giao dịch.")
+        elif action == 'refunded':
+            count = selected_qs.update(status='refunded')
+            messages.success(request, f"Đã đánh dấu hoàn tiền {count} giao dịch.")
+        elif action == 'delete':
+            count = selected_qs.count()
+            selected_qs.delete()
+            messages.success(request, f"Đã xóa {count} giao dịch.")
+        else:
+            messages.error(request, "Bulk action không hợp lệ.")
+        return _safe_next_url(request, 'admin_panel:quanly_quyengop')
+
+    donations = donations.order_by('-created_at')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Người ủng hộ', 'Email', 'Số tiền', 'Chiến dịch', 'Tổ chức', 'Phương thức', 'Trạng thái', 'Mã giao dịch', 'Ngày tạo']
+        rows = donations.values_list(
+            'id', 'donor_name', 'donor_email', 'amount',
+            'campaign__title', 'campaign__organization__name', 'payment_method',
+            'status', 'transaction_id', 'created_at'
+        )
+        return _export_table_response('quyen_gop', headers, rows, export_format)
+
+    stats = {
+        'total': donations.count(),
+        'completed': donations.filter(status='completed').count(),
+        'pending': donations.filter(status='pending').count(),
+        'failed': donations.filter(status='failed').count(),
+        'refunded': donations.filter(status='refunded').count(),
+        'amount_total': donations.filter(status='completed').aggregate(t=Sum('amount'))['t'] or 0,
+    }
+    return render(request, 'admin_panel/quanly_quyengop.html', {
+        'donations': donations,
+        'role': _get_user_role(request.user),
+        'query': q,
+        'selected_status': status,
+        'selected_payment_method': payment_method,
+        'created_from': created_from,
+        'created_to': created_to,
+        'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
+    })
 
 def sua_quyengop(request, pk):
     donation = get_object_or_404(Donation, pk=pk)
@@ -709,7 +1231,11 @@ def sua_quyengop(request, pk):
     else:
         form = DonationForm(instance=donation)
 
-    return render(request, 'admin_panel/sua_quyengop.html', {'form': form, 'donation': donation})
+    return render(request, 'admin_panel/sua_quyengop.html', {
+        'form': form,
+        'donation': donation,
+        'role': _get_user_role(request.user),
+    })
 
 
 # ========================================================
@@ -719,6 +1245,8 @@ def sua_quyengop(request, pk):
 @login_required(login_url='admin_panel:dangnhap')
 def quanly_giaingan(request):
     user = request.user
+    q = _normalize_query(request.GET.get('q'))
+    approver_context = _get_disbursement_approver_context(user)
 
     if user.is_superuser:
         role = 'admin'
@@ -726,6 +1254,12 @@ def quanly_giaingan(request):
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
         ).all()
         campaigns = Campaign.objects.filter(status='active')
+    elif approver_context['approver_role'] == 'supervisor':
+        role = 'supervisor'
+        proposals_qs = DisbursementProposal.objects.select_related(
+            'campaign', 'campaign__organization', 'created_by', 'approved_by'
+        ).all()
+        campaigns = Campaign.objects.none()
     elif user.managed_organizations.exists():
         role = 'partner'
         my_org = user.managed_organizations.first()
@@ -736,24 +1270,204 @@ def quanly_giaingan(request):
     else:
         return redirect('client:trangchu')
 
-    # Tính số tiền khả dụng thực tế (đã trừ phí gas) cho mỗi chiến dịch
+    # ========================================================
+    # LUỒNG V2: Công thức động theo số lần tạo giải ngân
+    #   onchain_available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
+    #   LẦN ĐẦU tạo giải ngân (chưa có proposal nào non-rejected):
+    #     net_available = onchain_available - est_disbursement_gas - est_recovery_gas - locked
+    #     (dự trù 2 phí: 1 cho tx giải ngân + 1 cho tx thu hồi gas cuối cùng)
+    #   LẦN 2 TRỞ ĐI:
+    #     net_available = onchain_available - est_disbursement_gas - locked
+    #     (chỉ dự trù 1 phí vì est_recovery_gas đã được reserve từ lần đầu)
+    #
+    #   Nút "Thu hồi gas" chỉ hiện khi: campaign đã hết hạn VÀ onchain_available ≈ 0
+    # ========================================================
     campaigns_with_available = []
+    bc = None
+    eth_vnd_rate = None
+    est_disbursement_gas_vnd = Decimal('0')
+    est_recovery_gas_vnd = Decimal('0')
+
+    # Breakdown hiển thị - Luồng v2 mới (gas A/B đã recordGasCost vào contract)
+    bank_record_gas_map = {
+        row['campaign_id']: (row['total'] or Decimal('0'))
+        for row in Donation.objects.filter(bank_record_gas_vnd__isnull=False).values('campaign_id').annotate(total=Sum('bank_record_gas_vnd'))
+    }
+    donate_onbehalf_gas_map = {
+        row['campaign_id']: (row['total'] or Decimal('0'))
+        for row in Donation.objects.filter(donate_onbehalf_gas_vnd__isnull=False).values('campaign_id').annotate(total=Sum('donate_onbehalf_gas_vnd'))
+    }
+    # Legacy (luồng cũ) - giữ để tương thích với donation cũ
+    admin_sendeth_gas_map = {
+        row['campaign_id']: (row['total'] or Decimal('0'))
+        for row in Donation.objects.filter(admin_send_eth_gas_fee_vnd__isnull=False).values('campaign_id').annotate(total=Sum('admin_send_eth_gas_fee_vnd'))
+    }
+    disbursement_gas_map = {
+        row['campaign_id']: (row['total'] or Decimal('0'))
+        for row in DisbursementProposal.objects.filter(status='executed').values('campaign_id').annotate(total=Sum('disbursement_gas_fee_vnd'))
+    }
+    # Map: chiến dịch đã có proposal non-rejected chưa? (để xác định lần đầu / lần 2+)
+    non_rejected_proposal_ids = set(
+        DisbursementProposal.objects.exclude(status='rejected').values_list('campaign_id', flat=True)
+    )
+
+    try:
+        bc = BlockchainService()
+        eth_vnd_rate = get_eth_vnd_rate()
+        est_gas_vnd, _est_gas_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
+        est_disbursement_gas_vnd = est_gas_vnd
+        est_recovery_gas_vnd = est_gas_vnd  # cùng công thức ước tính (1 tx on-chain)
+    except Exception:
+        bc = None
+        eth_vnd_rate = None
+
+    today = timezone.localdate()  # datetime.date - so sánh với end_date (DateField)
     for c in campaigns:
-        total_gas = Donation.objects.filter(
-            campaign=c, gas_fee_vnd__isnull=False
-        ).aggregate(total=Sum('gas_fee_vnd'))['total'] or Decimal('0')
-        net_available = c.current_amount - total_gas - c.disbursed_amount - c.locked_amount
+        gas_bank_record_vnd = bank_record_gas_map.get(c.id, Decimal('0'))
+        gas_donate_onbehalf_vnd = donate_onbehalf_gas_map.get(c.id, Decimal('0'))
+        gas_admin_sendeth_vnd = admin_sendeth_gas_map.get(c.id, Decimal('0'))  # legacy
+        gas_disbursement_actual_vnd = disbursement_gas_map.get(c.id, Decimal('0'))
+        gas_onchain_total_cost_vnd = Decimal('0')  # totalGasCost on-chain (đã cộng dồn)
+        gas_recovered_vnd = Decimal('0')
+        onchain_total_fund_vnd = c.current_amount
+        # SQL fallback: CHƯA trừ locked ở đây (locked sẽ trừ 1 lần duy nhất khi tính net_available)
+        onchain_available_vnd = max(Decimal('0'), c.current_amount - c.disbursed_amount)
+
+        # Lần đầu tạo giải ngân? (chưa có proposal nào non-rejected cho campaign này)
+        is_first_disbursement = c.id not in non_rejected_proposal_ids
+
+        if bc and eth_vnd_rate:
+            try:
+                stats = bc.get_campaign_onchain_stats(c.id)
+                # Dùng total_gas_cost_wei (v2); fallback total_gas_subsidized_wei (alias backward-compat)
+                total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
+                # onchain_available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
+                available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
+                gas_onchain_total_cost_vnd = _round_vnd(_wei_to_vnd(total_gas_cost_wei, eth_vnd_rate))
+                gas_recovered_vnd = _round_vnd(_wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate))
+                onchain_total_fund_vnd = _round_vnd(_wei_to_vnd(stats['total_fund_wei'], eth_vnd_rate))
+                onchain_available_vnd = _round_vnd(_wei_to_vnd(max(0, available_wei), eth_vnd_rate))
+            except Exception:
+                pass
+
+        # Công thức động:
+        #   lần đầu → trừ 2 phí (disbursement + recovery)
+        #   lần 2+  → chỉ trừ 1 phí (disbursement)
+        if is_first_disbursement:
+            reserve_gas_vnd = _round_vnd(est_disbursement_gas_vnd) + _round_vnd(est_recovery_gas_vnd)
+        else:
+            reserve_gas_vnd = _round_vnd(est_disbursement_gas_vnd)
+        net_available = onchain_available_vnd - reserve_gas_vnd - c.locked_amount
+
+        # Nút "Thu hồi gas" chỉ hiện khi campaign đã hết hạn VÀ đã giải ngân hết
+        # (onchain_available = 0 nghĩa là không còn tiền để giải ngân tiếp)
+        # Lưu ý: c.end_date là DateField (date) nên so với today (date) thay vì now (datetime)
+        is_ended = bool(c.end_date) and c.end_date < today
+        fully_disbursed = onchain_available_vnd <= FULLY_DISBURSED_THRESHOLD_VND
+        can_recover_gas = is_ended and fully_disbursed
+
+        # total_gas_vnd chỉ để hiển thị "tổng phí gas đã chi + dự trù"
+        total_gas_display_vnd = gas_onchain_total_cost_vnd + _round_vnd(gas_admin_sendeth_vnd) + _round_vnd(gas_disbursement_actual_vnd) + reserve_gas_vnd
         campaigns_with_available.append({
             'obj': c,
-            'total_gas_vnd': total_gas,
-            'net_available': max(Decimal('0'), net_available),
+            'total_gas_vnd': _round_vnd(total_gas_display_vnd),
+            # Luồng v2 breakdown
+            'gas_bank_record_vnd': _round_vnd(gas_bank_record_vnd),
+            'gas_donate_onbehalf_vnd': _round_vnd(gas_donate_onbehalf_vnd),
+            'gas_onchain_total_cost_vnd': gas_onchain_total_cost_vnd,
+            # Legacy
+            'gas_admin_sendeth_vnd': _round_vnd(gas_admin_sendeth_vnd),
+            'gas_disbursement_actual_vnd': _round_vnd(gas_disbursement_actual_vnd),
+            # Gas dự trù (động theo lần)
+            'est_disbursement_gas_vnd': _round_vnd(est_disbursement_gas_vnd),
+            'est_recovery_gas_vnd': _round_vnd(est_recovery_gas_vnd),
+            'reserve_gas_vnd': reserve_gas_vnd,
+            'is_first_disbursement': is_first_disbursement,
+            # Onchain info
+            'onchain_available_vnd': onchain_available_vnd,
+            'gas_recovered_vnd': gas_recovered_vnd,
+            'onchain_total_fund_vnd': _round_vnd(onchain_total_fund_vnd),
+            'net_available': max(Decimal('0'), _round_vnd(net_available)),
+            # Điều kiện thu hồi gas
+            'can_recover_gas': can_recover_gas,
+            'is_ended': is_ended,
+            'fully_disbursed': fully_disbursed,
         })
 
     campaign_filter = request.GET.get('campaign')
+    status_filter = request.GET.get('status', '')
     if campaign_filter:
         proposals_qs = proposals_qs.filter(campaign_id=campaign_filter)
+    if q:
+        proposals_qs = proposals_qs.filter(
+            Q(title__icontains=q) |
+            Q(purpose__icontains=q) |
+            Q(recipient_name__icontains=q) |
+            Q(campaign__title__icontains=q) |
+            Q(campaign__organization__name__icontains=q)
+        )
+    if status_filter:
+        proposals_qs = proposals_qs.filter(status=status_filter)
+
+    if request.method == 'POST' and request.POST.get('bulk_action'):
+        action = request.POST.get('bulk_action')
+        ids = _selected_ids(request)
+        if not ids:
+            messages.warning(request, "Vui lòng chọn ít nhất một đề xuất.")
+            return _safe_next_url(request, 'admin_panel:quanly_giaingan')
+
+        selected_qs = proposals_qs.filter(id__in=ids).select_related('campaign')
+        if action == 'approve':
+            if not user.is_superuser:
+                messages.error(request, "Bạn không có quyền duyệt đề xuất.")
+                return _safe_next_url(request, 'admin_panel:quanly_giaingan')
+            voting_days = int(request.POST.get('bulk_voting_days') or 7)
+            approved_count = 0
+            for proposal in selected_qs:
+                if proposal.status != 'pending':
+                    continue
+                proposal.status = 'voting'
+                proposal.approved_by = request.user
+                proposal.approved_at = timezone.now()
+                proposal.voting_days = voting_days
+                proposal.end_date = timezone.now() + timedelta(days=voting_days)
+                proposal.save(update_fields=['status', 'approved_by', 'approved_at', 'voting_days', 'end_date'])
+
+                campaign = proposal.campaign
+                campaign.locked_amount += proposal.amount_requested
+                campaign.save(update_fields=['locked_amount'])
+                approved_count += 1
+            messages.success(request, f"Đã duyệt {approved_count} đề xuất và mở bỏ phiếu.")
+        elif action == 'reject':
+            rejected_count = 0
+            for proposal in selected_qs:
+                if proposal.status not in ('pending', 'voting'):
+                    continue
+                if proposal.status == 'voting':
+                    campaign = proposal.campaign
+                    campaign.locked_amount = max(Decimal('0'), campaign.locked_amount - proposal.amount_requested)
+                    campaign.save(update_fields=['locked_amount'])
+                proposal.status = 'rejected'
+                proposal.save(update_fields=['status'])
+                rejected_count += 1
+            messages.success(request, f"Đã từ chối {rejected_count} đề xuất.")
+        elif action == 'delete':
+            count = selected_qs.count()
+            selected_qs.delete()
+            messages.success(request, f"Đã xóa {count} đề xuất.")
+        else:
+            messages.error(request, "Bulk action không hợp lệ.")
+        return _safe_next_url(request, 'admin_panel:quanly_giaingan')
 
     proposals_qs = proposals_qs.order_by('-created_at')
+    export_format = _get_export_format(request)
+    if export_format:
+        headers = ['ID', 'Chiến dịch', 'Tiêu đề', 'Số tiền yêu cầu', 'Mục đích', 'Đơn vị thụ hưởng', 'Trạng thái', 'Người tạo', 'Ngày tạo']
+        rows = proposals_qs.values_list(
+            'id', 'campaign__title', 'title', 'amount_requested', 'purpose',
+            'recipient_name', 'status', 'created_by__username', 'created_at'
+        )
+        return _export_table_response('giai_ngan', headers, rows, export_format)
 
     proposals_data = []
     for p in proposals_qs:
@@ -761,6 +1475,12 @@ def quanly_giaingan(request):
         yes_power = votes.filter(is_agree=True).aggregate(t=Sum('voting_power'))['t'] or Decimal('0')
         no_power = votes.filter(is_agree=False).aggregate(t=Sum('voting_power'))['t'] or Decimal('0')
         total_voted = yes_power + no_power
+        can_approve = role in ('admin', 'supervisor') and p.status in ('pending', 'approved') and bool(p.ipfs_cid)
+        already_approved = False
+        if role == 'admin':
+            already_approved = bool(p.admin_approval_tx_hash)
+        elif role == 'supervisor':
+            already_approved = bool(p.supervisor_approval_tx_hash)
         proposals_data.append({
             'obj': p,
             'yes_power': yes_power,
@@ -768,13 +1488,18 @@ def quanly_giaingan(request):
             'yes_pct': float(yes_power / total_voted * 100) if total_voted > 0 else 0,
             'no_pct': float(no_power / total_voted * 100) if total_voted > 0 else 0,
             'votes_count': votes.count(),
+            'can_approve': can_approve,
+            'already_approved': already_approved,
         })
 
     stats = {
         'pending': proposals_qs.filter(status='pending').count(),
         'voting': proposals_qs.filter(status='voting').count(),
+        'approved': proposals_qs.filter(status='approved').count(),
         'executed': proposals_qs.filter(status='executed').count(),
+        'rejected': proposals_qs.filter(status='rejected').count(),
         'total_disbursed': proposals_qs.filter(status='executed').aggregate(t=Sum('amount_requested'))['t'] or 0,
+        'total_requested': proposals_qs.aggregate(t=Sum('amount_requested'))['t'] or 0,
     }
 
     context = {
@@ -783,9 +1508,192 @@ def quanly_giaingan(request):
         'campaigns_available': campaigns_with_available,
         'role': role,
         'selected_campaign': campaign_filter,
+        'selected_status': status_filter,
+        'query': q,
         'stats': stats,
+        'current_url': request.get_full_path(),
+        'export_csv_url': _export_links(request)[0],
+        'export_excel_url': _export_links(request)[1],
+        'approver_context': approver_context,
+        'disbursement_web3_config': _build_disbursement_web3_config(request),
     }
     return render(request, 'admin_panel/quanly_giaingan.html', context)
+
+
+@login_required
+def ipfs_upload_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+
+    campaign_id = request.POST.get('campaign_id')
+    if not campaign_id:
+        return JsonResponse({'ok': False, 'message': 'Thiếu campaign_id.'}, status=400)
+
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+    if not _can_manage_campaign_disbursement(request.user, campaign):
+        return JsonResponse({'ok': False, 'message': 'Bạn không có quyền upload hóa đơn cho chiến dịch này.'}, status=403)
+
+    invoice_file = request.FILES.get('invoice_file')
+    if not invoice_file:
+        return JsonResponse({'ok': False, 'message': 'Vui lòng chọn hóa đơn/chứng từ để upload.'}, status=400)
+
+    if not settings.PINATA_API_KEY or not settings.PINATA_API_SECRET:
+        return JsonResponse({'ok': False, 'message': 'Thiếu cấu hình Pinata trong server.'}, status=500)
+
+    try:
+        response = requests.post(
+            'https://api.pinata.cloud/pinning/pinFileToIPFS',
+            headers={
+                'pinata_api_key': settings.PINATA_API_KEY,
+                'pinata_secret_api_key': settings.PINATA_API_SECRET,
+            },
+            files={
+                'file': (invoice_file.name, invoice_file, invoice_file.content_type or 'application/octet-stream'),
+            },
+            data={
+                'pinataMetadata': (
+                    '{"name":"%s","keyvalues":{"campaignId":"%s","uploadedBy":"%s"}}'
+                    % (invoice_file.name, campaign.id, request.user.id)
+                ),
+            },
+            timeout=60,
+        )
+    except requests.RequestException as exc:
+        return JsonResponse({'ok': False, 'message': f'Không thể kết nối Pinata: {exc}'}, status=502)
+
+    if response.status_code >= 400:
+        try:
+            error_payload = response.json()
+        except ValueError:
+            error_payload = {'error': response.text[:200]}
+        return JsonResponse(
+            {
+                'ok': False,
+                'message': 'Pinata từ chối upload.',
+                'details': error_payload,
+            },
+            status=502,
+        )
+
+    payload = response.json()
+    cid = payload.get('IpfsHash')
+    if not cid:
+        return JsonResponse({'ok': False, 'message': 'Pinata không trả về CID.'}, status=502)
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'cid': cid,
+            'gateway_url': f'https://gateway.pinata.cloud/ipfs/{cid}',
+            'file_name': invoice_file.name,
+            'pin_size': payload.get('PinSize'),
+            'timestamp': payload.get('Timestamp'),
+        }
+    )
+
+
+@login_required
+@csrf_exempt
+def sync_disbursement_approval(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+
+    approver_context = _get_disbursement_approver_context(request.user)
+    approver_role = approver_context.get('approver_role')
+    if approver_role not in ('admin', 'supervisor'):
+        return JsonResponse({'ok': False, 'message': 'Bạn không có quyền đồng bộ chữ ký duyệt.'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Payload JSON không hợp lệ.'}, status=400)
+
+    proposal_id = payload.get('proposal_id')
+    tx_hash = (payload.get('tx_hash') or '').strip()
+    if not proposal_id or not tx_hash:
+        return JsonResponse({'ok': False, 'message': 'Thiếu proposal_id hoặc tx_hash.'}, status=400)
+
+    proposal = get_object_or_404(DisbursementProposal.objects.select_related('campaign'), pk=proposal_id)
+    if proposal.status not in ('pending', 'approved'):
+        return JsonResponse({'ok': False, 'message': 'Đề xuất này không còn ở trạng thái chờ duyệt.'}, status=409)
+
+    try:
+        bc = BlockchainService()
+        campaign_meta = bc.get_campaign_disbursement_meta(proposal.campaign_id)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'message': f'Không đọc được trạng thái on-chain: {exc}'}, status=502)
+
+    if proposal.ipfs_cid and campaign_meta.get('ipfs_cid') and proposal.ipfs_cid != campaign_meta['ipfs_cid']:
+        return JsonResponse({'ok': False, 'message': 'CID on-chain không khớp với proposal đang duyệt.'}, status=409)
+
+    now = timezone.now()
+    updated_fields = ['approval_count', 'last_approval_synced_at', 'status']
+    proposal.approval_count = max(int(proposal.approval_count or 0), int(campaign_meta.get('approvals', 0)))
+    proposal.last_approval_synced_at = now
+    if approver_role == 'supervisor':
+        proposal.supervisor_approved_at = proposal.supervisor_approved_at or now
+        proposal.supervisor_approval_tx_hash = proposal.supervisor_approval_tx_hash or tx_hash
+        updated_fields.extend(['supervisor_approved_at', 'supervisor_approval_tx_hash'])
+    else:
+        proposal.admin_approved_at = proposal.admin_approved_at or now
+        proposal.admin_approval_tx_hash = proposal.admin_approval_tx_hash or tx_hash
+        proposal.approved_by = request.user
+        proposal.approved_at = proposal.approved_at or now
+        updated_fields.extend(['admin_approved_at', 'admin_approval_tx_hash', 'approved_by', 'approved_at'])
+
+    proposal.status = 'approved' if proposal.approval_count >= 2 else 'pending'
+    proposal.save(update_fields=list(dict.fromkeys(updated_fields)))
+
+    ActivityLog.objects.create(
+        user=request.user,
+        type='disbursement_approval_synced',
+        description=f'Đồng bộ chữ ký {approver_role} cho proposal #{proposal.id}. approvals={proposal.approval_count}, tx={tx_hash}',
+        campaign=proposal.campaign,
+    )
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'proposal_id': proposal.id,
+            'proposal_status': proposal.status,
+            'approval_count': proposal.approval_count,
+            'approver_role': approver_role,
+            'tx_hash': tx_hash,
+            'supervisor_approved': bool(proposal.supervisor_approval_tx_hash),
+            'admin_approved': bool(proposal.admin_approval_tx_hash),
+        }
+    )
+
+
+@login_required
+def sync_disbursement_onchain(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Bạn không có quyền đồng bộ giải ngân on-chain.")
+        return redirect('admin_panel:quanly_giaingan')
+
+    proposal = get_object_or_404(
+        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'),
+        pk=pk,
+    )
+
+    try:
+        result = sync_disbursement_proposal_status(proposal)
+    except Exception as exc:
+        messages.error(request, f"Lỗi đồng bộ sự kiện DisbursedAndBurned: {exc}")
+        return redirect('admin_panel:quanly_giaingan')
+
+    if result.get('synced'):
+        if result.get('already_synced'):
+            messages.info(request, f"Đề xuất đã được sync trước đó. Tx: {result['tx_hash']}")
+        else:
+            messages.success(
+                request,
+                f"Đã xác nhận DisbursedAndBurned và trigger mock bank transfer. Tx: {result['tx_hash']}",
+            )
+    else:
+        messages.warning(request, result.get('message') or 'Chưa tìm thấy sự kiện giải ngân trong các block gần đây.')
+
+    return redirect('admin_panel:quanly_giaingan')
 
 
 @login_required
@@ -795,20 +1703,48 @@ def tao_yeucau_giaingan(request):
             campaign_id = request.POST.get('campaign_id')
             campaign = get_object_or_404(Campaign, pk=campaign_id)
 
-            if not request.user.is_superuser:
-                my_org = request.user.managed_organizations.first()
-                if campaign.organization != my_org:
-                    messages.error(request, "Bạn không có quyền tạo yêu cầu giải ngân cho chiến dịch này!")
-                    return redirect('admin_panel:quanly_giaingan')
+            if not _can_manage_campaign_disbursement(request.user, campaign):
+                messages.error(request, "Bạn không có quyền tạo yêu cầu giải ngân cho chiến dịch này!")
+                return redirect('admin_panel:quanly_giaingan')
 
-            amount = Decimal(request.POST.get('amount_requested', '0'))
-            total_gas_fees = Donation.objects.filter(
-                campaign=campaign, gas_fee_vnd__isnull=False
-            ).aggregate(total=Sum('gas_fee_vnd'))['total'] or Decimal('0')
-            net_receivable = campaign.current_amount - total_gas_fees
-            available = net_receivable - campaign.disbursed_amount - campaign.locked_amount
+            amount_raw = (request.POST.get('amount_requested', '0') or '0').replace(',', '')
+            amount = _round_vnd(Decimal(amount_raw))
+            total_gas_fees = Decimal('0')
+
+            # Xác định lần tạo giải ngân (lần đầu hay lần 2+)
+            is_first_disbursement = not DisbursementProposal.objects.filter(
+                campaign=campaign
+            ).exclude(status='rejected').exists()
+
+            # Bắt đầu với SQL fallback: onchain_available = current - disbursed (chưa trừ locked)
+            onchain_available_vnd = max(Decimal('0'), campaign.current_amount - campaign.disbursed_amount)
+            est_per_tx = Decimal('0')
+            gas_onchain_cost_vnd = Decimal('0')
+
+            try:
+                bc = BlockchainService()
+                eth_vnd_rate = get_eth_vnd_rate()
+                stats = bc.get_campaign_onchain_stats(campaign.id)
+                # V2: dùng total_gas_cost_wei (contract mới, đã cộng dồn gas A+B+C qua recordGasCost)
+                total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
+                available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
+                est_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
+                est_per_tx = _round_vnd(est_gas_vnd)
+                gas_onchain_cost_vnd = _round_vnd(_wei_to_vnd(total_gas_cost_wei, eth_vnd_rate))
+                onchain_available_vnd = _round_vnd(_wei_to_vnd(max(0, available_wei), eth_vnd_rate))
+            except Exception:
+                pass
+
+            # CÔNG THỨC ĐỘNG (áp dụng cả khi BlockchainService fail để tránh bypass):
+            #   lần đầu   → trừ 2 phí dự trù (giải ngân + thu hồi)
+            #   lần 2+    → chỉ trừ 1 phí dự trù (giải ngân)
+            reserve_gas = est_per_tx * 2 if is_first_disbursement else est_per_tx
+            total_gas_fees = gas_onchain_cost_vnd + reserve_gas
+            available = onchain_available_vnd - reserve_gas - campaign.locked_amount
+            available = _round_vnd(max(Decimal('0'), available))
             if amount > available:
-                messages.error(request, f"Số tiền vượt quá số dư khả dụng ({int(available):,}đ). Đã trừ phí gas {int(total_gas_fees):,}đ.")
+                lan_msg = "lần đầu (dự trù 2 phí: giải ngân + thu hồi gas)" if is_first_disbursement else "lần tiếp theo (chỉ dự trù phí giải ngân)"
+                messages.error(request, f"Số tiền vượt quá số dư khả dụng ({int(available):,}đ). Đã trừ phí gas {int(total_gas_fees):,}đ [{lan_msg}].")
                 return redirect('admin_panel:quanly_giaingan')
 
             proposal = DisbursementProposal()
@@ -818,7 +1754,15 @@ def tao_yeucau_giaingan(request):
             proposal.purpose = request.POST.get('purpose')
             proposal.description = request.POST.get('description')
             proposal.recipient_name = request.POST.get('recipient_name')
+            proposal.ipfs_cid = (request.POST.get('ipfs_cid') or '').strip() or None
+            proposal.eth_tx_hash = (request.POST.get('proposal_tx_hash') or '').strip() or None
+            if not proposal.ipfs_cid or not proposal.eth_tx_hash:
+                messages.error(request, "Thiếu IPFS CID hoặc transaction hash gasless. Vui lòng upload lại hóa đơn và ký giao dịch.")
+                return redirect('admin_panel:quanly_giaingan')
             proposal.evidence_url = request.POST.get('evidence_url', '')
+            ipfs_gateway_url = (request.POST.get('ipfs_gateway_url') or '').strip()
+            if proposal.ipfs_cid and not proposal.evidence_url and ipfs_gateway_url:
+                proposal.evidence_url = ipfs_gateway_url
             proposal.created_by = request.user
             proposal.status = 'pending'
 
@@ -888,4 +1832,96 @@ def huy_giaingan(request, pk):
     proposal.status = 'rejected'
     proposal.save()
     messages.warning(request, "Đã từ chối yêu cầu giải ngân.")
+    return redirect('admin_panel:quanly_giaingan')
+
+
+@login_required
+def thu_hoi_gas(request):
+    if not request.user.is_superuser:
+        messages.error(request, "Bạn không có quyền thực hiện.")
+        return redirect('admin_panel:quanly_giaingan')
+
+    if request.method != 'POST':
+        return redirect('admin_panel:quanly_giaingan')
+
+    campaign_id = request.POST.get('campaign_id')
+    campaign = get_object_or_404(Campaign, pk=campaign_id)
+
+    # SERVER-SIDE VALIDATION: chỉ cho phép thu hồi khi chiến dịch đã hết hạn VÀ giải ngân hết
+    # c.end_date là DateField (date), dùng timezone.localdate() để tránh lỗi so sánh date vs datetime
+    today = timezone.localdate()
+    if not campaign.end_date or campaign.end_date >= today:
+        messages.error(request, "Không thể thu hồi gas: chiến dịch chưa hết hạn.")
+        return redirect('admin_panel:quanly_giaingan')
+
+    try:
+        bc = BlockchainService()
+        eth_vnd_rate = get_eth_vnd_rate()
+
+        stats = bc.get_campaign_onchain_stats(campaign.id)
+        total_recovered_vnd = _wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate)
+
+        # V2: Tổng gas admin đã chi = totalGasCost on-chain (đã bao gồm A+B+C qua recordGasCost)
+        total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
+        gas_onchain_cost_vnd = _wei_to_vnd(total_gas_cost_wei, eth_vnd_rate)
+
+        # Check chiến dịch đã giải ngân hết chưa (onchain_available ≤ ngưỡng)
+        available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
+        onchain_available_vnd = _wei_to_vnd(max(0, available_wei), eth_vnd_rate)
+        if onchain_available_vnd > FULLY_DISBURSED_THRESHOLD_VND:
+            messages.error(request, f"Không thể thu hồi gas: chiến dịch còn {int(onchain_available_vnd):,}đ chưa giải ngân hết.")
+            return redirect('admin_panel:quanly_giaingan')
+
+        # Legacy: donation cũ (luồng v1) không dùng recordGasCost - cộng riêng
+        gas_admin_sendeth_vnd = Donation.objects.filter(
+            campaign=campaign, admin_send_eth_gas_fee_vnd__isnull=False
+        ).aggregate(total=Sum('admin_send_eth_gas_fee_vnd'))['total'] or Decimal('0')
+        gas_disbursement_vnd = DisbursementProposal.objects.filter(
+            campaign=campaign, status='executed', disbursement_gas_fee_vnd__isnull=False
+        ).aggregate(total=Sum('disbursement_gas_fee_vnd'))['total'] or Decimal('0')
+        est_recovery_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
+
+        # Tổng gas cần thu hồi = gas on-chain (A+B+C v2) + legacy sendEth + disburse actual + 1 phí thu hồi
+        total_4_fees_vnd = gas_onchain_cost_vnd + gas_admin_sendeth_vnd + gas_disbursement_vnd + est_recovery_gas_vnd
+        remaining_gas_vnd = total_4_fees_vnd - total_recovered_vnd
+        if remaining_gas_vnd <= 0:
+            messages.warning(request, "Không có phí gas cần thu hồi cho chiến dịch này.")
+            return redirect('admin_panel:quanly_giaingan')
+
+        total_to_recover_vnd = remaining_gas_vnd
+        total_to_recover_eth = total_to_recover_vnd / eth_vnd_rate
+        total_to_recover_wei = int(total_to_recover_eth * Decimal('1000000000000000000'))
+
+        # available_wei đã tính ở trên
+        if total_to_recover_wei > available_wei:
+            total_to_recover_wei = available_wei
+            total_to_recover_eth = Decimal(str(total_to_recover_wei)) / Decimal('1000000000000000000')
+            total_to_recover_vnd = total_to_recover_eth * eth_vnd_rate
+            print(f"⚠️ [GAS RECOVERY] Giảm xuống {total_to_recover_wei} wei (giới hạn on-chain)")
+
+        print(f"💰 [GAS RECOVERY] Chiến dịch #{campaign.id}")
+        print(f"   ① Gas on-chain (v2 totalGasCost: A+B+C): {gas_onchain_cost_vnd:,.0f}")
+        print(f"   ② Gas sendEthToUser (legacy): {gas_admin_sendeth_vnd:,.0f}")
+        print(f"   ③ Gas executeDisbursement (actual): {gas_disbursement_vnd:,.0f}")
+        print(f"   ④ Gas thu hồi ước tính: {est_recovery_gas_vnd:,.0f}")
+        print(f"   = Tổng các phí: {total_4_fees_vnd:,.0f} VNĐ")
+        print(f"   - Đã thu hồi: {total_recovered_vnd:,.0f} VNĐ")
+        print(f"   = Còn thu hồi: {total_to_recover_vnd:,.0f} VNĐ = {total_to_recover_eth:.10f} ETH = {total_to_recover_wei} wei")
+
+        tx_hash = bc.withdraw_gas_recovery(
+            campaign_id=campaign.id,
+            amount_wei=total_to_recover_wei,
+        )
+
+        receipt = bc.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+        invalidate_campaign_cache(campaign.id)
+        if receipt and receipt.get('status') == 1:
+            messages.success(request, f"✅ Thu hồi thành công {total_to_recover_vnd:,.0f} VNĐ ({total_to_recover_eth:.8f} ETH). Tx: {tx_hash}")
+        else:
+            messages.error(request, f"Giao dịch thu hồi bị revert. Tx: {tx_hash}")
+
+    except Exception as e:
+        messages.error(request, f"Lỗi thu hồi gas: {e}")
+        print(f"❌ [GAS RECOVERY] Lỗi: {e}")
+
     return redirect('admin_panel:quanly_giaingan')

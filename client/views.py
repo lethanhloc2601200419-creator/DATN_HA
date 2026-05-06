@@ -4,7 +4,7 @@ from admin_panel.models import (
     UserProfile, Campaign, Donation, TargetProgram, BankStatement, ActivityLog,
     DisbursementProposal, ProposalVote, Organization,
 )
-from admin_panel.disbursement_utils import check_and_execute_proposal
+from admin_panel.disbursement_utils import check_and_execute_proposal, estimate_gas_per_tx_vnd
 from django.contrib import messages
 from django.db.models import Sum, Count, F, Q
 from django.conf import settings
@@ -12,8 +12,11 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import F
 import hashlib
 import hmac
 import urllib.parse
@@ -23,23 +26,137 @@ from datetime import datetime, timedelta
 import pytz
 import re
 import requests as http_requests
+from web3 import Web3
 
 # Import Service Blockchain đã viết
 from .blockchain import BlockchainService, get_eth_vnd_rate
+from .blockchain_processor import start_blockchain_thread
 
-# =====================================================
-# VNPAY HELPER FUNCTIONS
-# =====================================================
+WEI_IN_ETH = Decimal('1000000000000000000')
+SYBIL_DONATION_WINDOW = timedelta(hours=1)
+SYBIL_DONATION_THRESHOLD = 3
+
+def _wei_to_vnd(wei, eth_vnd_rate):
+    return (Decimal(str(wei)) / WEI_IN_ETH) * eth_vnd_rate
+
 vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+PAYOS_API_BASE = 'https://api-merchant.payos.vn'
 
-def create_vnpay_signature(params, secret_key):
-    """Tạo chữ ký VNPay (HMAC-SHA512)"""
-    filtered_params = {k: v for k, v in params.items() if k != 'vnp_SecureHash' and v is not None and str(v) != ''}
-    sorted_params = sorted(filtered_params.items())
-    query_parts = [f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in sorted_params]
-    sign_data = "&".join(query_parts)
-    h = hmac.new(secret_key.encode('utf-8'), sign_data.encode('utf-8'), hashlib.sha512)
-    return h.hexdigest()
+
+def _build_web3_username(address):
+    normalized = re.sub(r'[^a-zA-Z0-9_]+', '', (address or '').lower())
+    return f'web3_{normalized[-12:] or "user"}'
+
+
+def _get_or_create_web3_user(wallet_address, eoa_address='', email='', display_name=''):
+    checksum_wallet = Web3.to_checksum_address(wallet_address)
+    checksum_eoa = Web3.to_checksum_address(eoa_address) if eoa_address and Web3.is_address(eoa_address) else ''
+    email = (email or '').strip().lower()
+    display_name = (display_name or '').strip()
+
+    profile = None
+    if checksum_wallet:
+        profile = UserProfile.objects.filter(
+            Q(wallet_address__iexact=checksum_wallet) |
+            Q(smart_account_address__iexact=checksum_wallet) |
+            Q(eoa_address__iexact=checksum_wallet)
+        ).select_related('user').first()
+
+    if not profile and checksum_eoa:
+        profile = UserProfile.objects.filter(
+            Q(eoa_address__iexact=checksum_eoa) |
+            Q(wallet_address__iexact=checksum_eoa) |
+            Q(smart_account_address__iexact=checksum_eoa)
+        ).select_related('user').first()
+
+    user = profile.user if profile else None
+
+    if not user and email:
+        user = User.objects.filter(email__iexact=email).first()
+
+    if not user:
+        base_username = _build_web3_username(checksum_wallet)
+        username = base_username
+        suffix = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}_{suffix}"
+            suffix += 1
+
+        user = User.objects.create(
+            username=username,
+            email=email,
+            first_name=display_name[:150] if display_name else '',
+        )
+
+    profile, _created = UserProfile.objects.get_or_create(user=user)
+    if email and user.email != email:
+        user.email = email
+    if display_name and not user.first_name:
+        user.first_name = display_name[:150]
+    user.save(update_fields=['email', 'first_name'])
+
+    profile.display_name = display_name or profile.display_name or user.first_name or user.username
+    profile.eoa_address = checksum_eoa or profile.eoa_address
+    profile.smart_account_address = checksum_wallet
+    profile.wallet_address = checksum_wallet
+    profile.save(update_fields=[
+        'display_name',
+        'eoa_address',
+        'smart_account_address',
+        'wallet_address',
+        'updated_at',
+    ])
+
+    return user, profile
+
+
+@require_POST
+def api_web3_login(request):
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Invalid JSON payload.'}, status=400)
+
+    wallet_address = (payload.get('wallet_address') or '').strip()
+    eoa_address = (payload.get('eoa_address') or '').strip()
+    email = (payload.get('email') or '').strip()
+    display_name = (payload.get('display_name') or payload.get('name') or '').strip()
+    provider = (payload.get('provider') or 'web3auth_google').strip()
+
+    if not wallet_address or not Web3.is_address(wallet_address):
+        return JsonResponse({'ok': False, 'message': 'wallet_address không hợp lệ.'}, status=400)
+
+    if eoa_address and not Web3.is_address(eoa_address):
+        return JsonResponse({'ok': False, 'message': 'eoa_address không hợp lệ.'}, status=400)
+
+    user, profile = _get_or_create_web3_user(
+        wallet_address=wallet_address,
+        eoa_address=eoa_address,
+        email=email,
+        display_name=display_name,
+    )
+
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+    ActivityLog.objects.create(
+        user=user,
+        type='web3_login',
+        description=f'Đăng nhập Django session qua {provider} | ví {profile.wallet_address}',
+    )
+
+    return JsonResponse({
+        'ok': True,
+        'message': 'Đăng nhập Web3 thành công.',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+        },
+        'wallet_address': profile.wallet_address,
+        'eoa_address': profile.eoa_address or '',
+        'smart_account_address': profile.smart_account_address or '',
+    })
+
 
 def get_client_ip(request):
     """Lấy IP client"""
@@ -51,6 +168,295 @@ def get_client_ip(request):
             if ip and ip != '127.0.0.1' and not ip.startswith('192.168.'):
                 return ip
     return '203.162.71.6'
+
+
+def _normalize_payos_value(value):
+    if value in (None, 'undefined', 'null'):
+        return ''
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if isinstance(value, list):
+        normalized_items = []
+        for item in value:
+            if isinstance(item, dict):
+                normalized_items.append({k: _normalize_payos_value(v) for k, v in sorted(item.items())})
+            else:
+                normalized_items.append(_normalize_payos_value(item))
+        return json.dumps(normalized_items, ensure_ascii=False, separators=(',', ':'))
+    if isinstance(value, dict):
+        normalized_dict = {k: _normalize_payos_value(v) for k, v in sorted(value.items())}
+        return json.dumps(normalized_dict, ensure_ascii=False, separators=(',', ':'))
+    return str(value)
+
+
+def _flag_recent_sybil_donations(device_fingerprint):
+    if not device_fingerprint:
+        return False, 0
+
+    window_start = timezone.now() - SYBIL_DONATION_WINDOW
+    recent_qs = Donation.objects.filter(
+        device_fingerprint=device_fingerprint,
+        created_at__gte=window_start,
+    )
+    recent_count = recent_qs.count()
+    if recent_count > SYBIL_DONATION_THRESHOLD:
+        reason = (
+            f'Fingerprint {device_fingerprint} tạo hơn {SYBIL_DONATION_THRESHOLD} '
+            f'giao dịch trong {int(SYBIL_DONATION_WINDOW.total_seconds() // 60)} phút.'
+        )
+        recent_qs.update(
+            is_sybil=True,
+            sybil_flag_reason=reason,
+            updated_at=timezone.now(),
+        )
+        return True, recent_count
+
+    return False, recent_count
+
+
+def _build_payos_signature_payload(data):
+    sorted_items = sorted(data.items(), key=lambda item: item[0])
+    return "&".join(f"{key}={_normalize_payos_value(value)}" for key, value in sorted_items)
+
+
+def _create_payos_signature(data):
+    payload = _build_payos_signature_payload(data)
+    return hmac.new(
+        settings.PAYOS_CHECKSUM_KEY.encode('utf-8'),
+        payload.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _verify_payos_signature(data, signature):
+    expected_signature = _create_payos_signature(data)
+    return hmac.compare_digest(expected_signature.lower(), str(signature or '').lower())
+
+
+def _generate_payos_order_code(donation_id):
+    # PayOS nhận orderCode dạng number. Nếu vượt ngưỡng số nguyên an toàn của JS
+    # (2^53 - 1), phía nhận có thể làm tròn và khiến signature bị lệch.
+    # Dùng Unix timestamp (10 chữ số) + 5 chữ số donation_id để luôn < 10^15.
+    timestamp_prefix = int(timezone.now().timestamp())
+    donation_suffix = donation_id % 100000
+    return int(f"{timestamp_prefix}{donation_suffix:05d}")
+
+
+def _parse_payos_datetime(value):
+    if not value:
+        return None
+    try:
+        dt = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+        return vietnam_tz.localize(dt)
+    except (TypeError, ValueError):
+        return None
+
+
+def _create_payos_payment_link(request, donation):
+    return_url = request.build_absolute_uri(reverse('client:payos_return', args=[donation.id]))
+    cancel_url = request.build_absolute_uri(reverse('client:payos_cancel', args=[donation.id]))
+    order_code = _generate_payos_order_code(donation.id)
+    description = f"DCP{donation.id:06d}"[-25:]
+    payload = {
+        'orderCode': order_code,
+        'amount': int(donation.amount),
+        'description': description,
+        'buyerName': donation.donor_name or 'Nha hao tam',
+        'buyerEmail': donation.donor_email or '',
+        'buyerPhone': donation.donor_phone or '',
+        'items': [
+            {
+                'name': f'Ung ho chien dich {donation.campaign.id}',
+                'quantity': 1,
+                'price': int(donation.amount),
+            }
+        ],
+        'cancelUrl': cancel_url,
+        'returnUrl': return_url,
+        'expiredAt': int((timezone.now() + timedelta(minutes=15)).timestamp()),
+    }
+    signature_payload = {
+        'amount': payload['amount'],
+        'cancelUrl': payload['cancelUrl'],
+        'description': payload['description'],
+        'orderCode': payload['orderCode'],
+        'returnUrl': payload['returnUrl'],
+    }
+    raw_signature_payload = _build_payos_signature_payload(signature_payload)
+    generated_signature = _create_payos_signature(signature_payload)
+    payload['signature'] = generated_signature
+
+    if settings.DEBUG:
+        print("\n========== PAYOS SIGNATURE DEBUG ==========")
+        print("DONATION_ID:", donation.id)
+        print("PAYOS_CLIENT_ID:", settings.PAYOS_CLIENT_ID)
+        print("PAYOS_API_KEY_PRESENT:", bool(settings.PAYOS_API_KEY))
+        print("PAYOS_CHECKSUM_KEY_REPR:", repr(settings.PAYOS_CHECKSUM_KEY))
+        print("SIGNATURE_PAYLOAD_DICT:", signature_payload)
+        print("SIGNATURE_PAYLOAD_RAW:", raw_signature_payload)
+        print("GENERATED_SIGNATURE:", generated_signature)
+        print("RETURN_URL:", payload['returnUrl'])
+        print("CANCEL_URL:", payload['cancelUrl'])
+        print("DESCRIPTION:", payload['description'])
+        print("ORDER_CODE:", payload['orderCode'])
+        print("AMOUNT:", payload['amount'])
+        print("==========================================\n")
+
+    response = http_requests.post(
+        f'{PAYOS_API_BASE}/v2/payment-requests',
+        json=payload,
+        headers={
+            'x-client-id': settings.PAYOS_CLIENT_ID,
+            'x-api-key': settings.PAYOS_API_KEY,
+            'Content-Type': 'application/json',
+        },
+        timeout=20,
+    )
+    try:
+        response_payload = response.json()
+    except ValueError:
+        response_payload = {'raw_text': response.text}
+
+    if settings.DEBUG:
+        print("\n========== PAYOS CREATE RESPONSE ==========")
+        print("STATUS_CODE:", response.status_code)
+        print("RESPONSE_BODY:", response_payload)
+        print("==========================================\n")
+
+    response.raise_for_status()
+    if response_payload.get('code') != '00' or 'data' not in response_payload:
+        raise ValueError(response_payload.get('desc') or 'Không tạo được link thanh toán PayOS.')
+
+    data = response_payload['data']
+    donation.order_code = data.get('orderCode', order_code)
+    donation.transaction_id = donation.transaction_id or f"PAYOS-{donation.order_code}"
+    donation.payos_payment_link_id = data.get('paymentLinkId')
+    donation.payos_checkout_url = data.get('checkoutUrl')
+    donation.payos_qr_code = data.get('qrCode')
+    donation.payos_reference = data.get('description') or description
+    donation.save(update_fields=[
+        'order_code',
+        'transaction_id',
+        'payos_payment_link_id',
+        'payos_checkout_url',
+        'payos_qr_code',
+        'payos_reference',
+        'updated_at',
+    ])
+    return data
+
+
+def _mark_payos_donation_completed(donation, webhook_data):
+    if donation.status == 'completed':
+        return False
+
+    paid_at = _parse_payos_datetime(webhook_data.get('transactionDateTime')) or timezone.now()
+    donation.status = 'completed'
+    donation.payment_method = 'payos'
+    donation.payos_paid_at = paid_at
+    donation.payos_webhook_received_at = timezone.now()
+    donation.payos_transaction_id = webhook_data.get('transactionId') or webhook_data.get('reference') or donation.payos_transaction_id
+    donation.payos_reference = webhook_data.get('reference') or donation.payos_reference
+    donation.payos_payment_link_id = webhook_data.get('paymentLinkId') or donation.payos_payment_link_id
+    donation.bank_transaction_no = webhook_data.get('reference') or donation.bank_transaction_no
+    donation.blockchain_status = 'pending'
+    donation.save(update_fields=[
+        'status',
+        'payment_method',
+        'payos_paid_at',
+        'payos_webhook_received_at',
+        'payos_transaction_id',
+        'payos_reference',
+        'payos_payment_link_id',
+        'bank_transaction_no',
+        'blockchain_status',
+        'updated_at',
+    ])
+
+    campaign = donation.campaign
+    Campaign.objects.filter(pk=campaign.pk).update(current_amount=F('current_amount') + donation.amount)
+
+    statement_defaults = {
+        'campaign': campaign,
+        'donation': donation,
+        'transaction_date': paid_at,
+        'transaction_type': 'in',
+        'amount': donation.amount,
+        'reference_number': webhook_data.get('reference') or str(donation.order_code),
+        'description': f"PayOS: {donation.donor_name or 'Ẩn danh'} ủng hộ chiến dịch {campaign.title}",
+        'sender_name': webhook_data.get('counterAccountName') or donation.donor_name,
+        'sender_account': webhook_data.get('counterAccountNumber') or '',
+        'source': 'payos',
+    }
+    BankStatement.objects.get_or_create(
+        donation=donation,
+        reference_number=statement_defaults['reference_number'],
+        defaults=statement_defaults,
+    )
+
+    ActivityLog.objects.create(
+        user=donation.donor,
+        type='payos_webhook_paid',
+        description=f"PayOS xác nhận thanh toán thành công cho Donation #{donation.id} - orderCode {donation.order_code}",
+        campaign=campaign,
+        donation=donation,
+    )
+    return True
+
+
+def _trigger_record_donation_bridge(donation):
+    bc = BlockchainService()
+    if not donation.donor_wallet_address and donation.donor_id and hasattr(donation.donor, 'profile'):
+        donation.donor_wallet_address = (
+            donation.donor.profile.smart_account_address
+            or donation.donor.profile.wallet_address
+            or None
+        )
+    donor_address = donation.donor_wallet_address or bc.get_fallback_donor_address()
+
+    donation.blockchain_status = 'processing'
+    donation.blockchain_started_at = timezone.now()
+    donation.blockchain_error = None
+    donation.blockchain_retry_count = (donation.blockchain_retry_count or 0) + 1
+    donation.save(update_fields=[
+        'blockchain_status',
+        'blockchain_started_at',
+        'blockchain_error',
+        'blockchain_retry_count',
+        'updated_at',
+    ])
+
+    tx_result = bc.trigger_record_donation(
+        campaign_id=donation.campaign_id,
+        donor_address=donor_address,
+        fiat_amount=int(donation.amount),
+    )
+    tx_hash = tx_result['tx_hash']
+
+    donation.eth_tx_hash = tx_hash
+    donation.is_blockchain_synced = True
+    donation.blockchain_status = 'confirmed'
+    donation.blockchain_completed_at = timezone.now()
+    donation.blockchain_error = None
+    donation.donor_wallet_address = donor_address
+    donation.save(update_fields=[
+        'eth_tx_hash',
+        'is_blockchain_synced',
+        'blockchain_status',
+        'blockchain_completed_at',
+        'blockchain_error',
+        'donor_wallet_address',
+        'updated_at',
+    ])
+
+    ActivityLog.objects.create(
+        user=donation.donor,
+        type='record_donation_onchain',
+        description=f"recordDonation thành công cho Donation #{donation.id} - tx {tx_hash}",
+        campaign=donation.campaign,
+        donation=donation,
+    )
+    return tx_hash
 
 # ==========================================
 # HELPER: Tính phí gas và lưu vào donation
@@ -101,28 +507,33 @@ def ungho(request, pk):
     
     if request.method == 'POST':
         try:
-            # 1. Lấy dữ liệu từ form
+            # 1. Lấy dữ liệu từ form (LUỒNG MỚI: không còn MetaMask)
             amount = request.POST.get('amount').replace(',', '') # Xóa dấu phẩy
             message = request.POST.get('message')
-            payment_method = request.POST.get('payment_method')
-            donor_wallet_address = request.POST.get('donor_wallet_address')
-            
+            payment_method = request.POST.get('payment_method') or 'payos'
+            device_fingerprint = (request.POST.get('device_fingerprint') or '').strip()
+
             # 2. Tạo đối tượng Donation
             donation = Donation()
             donation.campaign = campaign
             donation.amount = amount
             donation.message = message
             donation.payment_method = payment_method
-            donation.donor_wallet_address = donor_wallet_address or None
-            
+            donation.donor_wallet_address = None
+            donation.device_fingerprint = device_fingerprint or None
+            donation.ip_address = get_client_ip(request)
+            donation.user_agent = request.META.get('HTTP_USER_AGENT', '')[:1000]
+
             # 3. Xử lý User (Đăng nhập hay vãng lai)
             if request.user.is_authenticated:
                 donation.donor = request.user
                 if hasattr(request.user, 'profile'):
-                    donation.donor_name = request.user.profile.display_name 
-                    if donation.donor_wallet_address:
-                        request.user.profile.wallet_address = donation.donor_wallet_address
-                        request.user.profile.save(update_fields=['wallet_address'])
+                    donation.donor_name = request.user.profile.display_name
+                    donation.donor_wallet_address = (
+                        request.user.profile.smart_account_address
+                        or request.user.profile.wallet_address
+                        or None
+                    )
                 else:
                     donation.donor_name = request.user.username
                 donation.donor_email = request.user.email
@@ -131,56 +542,41 @@ def ungho(request, pk):
                 donation.donor_email = request.POST.get('donor_email')
                 donation.is_anonymous = True
 
-            if payment_method == 'vnpay' and not donation.donor_wallet_address:
-                messages.error(request, "Vui lòng kết nối MetaMask trước khi thanh toán VNPay.")
-                return redirect('client:ungho', pk=campaign.id)
-            if payment_method == 'vnpay' and donation.donor_wallet_address and donation.donor_wallet_address.lower() == settings.WALLET_ADDRESS.lower():
-                messages.error(request, "Ví MetaMask đang là ví Admin. Vui lòng đổi sang ví người dùng trước khi thanh toán.")
-                return redirect('client:ungho', pk=campaign.id)
-
             # 4. Lưu vào DB SQL trước
             donation.save()
+            is_sybil, recent_count = _flag_recent_sybil_donations(device_fingerprint)
+            if is_sybil:
+                donation.refresh_from_db(fields=['is_sybil', 'sybil_flag_reason'])
+                ActivityLog.objects.create(
+                    user=request.user,
+                    type='sybil_donation_flagged',
+                    description=(
+                        f'Donation #{donation.id} bị gắn cờ Sybil. '
+                        f'Fingerprint={device_fingerprint}, recent_count={recent_count}'
+                    ),
+                    campaign=campaign,
+                    donation=donation,
+                    ip_address=donation.ip_address,
+                    user_agent=donation.user_agent,
+                )
             
             # ======================================================
             # CODE DEBUG GHI BLOCKCHAIN (Dành cho Tiền mặt/Chuyển khoản)
             # ======================================================
-            if payment_method != 'vnpay':
+            if payment_method != 'payos':
                 campaign.current_amount += int(amount)
                 campaign.save()
                 messages.success(request, "Cảm ơn tấm lòng vàng của bạn!")
                 return redirect('client:camon', pk=donation.id)
-            
-            # --- XỬ LÝ NẾU LÀ VNPAY ---
-            # Build VNPay params và redirect sang cổng thanh toán
-            vn_now = datetime.now(vietnam_tz)
-            
-            vnpay_params = {
-                'vnp_Version': '2.1.0',
-                'vnp_Command': 'pay',
-                'vnp_TmnCode': settings.VNPAY_TMN_CODE,
-                'vnp_Amount': int(amount) * 100,
-                'vnp_BankCode': 'VNBANK',
-                'vnp_CreateDate': vn_now.strftime('%Y%m%d%H%M%S'),
-                'vnp_CurrCode': 'VND',
-                'vnp_IpAddr': get_client_ip(request),
-                'vnp_Locale': 'vn',
-                'vnp_OrderInfo': f'Ung-ho-chien-dich-{campaign.id}',
-                'vnp_OrderType': 'other',
-                'vnp_ReturnUrl': request.build_absolute_uri(reverse('client:vnpay_return')),
-                'vnp_TxnRef': str(donation.id),
-                'vnp_ExpireDate': (vn_now + timedelta(minutes=15)).strftime('%Y%m%d%H%M%S'),
-            }
-            
-            signature = create_vnpay_signature(vnpay_params, settings.VNPAY_HASH_SECRET)
-            vnpay_params['vnp_SecureHash'] = signature
-            
-            query_string = urllib.parse.urlencode(vnpay_params, quote_via=urllib.parse.quote)
-            vnpay_url = f"{settings.VNPAY_URL}?{query_string}"
-            
-            print(f"\n🚀 [VNPAY] Redirecting to VNPay...")
-            print(f"🔗 URL: {vnpay_url[:100]}...")
-            
-            return HttpResponseRedirect(vnpay_url)
+
+            payos_data = _create_payos_payment_link(request, donation)
+            checkout_url = payos_data.get('checkoutUrl')
+            if not checkout_url:
+                raise ValueError('PayOS không trả về checkoutUrl hợp lệ.')
+
+            print(f"\n🚀 [PAYOS] Redirecting to PayOS checkout for donation #{donation.id}")
+            print(f"🔗 URL: {checkout_url[:120]}...")
+            return HttpResponseRedirect(checkout_url)
 
         except Exception as e:
             messages.error(request, f"Lỗi xử lý: {e}")
@@ -188,7 +584,6 @@ def ungho(request, pk):
 
     return render(request, 'client/ungho.html', {
         'campaign': campaign,
-        'admin_wallet_address': settings.WALLET_ADDRESS,
     })
 def camon(request, pk):
     donation = get_object_or_404(Donation, pk=pk)
@@ -212,164 +607,90 @@ def saoke(request):
     }
     return render(request, 'client/saoke.html', context)
 
-# ==========================================
-# PHẦN MỚI: XỬ LÝ VNPAY RETURN + BLOCKCHAIN
-# ==========================================
+def payos_return(request, donation_id):
+    donation = get_object_or_404(Donation, pk=donation_id)
+    status = (request.GET.get('status') or '').upper()
+    is_cancelled = (request.GET.get('cancel') or '').lower() == 'true'
+    payment_link_id = request.GET.get('id')
+    order_code = request.GET.get('orderCode')
 
-def vnpay_return(request):
-    """
-    Hàm này chạy khi User thanh toán xong trên VNPay và tự động quay về Web
-    """
-    input_data = request.GET.dict()
-    if not input_data:
-        return render(request, "client/payment_failed.html", {"message": "Không có dữ liệu trả về từ VNPay"})
+    if payment_link_id and not donation.payos_payment_link_id:
+        donation.payos_payment_link_id = payment_link_id
+        donation.save(update_fields=['payos_payment_link_id', 'updated_at'])
 
-    print("\n" + "="*50)
-    print("[VNPAY RETURN] Callback Received")
-    for key, value in input_data.items():
-        print(f"  {key}: {value}")
-    print("="*50)
+    if is_cancelled or status == 'CANCELLED':
+        return render(request, "client/payment_failed.html", {
+            "message": "Bạn đã hủy thanh toán trên PayOS.",
+        })
 
-    # 1. Lấy dữ liệu VNPay trả về
-    vnp_SecureHash = input_data.get('vnp_SecureHash')
-    vnp_ResponseCode = input_data.get('vnp_ResponseCode')
-    vnp_TxnRef = input_data.get('vnp_TxnRef')  # ID của Donation
-    vnp_Amount = input_data.get('vnp_Amount')
-    vnp_OrderInfo = input_data.get('vnp_OrderInfo')
+    return render(request, "client/payment_success.html", {
+        "donation": donation,
+        "payment_provider": "PayOS",
+        "payment_status": status or ('PAID' if donation.status == 'completed' else 'PENDING'),
+        "show_blockchain_status": False,
+        "message": "Thanh toán đã được gửi tới PayOS. Hệ thống sẽ xác nhận chính thức khi webhook hợp lệ được nhận.",
+        "payos_order_code": order_code or donation.order_code,
+    })
 
-    if not all([vnp_SecureHash, vnp_TxnRef, vnp_ResponseCode]):
-        return render(request, "client/payment_failed.html", {"message": "Dữ liệu VNPay trả về không hợp lệ"})
 
-    # 2. Verify chữ ký (dùng cùng hàm create_vnpay_signature từ doan4)
-    verify_params = {k: v for k, v in input_data.items() if k != 'vnp_SecureHash'}
-    expected_hash = create_vnpay_signature(verify_params, settings.VNPAY_HASH_SECRET)
+def payos_cancel(request, donation_id):
+    donation = get_object_or_404(Donation, pk=donation_id)
+    return render(request, "client/payment_failed.html", {
+        "message": f"Bạn đã hủy thanh toán PayOS cho giao dịch #{donation.id}.",
+    })
 
-    print(f"[VNPAY] Expected Hash: {expected_hash[:30]}...")
-    print(f"[VNPAY] Received Hash: {vnp_SecureHash[:30]}...")
 
-    # 3. So sánh Hash
-    if vnp_SecureHash.lower() != expected_hash.lower():
-        print("[VNPAY] ❌ Signature mismatch!")
-        return render(request, "client/payment_failed.html", {"message": "Sai chữ ký bảo mật (Checksum failed)"})
+@login_required(login_url='admin_panel:dangnhap')
+@require_POST
+def api_wallet_sync(request):
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Invalid JSON payload.'}, status=400)
 
-    print("[VNPAY] ✅ Signature verified!")
+    wallet_address = (payload.get('wallet_address') or '').strip()
+    eoa_address = (payload.get('eoa_address') or '').strip()
+    smart_account_address = (payload.get('smart_account_address') or '').strip()
+    provider = (payload.get('provider') or 'web3auth').strip()
 
-    if vnp_ResponseCode == "00":
-        # Thanh toán thành công
-        try:
-            donation = Donation.objects.get(id=vnp_TxnRef)
-            
-            # Kiểm tra nếu chưa xử lý (tránh F5 cộng tiền 2 lần)
-            if donation.status == 'pending':
-                # Cập nhật thông tin VNPay vào donation
-                donation.vnpay_transaction_no = input_data.get('vnp_TransactionNo', '')
-                donation.status = 'completed'
-                
-                # Cộng tiền vào chiến dịch
-                campaign = donation.campaign
-                campaign.current_amount += donation.amount
-                campaign.save()
-                
-                # --- TẠO BANKSTATEMENT TỰ ĐỘNG TỪ VNPAY ---
-                try:
-                    BankStatement.objects.create(
-                        campaign=campaign,
-                        donation=donation,
-                        transaction_date=donation.created_at,
-                        transaction_type='in',
-                        amount=donation.amount,
-                        reference_number=donation.vnpay_transaction_no,
-                        description=f"VNPay: {donation.donor_name or 'Ẩn danh'} ủng hộ chiến dịch {campaign.title}",
-                        sender_name=donation.donor_name,
-                        source='vnpay',
-                    )
-                    print(f"✅ [BANKSTATEMENT] Đã tạo sao kê từ VNPay cho Donation #{donation.id}")
-                except Exception as e:
-                    print(f"❌ [BANKSTATEMENT] Lỗi tạo sao kê: {e}")
+    if not smart_account_address and wallet_address:
+        smart_account_address = wallet_address
 
-                # --- GỌI SMART CONTRACT CẤP ETH CHO USER ---
-                blockchain_error = None
-                try:
-                    bc = BlockchainService()
-                    if bc.admin_has_pending_tx():
-                        raise Exception("Ví Admin đang có giao dịch pending. Vui lòng đợi xác nhận hoặc Speed Up trong MetaMask.")
-                    if not bc.is_campaign_active(donation.campaign.id):
-                        org = donation.campaign.organization
-                        if not org or not org.wallet_address:
-                            raise Exception("Chiến dịch chưa được khởi tạo on-chain và tổ chức chưa có ví.")
-                        bc.init_campaign(
-                            campaign_id=donation.campaign.id,
-                            org_name=org.name,
-                            org_address=org.wallet_address,
-                        )
+    if not smart_account_address:
+        return JsonResponse({'ok': False, 'message': 'Thiếu smart_account_address.'}, status=400)
 
-                    if not donation.donor_wallet_address:
-                        raise Exception("Thiếu địa chỉ ví MetaMask của người dùng.")
+    if eoa_address and not Web3.is_address(eoa_address):
+        return JsonResponse({'ok': False, 'message': 'EOA address không hợp lệ.'}, status=400)
 
-                    eth_vnd_rate = get_eth_vnd_rate()
-                    amount_vnd = Decimal(str(donation.amount))
-                    amount_e_eth = amount_vnd / eth_vnd_rate
-                    amount_e_wei = int(amount_e_eth * Decimal('1000000000000000000'))
+    if not Web3.is_address(smart_account_address):
+        return JsonResponse({'ok': False, 'message': 'Smart Account address không hợp lệ.'}, status=400)
 
-                    try:
-                        gas_limit = bc.contract.functions.donate(donation.campaign.id).estimate_gas({
-                            'from': bc.w3.to_checksum_address(donation.donor_wallet_address),
-                            'value': amount_e_wei,
-                        })
-                    except Exception:
-                        gas_limit = 120000
+    checksum_eoa = Web3.to_checksum_address(eoa_address) if eoa_address else ''
+    checksum_smart = Web3.to_checksum_address(smart_account_address)
+    profile, _created = UserProfile.objects.get_or_create(user=request.user)
+    profile.eoa_address = checksum_eoa or None
+    profile.smart_account_address = checksum_smart
+    profile.wallet_address = checksum_smart
+    profile.save(update_fields=[
+        'eoa_address',
+        'smart_account_address',
+        'wallet_address',
+        'updated_at',
+    ])
 
-                    gas_price = bc.w3.eth.gas_price
-                    # Buffer 30% de tranh bien dong gas
-                    amount_g_wei = int(gas_limit * gas_price * 1.3)
+    ActivityLog.objects.create(
+        user=request.user,
+        type='wallet_sync',
+        description=f'Đồng bộ Smart Account {checksum_smart} từ {provider}' + (f' | EOA {checksum_eoa}' if checksum_eoa else ''),
+    )
 
-                    tx_hash = bc.send_eth_to_user(
-                        campaign_id=donation.campaign.id,
-                        user_address=donation.donor_wallet_address,
-                        amount_e_wei=amount_e_wei,
-                        amount_g_wei=amount_g_wei,
-                    )
-
-                    donation.send_eth_tx_hash = tx_hash
-                    donation.donated_eth_wei = amount_e_wei
-                    donation.gas_subsidy_wei = amount_g_wei
-
-                    gas_fee_eth = Decimal(str(amount_g_wei)) / Decimal('1000000000000000000')
-                    donation.gas_fee_eth = gas_fee_eth
-                    donation.gas_fee_vnd = int(gas_fee_eth * eth_vnd_rate)
-                    donation.net_amount = max(0, int(donation.amount) - int(donation.gas_fee_vnd or 0))
-
-                    print(f"✅ Đã cấp ETH cho user: {tx_hash}")
-                except Exception as e:
-                    blockchain_error = str(e)
-                    print(f"❌ Lỗi Blockchain: {blockchain_error}")
-                
-                donation.save()
-                print(f"✅ [VNPAY] Donation #{donation.id} thanh toán thành công!")
-            
-            return render(request, "client/payment_success.html", {
-                "donation": donation,
-                "tx_hash": donation.eth_tx_hash,
-                "send_eth_tx_hash": donation.send_eth_tx_hash,
-                "amount_e_wei": str(donation.donated_eth_wei) if donation.donated_eth_wei is not None else '',
-                "gas_g_wei": str(donation.gas_subsidy_wei) if donation.gas_subsidy_wei is not None else '',
-                "wallet_address": donation.donor_wallet_address,
-                "contract_address": settings.SMART_CONTRACT_ADDRESS,
-                "contract_abi": json.dumps([{
-                    "inputs": [{"internalType": "uint256", "name": "_cid", "type": "uint256"}],
-                    "name": "donate",
-                    "outputs": [],
-                    "stateMutability": "payable",
-                    "type": "function",
-                }]),
-                "blockchain_error": blockchain_error,
-            })
-
-        except Donation.DoesNotExist:
-            return render(request, "client/payment_failed.html", {"message": "Không tìm thấy giao dịch"})
-    else:
-        print(f"[VNPAY] ❌ Payment failed with code: {vnp_ResponseCode}")
-        return render(request, "client/payment_failed.html", {"message": f"Giao dịch bị hủy hoặc lỗi tại ngân hàng (Mã: {vnp_ResponseCode})"})
+    return JsonResponse({
+        'ok': True,
+        'wallet_address': checksum_smart,
+        'eoa_address': checksum_eoa,
+        'smart_account_address': checksum_smart,
+        'provider': provider,
+    })
     
 
 # client/views.py
@@ -378,11 +699,68 @@ def chitiet_chiendich(request, pk):
     campaign = get_object_or_404(Campaign, pk=pk)
     donations = Donation.objects.filter(campaign=campaign).order_by('-created_at')
 
-    # Tính tổng phí gas của chiến dịch
-    total_gas_vnd = Donation.objects.filter(
-        campaign=campaign, gas_fee_vnd__isnull=False
-    ).aggregate(total=Sum('gas_fee_vnd'))['total'] or Decimal('0')
-    net_receivable = campaign.current_amount - total_gas_vnd
+    # Breakdown gas cho trang public (luồng v2)
+    gas_subsidized_vnd = Decimal('0')        # Tổng totalGasCost on-chain (A+B+C)
+    est_disbursement_gas_vnd = Decimal('0')  # Gas dự trù cho lần giải ngân tiếp theo
+    gas_recovered_vnd = Decimal('0')
+    onchain_total_fund_vnd = campaign.current_amount
+    onchain_total_disbursed_vnd = campaign.disbursed_amount
+    onchain_available_vnd = Decimal('0')
+
+    # Luồng v2: gas A (recordBankDonation) + gas B (donateOnBehalf) từ Donation table
+    gas_bank_record_vnd = Donation.objects.filter(
+        campaign=campaign, bank_record_gas_vnd__isnull=False
+    ).aggregate(total=Sum('bank_record_gas_vnd'))['total'] or Decimal('0')
+    gas_donate_onbehalf_vnd = Donation.objects.filter(
+        campaign=campaign, donate_onbehalf_gas_vnd__isnull=False
+    ).aggregate(total=Sum('donate_onbehalf_gas_vnd'))['total'] or Decimal('0')
+
+    # Legacy: gas sendEthToUser (chỉ còn donation cũ)
+    gas_admin_sendeth_vnd = Donation.objects.filter(
+        campaign=campaign, admin_send_eth_gas_fee_vnd__isnull=False
+    ).aggregate(total=Sum('admin_send_eth_gas_fee_vnd'))['total'] or Decimal('0')
+
+    gas_disbursement_vnd = DisbursementProposal.objects.filter(
+        campaign=campaign, status='executed', disbursement_gas_fee_vnd__isnull=False
+    ).aggregate(total=Sum('disbursement_gas_fee_vnd'))['total'] or Decimal('0')
+
+    try:
+        bc = BlockchainService()
+        eth_vnd_rate = get_eth_vnd_rate()
+        stats = bc.get_campaign_onchain_stats(campaign.id)
+        # V2: dùng total_gas_cost_wei (contract mới); fallback total_gas_subsidized_wei
+        total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
+        gas_subsidized_vnd = _wei_to_vnd(total_gas_cost_wei, eth_vnd_rate)
+        gas_recovered_vnd = _wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate)
+        onchain_total_fund_vnd = _wei_to_vnd(stats['total_fund_wei'], eth_vnd_rate)
+        onchain_total_disbursed_vnd = _wei_to_vnd(stats['total_disbursed_wei'], eth_vnd_rate)
+        est_per_tx_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
+        # Chỉ cần 1 phí dự trù duy nhất: 1 lần executeDisbursement chuyển ETH contract→tổ chức
+        est_disbursement_gas_vnd = est_per_tx_gas_vnd
+        est_recovery_gas_vnd = Decimal('0')  # KHÔNG cộng double, chỉ hiển thị nếu cần
+        # onchain_available: số tiền còn có thể giải ngân = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered - gas dự trù
+        est_disbursement_wei = int((est_disbursement_gas_vnd / eth_vnd_rate) * Decimal('1000000000000000000')) if eth_vnd_rate else 0
+        onchain_available_wei = max(
+            0,
+            stats['total_fund_wei']
+            - total_gas_cost_wei
+            - stats['total_disbursed_wei']
+            - stats['total_admin_recovered_wei']
+            - est_disbursement_wei,
+        )
+        onchain_available_vnd = _wei_to_vnd(onchain_available_wei, eth_vnd_rate)
+    except Exception:
+        pass
+
+    # Tổng gas: gas_subsidized_vnd (=total_gas_cost_wei từ contract) đã bao gồm gas admin đã chi (A+B+C)
+    # + gas giải ngân đã thực thi + 1 gas dự trù cho lần giải ngân tiếp theo
+    # KHÔNG cộng gas_bank_record_vnd/gas_donate_onbehalf_vnd lần nữa (đã nằm trong totalGasCost on-chain).
+    # Khi quỹ on-chain = 0 (chưa ai donate), bỏ qua est_disbursement_gas_vnd để không hiển thị gas âm vô nghĩa.
+    if onchain_total_fund_vnd <= 0:
+        est_disbursement_gas_vnd = Decimal('0')
+    total_gas_vnd = gas_subsidized_vnd + gas_disbursement_vnd + est_disbursement_gas_vnd + gas_admin_sendeth_vnd
+    # net_receivable = tổng quỹ on-chain - tổng gas (clamp >= 0 để không hiển thị âm khi quỹ = 0)
+    net_receivable = max(Decimal('0'), onchain_total_fund_vnd - total_gas_vnd)
 
     voting_powers, total_system_power = campaign.calculate_voting_distribution()
 
@@ -457,6 +835,18 @@ def chitiet_chiendich(request, pk):
         'user_voting_pct': user_voting_pct,
         'total_gas_vnd': total_gas_vnd,
         'net_receivable': net_receivable,
+        # Breakdown v2
+        'gas_bank_record_vnd': gas_bank_record_vnd,
+        'gas_donate_onbehalf_vnd': gas_donate_onbehalf_vnd,
+        'gas_subsidized_vnd': gas_subsidized_vnd,       # totalGasCost on-chain (A+B+C)
+        'gas_disbursement_vnd': gas_disbursement_vnd,   # gas giải ngân thực tế
+        'est_disbursement_gas_vnd': est_disbursement_gas_vnd,
+        # Legacy
+        'gas_admin_sendeth_vnd': gas_admin_sendeth_vnd,
+        'gas_recovered_vnd': gas_recovered_vnd,
+        'onchain_total_fund_vnd': onchain_total_fund_vnd,
+        'onchain_total_disbursed_vnd': onchain_total_disbursed_vnd,
+        'onchain_available_vnd': onchain_available_vnd,
     }
     return render(request, 'client/chitiet_chiendich.html', context)
 
@@ -506,10 +896,14 @@ def vote_proposal(request, campaign_id, proposal_id):
 
     # Voting off-chain: không gọi blockchain
 
-    check_and_execute_proposal(proposal)
+    executed, blockchain_error = check_and_execute_proposal(proposal)
 
     vote_text = 'đồng ý' if is_agree else 'từ chối'
     messages.success(request, f'Đã bỏ phiếu {vote_text} thành công!')
+    if executed:
+        messages.success(request, '✅ Giải ngân đã được thực thi thành công trên blockchain! ETH đã chuyển cho tổ chức.')
+    elif blockchain_error:
+        messages.error(request, f'⚠️ {blockchain_error}')
     return redirect('client:chitiet_chiendich', pk=campaign_id)
 
 def ban_do_page(request):
@@ -720,6 +1114,82 @@ def api_webhook_bank_statement(request):
     })
 
 
+@csrf_exempt
+@require_POST
+def payos_webhook_view(request):
+    # return JsonResponse({"error": 0, "message": "Ok", "data": None})
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    signature = payload.get('signature')
+    data = payload.get('data') or {}
+    if not signature or not data:
+        return JsonResponse({'error': 'Missing signature or data'}, status=400)
+
+    if not _verify_payos_signature(data, signature):
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+
+    order_code = data.get('orderCode')
+    if not order_code:
+        return JsonResponse({'error': 'Missing orderCode'}, status=400)
+
+    try:
+        donation = Donation.objects.select_related('campaign', 'donor').get(order_code=order_code)
+    except Donation.DoesNotExist:
+        return JsonResponse({'error': 'Donation not found'}, status=404)
+
+    donation.payos_webhook_received_at = timezone.now()
+    donation.payos_payment_link_id = data.get('paymentLinkId') or donation.payos_payment_link_id
+    donation.payos_reference = data.get('reference') or donation.payos_reference
+    donation.payos_transaction_id = data.get('transactionId') or data.get('reference') or donation.payos_transaction_id
+    donation.save(update_fields=[
+        'payos_webhook_received_at',
+        'payos_payment_link_id',
+        'payos_reference',
+        'payos_transaction_id',
+        'updated_at',
+    ])
+
+    if payload.get('success') and data.get('code') == '00':
+        with transaction.atomic():
+            donation = Donation.objects.select_for_update().get(pk=donation.pk)
+            created = _mark_payos_donation_completed(donation, data)
+        tx_hash = donation.eth_tx_hash
+        blockchain_triggered = False
+        if created:
+            try:
+                donation = Donation.objects.select_related('campaign', 'donor').get(pk=donation.pk)
+                tx_hash = _trigger_record_donation_bridge(donation)
+                blockchain_triggered = True
+            except Exception as exc:
+                donation = Donation.objects.get(pk=donation.pk)
+                donation.blockchain_status = 'failed'
+                donation.blockchain_completed_at = timezone.now()
+                donation.blockchain_error = str(exc)[:500]
+                donation.save(update_fields=[
+                    'blockchain_status',
+                    'blockchain_completed_at',
+                    'blockchain_error',
+                    'updated_at',
+                ])
+        return JsonResponse({
+            'success': True,
+            'orderCode': order_code,
+            'updated': created,
+            'blockchain_triggered': blockchain_triggered,
+            'tx_hash': tx_hash,
+        })
+
+    return JsonResponse({
+        'success': True,
+        'orderCode': order_code,
+        'updated': False,
+        'message': data.get('desc') or payload.get('desc') or 'Webhook received without successful payment state.',
+    })
+
+
 # =====================================================
 # API MOCK GỬI WEBHOOK (CHỈ KHI DEBUG=True)
 # =====================================================
@@ -794,6 +1264,62 @@ def api_campaign_finance(request, campaign_id):
         'balance': float(total_donated - total_disbursed),
         'transactions': transactions,
     })
+
+
+@require_GET
+def api_donation_blockchain_status(request, donation_id):
+    """
+    API polling cho frontend - trả về trạng thái blockchain của Donation (v2).
+    Trả về 2 tx hash: A (bank_record) + B (donateOnBehalf).
+    Frontend gọi mỗi 5s để biết khi nào cả 2 đã confirm.
+    """
+    try:
+        donation = Donation.objects.get(id=donation_id)
+    except Donation.DoesNotExist:
+        return JsonResponse({'ok': False, 'message': 'Không tìm thấy giao dịch.'}, status=404)
+
+    return JsonResponse({
+        'ok': True,
+        'donation_id': donation.id,
+        'blockchain_status': donation.blockchain_status,
+        'blockchain_error': donation.blockchain_error,
+        # Giao dịch A: ghi sao kê NH
+        'bank_record_tx_hash': donation.bank_record_tx_hash or '',
+        'bank_record_gas_vnd': int(donation.bank_record_gas_vnd) if donation.bank_record_gas_vnd else 0,
+        # Giao dịch B: admin nạp ETH
+        'donate_onbehalf_tx_hash': donation.donate_onbehalf_tx_hash or '',
+        'donate_onbehalf_gas_vnd': int(donation.donate_onbehalf_gas_vnd) if donation.donate_onbehalf_gas_vnd else 0,
+        # Tổng gas admin đã chi (A+B)
+        'total_admin_gas_vnd': int(donation.total_admin_gas_vnd) if donation.total_admin_gas_vnd else 0,
+        # Các thông tin bổ sung
+        'amount_vnd': int(donation.amount),
+        'net_amount': int(donation.net_amount) if donation.net_amount else 0,
+        'donated_eth_wei': str(donation.donated_eth_wei) if donation.donated_eth_wei is not None else '',
+    })
+
+
+@csrf_exempt
+@require_POST
+def api_retry_donation_blockchain(request, donation_id):
+    """
+    API retry blockchain cho Donation bị failed.
+    """
+    try:
+        donation = Donation.objects.get(id=donation_id)
+    except Donation.DoesNotExist:
+        return JsonResponse({'ok': False, 'message': 'Không tìm thấy giao dịch.'}, status=404)
+
+    if donation.blockchain_status == 'confirmed':
+        return JsonResponse({'ok': True, 'message': 'Đã confirm trước đó.'})
+
+    if donation.blockchain_status == 'processing':
+        return JsonResponse({'ok': True, 'message': 'Đang xử lý, vui lòng đợi.'})
+
+    try:
+        start_blockchain_thread(donation.id)
+        return JsonResponse({'ok': True, 'message': 'Đã bắt đầu retry.'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'message': str(e)}, status=500)
 
 
 @csrf_exempt

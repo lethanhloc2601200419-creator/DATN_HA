@@ -2,15 +2,114 @@
 {% load humanize %}
 
 {% block content %}
-<div class="card shadow border-0 mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+<div class="container-fluid px-4">
+<h2 class="page-title">Quản lý Quyên góp</h2>
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card admin-stat-card">
+            <div class="card-body">
+                <div class="metric-value text-primary">{{ stats.total }}</div>
+                <div class="metric-label">Tổng giao dịch</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-stat-card">
+            <div class="card-body">
+                <div class="metric-value text-success">{{ stats.completed }}</div>
+                <div class="metric-label">Hoàn tất</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-stat-card">
+            <div class="card-body">
+                <div class="metric-value text-warning">{{ stats.pending }}</div>
+                <div class="metric-label">Đang chờ</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card admin-stat-card">
+            <div class="card-body">
+                <div class="metric-value text-danger">{{ stats.amount_total|intcomma }}đ</div>
+                <div class="metric-label">Tổng tiền hoàn tất</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="card admin-toolbar">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <input type="text" name="q" class="form-control" placeholder="Tìm người ủng hộ, chiến dịch, mã giao dịch..." value="{{ query }}">
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
+                    <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Thành công</option>
+                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>Thất bại</option>
+                    <option value="refunded" {% if selected_status == 'refunded' %}selected{% endif %}>Hoàn tiền</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="payment_method" class="form-select">
+                    <option value="">Tất cả phương thức</option>
+                    <option value="vietqr" {% if selected_payment_method == 'vietqr' %}selected{% endif %}>VietQR</option>
+                    <option value="vnpay" {% if selected_payment_method == 'vnpay' %}selected{% endif %}>VNPay</option>
+                    <option value="bank_transfer" {% if selected_payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="from" class="form-control" value="{{ created_from }}">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="to" class="form-control" value="{{ created_to }}">
+            </div>
+            <div class="col-md-12 text-end">
+                <div class="admin-actions justify-content-end">
+                    <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
+                    <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
+                    <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-primary">Xóa lọc</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-1"></i> Lọc
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="card admin-shell-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="m-0 fw-bold text-primary">Danh sách Quyên góp (Donations)</h6>
     </div>
     <div class="card-body p-0">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ current_url }}">
+            <div class="p-3 border-bottom bg-light">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <select name="bulk_action" class="form-select">
+                            <option value="">-- Bulk action --</option>
+                            <option value="completed">Duyệt nhiều dòng</option>
+                            <option value="pending">Chuyển về chờ xử lý</option>
+                            <option value="failed">Đánh dấu thất bại</option>
+                            <option value="refunded">Đánh dấu hoàn tiền</option>
+                            <option value="delete">Xóa nhiều dòng</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các giao dịch đã chọn?')">Áp dụng</button>
+                    </div>
+                </div>
+            </div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light">
+            <table class="table admin-table">
+                <thead>
                     <tr>
+                        <th><input type="checkbox" id="select-all-donations"></th>
                         <th class="ps-4">ID</th>
                         <th>Người ủng hộ</th>
                         <th>Số tiền</th>
@@ -23,6 +122,7 @@
                 <tbody>
                     {% for d in donations %}
                     <tr>
+                        <td><input type="checkbox" class="row-checkbox-donation" name="selected_ids" value="{{ d.id }}"></td>
                         <td class="ps-4 fw-bold">#{{ d.id }}</td>
                         <td>
                             <div class="fw-bold text-dark">{{ d.donor_name|default:"Ẩn danh" }}</div>
@@ -45,17 +145,28 @@
                             {% endif %}
                         </td>
                         <td class="text-end pe-4">
+                            <div class="admin-actions justify-content-end">
                             <a href="{% url 'admin_panel:sua_quyengop' d.id %}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-edit"></i> Sửa
                             </a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7" class="text-center py-4">Chưa có dữ liệu</td></tr>
+                    <tr><td colspan="8" class="admin-empty">Chưa có dữ liệu</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        </form>
     </div>
 </div>
+</div>
+<script>
+document.getElementById('select-all-donations')?.addEventListener('change', function() {
+    document.querySelectorAll('.row-checkbox-donation').forEach(cb => {
+        cb.checked = this.checked;
+    });
+});
+</script>
 {% endblock %}
