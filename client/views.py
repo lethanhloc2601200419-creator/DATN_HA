@@ -109,7 +109,10 @@ def _get_or_create_web3_user(wallet_address, eoa_address='', email='', display_n
 
     return user, profile
 
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 
+@csrf_exempt
 @require_POST
 def api_web3_login(request):
     try:
