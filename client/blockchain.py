@@ -387,13 +387,27 @@ class BlockchainService:
         Phase 2 bridge:
         Gọi trực tiếp DCPManager.recordDonation(campaignId, donor, fiatAmount)
         và đợi receipt để chắc chắn giao dịch đã vào chain trước khi trả về.
+
+        LƯU Ý VỀ DECIMALS:
+        Token VNDT có 18 decimals (ERC20 chuẩn), nhưng giá trị nhập vào
+        `fiat_amount` là đơn vị VND "người dùng thấy" (vd: 2000 VND).
+        Contract mint đúng bằng số integer nhận được, nên nếu truyền 2000 sẽ
+        hiện 0.000000000000002 VNDT trên Etherscan.
+        => Nhân với 10^18 (Web3.to_wei(..., 'ether')) TRƯỚC khi gửi để
+        Etherscan hiển thị đúng "2000.0 VNDT".
         """
         donor = donor_address or self.admin_address
         donor_checksum = self.w3.to_checksum_address(donor)
+
+        # Chuyển fiat_amount (VND) → số nguyên 18 decimals.
+        # Dùng Decimal (đã import ở top file) để tránh sai số float
+        # khi amount là kiểu float/str.
+        amount_18 = int(Decimal(str(fiat_amount)) * Decimal(10) ** 18)
+
         func = self.contract.functions.recordDonation(
             int(campaign_id),
             donor_checksum,
-            int(fiat_amount),
+            amount_18,
         )
         # _send_transaction() giờ đã tự replay eth_call nếu receipt.status != 1
         # và raise ContractLogicError với reason thật. Không cần fallback generic nữa.
