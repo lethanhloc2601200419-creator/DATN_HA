@@ -1,226 +1,174 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
-/**
- * @title CharityTransparentPlatform (v2 - Async Flow)
- * @dev
- *  Luồng mới:
- *    1) User thanh toán qua VNPay (KHÔNG cần MetaMask).
- *    2) Backend gọi recordBankDonation() để ghi sao kê NH lên blockchain (minh bạch).
- *    3) Backend (ví Admin) gọi donateOnBehalf() để nạp ETH tương ứng thay user
- *       → ETH đi thẳng từ ví Admin vào contract của campaign.
- *    4) Backend gọi recordGasCost() để ghi nhận phí gas A+B đã chi
- *       (để lúc giải ngân contract biết trừ đúng số tiền).
- *    5) Khi đủ điều kiện + vote, admin gọi executeDisbursement():
- *       available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
- *       ETH chuyển thẳng từ contract → ví tổ chức (1 lần duy nhất).
- *    6) Nếu gas C dự trù còn dư, admin có thể withdrawGasRecovery().
- */
-contract CharityTransparentPlatform {
-    address public admin;
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+// ==========================================
+// 1. CONTRACT TOKEN VNDT (Tỉ lệ 1:1 với VNĐ)
+// ==========================================
+contract VNDT is ERC20, Ownable {
+    // Truyền msg.sender làm owner khởi tạo cho thư viện Ownable
+    constructor() ERC20("VND Token", "VNDT") Ownable(msg.sender) {}
+
+    // Chỉ Admin (Contract quản lý) mới có quyền gọi hàm đúc/đốt token
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) external onlyOwner {
+        _burn(from, amount);
+    }
+}
+
+// ==========================================
+// 2. CONTRACT QUẢN LÝ DỰ ÁN & GIẢI NGÂN (DCPManager)
+// ==========================================
+contract DCPManager is Ownable {
+    VNDT public token;
+
+    address public supervisorWallet; // Cơ quan giám sát
+    address public treasuryWallet;   // Quỹ duy trì hệ thống (nhận phí)
+    address public adminWallet;      // Backend Django (Ví gọi lệnh)
+
+    // [ĐÃ SỬA]: Chuyển từ "constant" (cố định 3) sang biến linh hoạt, mặc định là 0%
+    uint256 public platformFee = 0;
 
     struct Campaign {
-        address payable organizationAddress;
-        string organizationName;
-        uint256 totalFund;           // Tổng ETH đã nạp cho campaign (donate + donateOnBehalf)
-        uint256 totalGasCost;        // Tổng phí gas admin đã chi (gas A + B + ...) - trừ khi giải ngân
-        uint256 totalDisbursed;      // Đã giải ngân cho tổ chức
-        uint256 totalAdminRecovered; // Admin đã thu hồi gas dự trù còn dư
-        bool isActive;
+        address organization;
+        uint256 currentAmount;
+        bool isDisbursed;
+        string ipfsCid;
+        uint8 approvals;
+        mapping(address => bool) hasApproved;
     }
 
     mapping(uint256 => Campaign) public campaigns;
+    // [ĐÃ SỬA]: campaignCount giờ chỉ là counter thống kê, KHÔNG dùng để sinh ID nữa.
+    // Backend Django truyền thẳng Campaign.id (Postgres PK) vào createCampaign để
+    // on-chain ID khớp 100% với DB, tránh phải mapping ngược qua event.
+    uint256 public campaignCount;
 
-    // ===== EVENTS =====
-    event CampaignCreated(uint256 indexed cid, address orgAddress, string orgName);
+    // Lưu trữ quyền lực Vote của từng người dùng cho từng dự án (Quadratic Funding Data)
+    mapping(uint256 => mapping(address => uint256)) public donorContributions;
 
-    // Giao dịch A: ghi sao kê NH (chỉ emit event, không lưu storage để tiết kiệm gas)
-    event BankDonationRecorded(
-        uint256 indexed cid,
-        address indexed donorAddress,   // ví user nếu có, hoặc address(0)
-        string donorName,
-        uint256 amountVND,
-        string vnpayRef,
-        uint256 timestamp
-    );
+    // Các Event để Webhook Django lắng nghe và đồng bộ Database
+    event CampaignCreated(uint256 indexed campaignId, address organization);
+    event DonationRecorded(uint256 indexed campaignId, address indexed donor, uint256 netAmount, uint256 fee);
+    event DisbursementProposed(uint256 indexed campaignId, string ipfsCid);
+    event DisbursementApproved(uint256 indexed campaignId, address approver);
+    event DisbursedAndBurned(uint256 indexed campaignId, uint256 amountBurned, string ipfsCid);
 
-    // Giao dịch B: admin nạp ETH thay user (onBehalf=true), hoặc user tự ký donate (onBehalf=false)
-    event Donated(
-        uint256 indexed cid,
-        address indexed donor,
-        uint256 amount,
-        bool onBehalf
-    );
-
-    // Record gas A/B đã chi để trừ khi giải ngân
-    event GasCostRecorded(uint256 indexed cid, uint256 amount, string reason);
-
-    event Disbursed(uint256 indexed cid, uint256 amount, address recipient);
-    event GasRecovered(uint256 indexed cid, uint256 amount);
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "Error: Chi Admin moi co quyen");
-        _;
+    // Khi Deploy, ông cần truyền vào 2 địa chỉ ví: 1 của Giám sát, 1 của Quỹ nền tảng
+    constructor(address _supervisor, address _treasury) Ownable(msg.sender) {
+        token = new VNDT(); // Tự động đúc contract VNDT ngay khi khởi tạo
+        adminWallet = msg.sender;
+        supervisorWallet = _supervisor;
+        treasuryWallet = _treasury;
     }
 
-    constructor() {
-        admin = msg.sender;
+    // Lấy địa chỉ contract của Token VNDT
+    function getTokenAddress() external view returns (address) {
+        return address(token);
     }
 
-    // =====================================================
-    // 1. INIT CAMPAIGN
-    // =====================================================
-    function initCampaign(
-        uint256 _cid,
-        string memory _orgName,
-        address payable _orgAddress
-    ) public {
-        require(!campaigns[_cid].isActive, "Error: Chien dich da ton tai");
-        require(_orgAddress != address(0), "Error: Dia chi vi khong hop le");
-
-        Campaign storage c = campaigns[_cid];
-        c.organizationAddress = _orgAddress;
-        c.organizationName = _orgName;
-        c.isActive = true;
-
-        emit CampaignCreated(_cid, _orgAddress, _orgName);
+    // [THÊM MỚI]: Hàm để cấu hình phí linh hoạt. Sau này ông thích thu phí thì gọi hàm này.
+    function setPlatformFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 10, "Phi khong duoc vuot qua 10%");
+        platformFee = _fee;
     }
 
-    // =====================================================
-    // 2. GIAO DỊCH A: GHI SAO KÊ NGÂN HÀNG LÊN BLOCKCHAIN
-    //    Chỉ emit event (không lưu storage) -> rẻ gas.
-    //    Hash giao dịch này hiện trên trang cảm ơn -> user click Etherscan verify.
-    // =====================================================
-    function recordBankDonation(
-        uint256 _cid,
-        address _donorAddress,
-        string memory _donorName,
-        uint256 _amountVND,
-        string memory _vnpayRef,
-        uint256 _timestamp
-    ) public onlyAdmin {
-        require(campaigns[_cid].isActive, "Error: Chien dich da dong hoac khong ton tai");
-        require(_amountVND > 0, "Error: So tien VND phai > 0");
+    // ------------------------------------------
+    // LUỒNG 1: TẠO DỰ ÁN
+    // [ĐÃ SỬA]: Nhận trực tiếp _campaignId từ backend (Django Campaign.id)
+    // → on-chain ID = Django PK, không cần parse event để map ngược.
+    // ------------------------------------------
+    function createCampaign(uint256 _campaignId, address _organization) external onlyOwner {
+        require(_campaignId > 0, "Campaign ID phai > 0");
+        require(_organization != address(0), "Dia chi to chuc khong hop le");
+        // Dùng organization khác address(0) làm cờ tồn tại, tránh tạo trùng.
+        require(campaigns[_campaignId].organization == address(0), "Chien dich da ton tai");
 
-        emit BankDonationRecorded(
-            _cid,
-            _donorAddress,
-            _donorName,
-            _amountVND,
-            _vnpayRef,
-            _timestamp
-        );
+        Campaign storage c = campaigns[_campaignId];
+        c.organization = _organization;
+        campaignCount++; // chỉ tăng counter thống kê
+        emit CampaignCreated(_campaignId, _organization);
     }
 
-    // =====================================================
-    // 3. GIAO DỊCH B: ADMIN NẠP ETH THAY USER
-    //    ETH đi từ ví Admin (msg.sender) -> contract (msg.value).
-    //    Ghi nhận là "user X đã ủng hộ" qua event.
-    // =====================================================
-    function donateOnBehalf(uint256 _cid, address _donorAddress) public payable onlyAdmin {
-        Campaign storage c = campaigns[_cid];
-        require(c.isActive, "Error: Chien dich da dong hoac khong ton tai");
-        require(msg.value > 0, "Error: So tien ung ho phai lon hon 0");
+    // ------------------------------------------
+    // LUỒNG 2: NGƯỜI DÙNG NẠP VNĐ -> ĐÚC TOKEN
+    // Backend gọi hàm này khi PayOS báo nhận được tiền VNĐ
+    // ------------------------------------------
+    function recordDonation(uint256 _campaignId, address _donor, uint256 _fiatAmount) external onlyOwner {
+        // [ĐÃ SỬA]: Check tồn tại qua organization != address(0) thay vì so với campaignCount
+        // (vì _campaignId giờ là Django PK, không còn tuần tự).
+        require(campaigns[_campaignId].organization != address(0), "Chien dich khong ton tai");
+        require(!campaigns[_campaignId].isDisbursed, "Chien dich da giai ngan");
 
-        c.totalFund += msg.value;
-        emit Donated(_cid, _donorAddress, msg.value, true);
+        // [ĐÃ SỬA]: Tính toán phí dựa trên biến platformFee (đang là 0)
+        uint256 fee = 0;
+        uint256 netAmount = _fiatAmount;
+
+        if (platformFee > 0) {
+            fee = (_fiatAmount * platformFee) / 100;
+            netAmount = _fiatAmount - fee;
+            token.mint(treasuryWallet, fee); // Đúc phần phí đẩy về quỹ
+        }
+
+        // Đúc tiền thực nhận và lưu trữ tại Contract này (đóng vai trò như kho bạc)
+        token.mint(address(this), netAmount);
+
+        // Ghi nhận số dư cho dự án & quyền lực vote cho người dùng
+        campaigns[_campaignId].currentAmount += netAmount;
+        donorContributions[_campaignId][_donor] += netAmount;
+
+        emit DonationRecorded(_campaignId, _donor, netAmount, fee);
     }
 
-    // =====================================================
-    // 4. GHI NHẬN PHÍ GAS ĐÃ CHI (để trừ khi giải ngân)
-    //    _reason: "bank_record" (gas A) / "donate_onbehalf" (gas B) / "reserve_disbursement" (gas C)
-    //    _amount: tính bằng wei (quy đổi từ VND sang wei theo tỉ giá ETH hiện tại)
-    // =====================================================
-    function recordGasCost(
-        uint256 _cid,
-        uint256 _amount,
-        string memory _reason
-    ) public onlyAdmin {
-        Campaign storage c = campaigns[_cid];
-        require(c.isActive, "Error: Chien dich da dong hoac khong ton tai");
-        require(_amount > 0, "Error: Amount phai > 0");
+    // ------------------------------------------
+    // LUỒNG 3: MINH BẠCH & GIẢI NGÂN (Multisig)
+    // ------------------------------------------
 
-        c.totalGasCost += _amount;
-        emit GasCostRecorded(_cid, _amount, _reason);
+    // Tổ chức tải hóa đơn lên IPFS và đề xuất giải ngân
+    function proposeDisbursement(uint256 _campaignId, string memory _ipfsCid) external {
+        Campaign storage c = campaigns[_campaignId];
+        require(c.organization != address(0), "Chien dich khong ton tai");
+        require(msg.sender == c.organization || msg.sender == adminWallet || msg.sender == supervisorWallet, "Khong co quyen");
+        require(!c.isDisbursed, "Da giai ngan");
+
+        c.ipfsCid = _ipfsCid;
+        emit DisbursementProposed(_campaignId, _ipfsCid);
     }
 
-    // =====================================================
-    // 5. FALLBACK: USER TỰ KÝ ỦNG HỘ (nếu có MetaMask)
-    //    Giữ lại cho trường hợp dùng cao cấp. Luồng chính là donateOnBehalf.
-    // =====================================================
-    function donate(uint256 _cid) public payable {
-        Campaign storage c = campaigns[_cid];
-        require(c.isActive, "Error: Chien dich da dong hoac khong ton tai");
-        require(msg.value > 0, "Error: So tien ung ho phai lon hon 0");
+    // Ký duyệt giải ngân (Cần 3 chữ ký)
+    function approveDisbursement(uint256 _campaignId) external {
+        Campaign storage c = campaigns[_campaignId];
+        require(c.organization != address(0), "Chien dich khong ton tai");
+        require(!c.isDisbursed, "Da giai ngan");
+        require(msg.sender == c.organization || msg.sender == adminWallet || msg.sender == supervisorWallet, "Khong co quyen");
+        require(!c.hasApproved[msg.sender], "Vi nay da ky roi");
 
-        c.totalFund += msg.value;
-        emit Donated(_cid, msg.sender, msg.value, false);
+        c.hasApproved[msg.sender] = true;
+        c.approvals++;
+
+        emit DisbursementApproved(_campaignId, msg.sender);
+
+        // Nếu đủ 3 bên (Tổ chức, Admin, Giám sát) cùng gật đầu -> Kích hoạt giải ngân
+        if (c.approvals >= 3) {
+            _executeDisbursement(_campaignId);
+        }
     }
 
-    // =====================================================
-    // 6. GIẢI NGÂN
-    //    available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
-    //    ETH chuyển thẳng từ contract -> ví tổ chức.
-    // =====================================================
-    function executeDisbursement(uint256 _cid, uint256 _amount) public onlyAdmin {
-        Campaign storage c = campaigns[_cid];
-        require(_amount > 0, "Error: Amount phai > 0");
-        uint256 availableToWithdraw = getAvailableBalance(_cid);
-        require(_amount <= availableToWithdraw, "Error: So tien vuot qua han muc sau khi tru phi Gas");
+    // Nội bộ tự động đốt token và chốt sổ
+    function _executeDisbursement(uint256 _campaignId) internal {
+        Campaign storage c = campaigns[_campaignId];
+        c.isDisbursed = true;
+        uint256 amountToBurn = c.currentAmount;
 
-        c.totalDisbursed += _amount;
-        (bool success, ) = c.organizationAddress.call{value: _amount}("");
-        require(success, "Error: Giai ngan cho to chuc that bai");
+        // Đốt lượng token trong kho bạc tương ứng để cân bằng với việc tiền VNĐ sẽ được xả từ ngân hàng ra
+        token.burn(address(this), amountToBurn);
 
-        emit Disbursed(_cid, _amount, c.organizationAddress);
+        // Bắn event để Django biết lệnh đốt thành công -> Gọi API ngân hàng chuyển tiền thật
+        emit DisbursedAndBurned(_campaignId, amountToBurn, c.ipfsCid);
     }
-
-    // =====================================================
-    // 7. ADMIN THU HỒI GAS DỰ TRÙ CÒN DƯ
-    //    Sau khi giải ngân, contract vẫn giữ phần ETH tương ứng với totalGasCost
-    //    (vì recordGasCost chỉ tăng counter, không chuyển ETH ra).
-    //    Admin gọi hàm này để reclaim lại số ETH đó (bù cho gas đã chi ngoài đời thực).
-    // =====================================================
-    function withdrawGasRecovery(uint256 _cid, uint256 _amount) public onlyAdmin {
-        Campaign storage c = campaigns[_cid];
-        require(_amount > 0, "Error: Amount phai > 0");
-        uint256 remaining = c.totalFund - c.totalDisbursed - c.totalAdminRecovered;
-        require(_amount <= remaining, "Error: Vuot qua so du kha dung");
-        require(address(this).balance >= _amount, "Error: So du hop dong khong du de hoan phi");
-
-        c.totalAdminRecovered += _amount;
-        (bool success, ) = payable(admin).call{value: _amount}("");
-        require(success, "Error: Thu hoi phi Gas that bai");
-
-        emit GasRecovered(_cid, _amount);
-    }
-
-    // =====================================================
-    // 8. VIEW HELPERS
-    // =====================================================
-    function getAvailableBalance(uint256 _cid) public view returns (uint256) {
-        Campaign storage c = campaigns[_cid];
-        uint256 cost = c.totalGasCost + c.totalDisbursed + c.totalAdminRecovered;
-        if (c.totalFund <= cost) return 0;
-        return c.totalFund - cost;
-    }
-
-    function getCampaignStats(uint256 _cid) public view returns (
-        uint256 totalFund,
-        uint256 totalGasCost,
-        uint256 totalDisbursed,
-        uint256 totalAdminRecovered,
-        uint256 available,
-        bool isActive
-    ) {
-        Campaign storage c = campaigns[_cid];
-        totalFund = c.totalFund;
-        totalGasCost = c.totalGasCost;
-        totalDisbursed = c.totalDisbursed;
-        totalAdminRecovered = c.totalAdminRecovered;
-        available = getAvailableBalance(_cid);
-        isActive = c.isActive;
-    }
-
-    receive() external payable {}
 }

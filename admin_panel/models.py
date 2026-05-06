@@ -317,7 +317,16 @@ class Campaign(models.Model):
     
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_campaigns')
     approved_at = models.DateTimeField(blank=True, null=True)
-    
+
+    # --- 6.5 ĐỒNG BỘ BLOCKCHAIN (DCPManager v3) ---
+    # Được set khi admin duyệt campaign → backend gọi createCampaign(_cid, org_addr).
+    # Nếu tx thành công: blockchain_tx_hash + blockchain_synced_at được set, is_onchain=True.
+    # Nếu revert/fail: blockchain_sync_error chứa reason, is_onchain=False (để thử lại).
+    is_onchain = models.BooleanField(default=False, verbose_name="Đã tạo trên blockchain")
+    blockchain_tx_hash = models.CharField(max_length=100, blank=True, null=True, verbose_name="TxHash createCampaign")
+    blockchain_synced_at = models.DateTimeField(blank=True, null=True, verbose_name="Thời điểm đồng bộ on-chain")
+    blockchain_sync_error = models.TextField(blank=True, null=True, verbose_name="Lỗi đồng bộ blockchain (nếu có)")
+
     # --- 7. POSTGRESQL SPECIFIC ---
     share_count = models.IntegerField(default=0)
     comment_count = models.IntegerField(default=0)

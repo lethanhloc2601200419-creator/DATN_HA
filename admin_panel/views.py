@@ -216,23 +216,66 @@ def _get_disbursement_approver_context(user):
     return context
 
 
+def _sync_campaign_to_blockchain(campaign):
+    """
+    Admin Relayer (Gas Station): backend tự gọi createCampaign(_cid, org_addr)
+    trên DCPManager v3 bằng ví Admin → on-chain campaignId = Django Campaign.id.
+
+    Idempotent: nếu campaign.is_onchain = True thì bỏ qua (đã sync rồi).
+    Mọi lỗi (thiếu ví, revert, RPC down) đều được lưu vào blockchain_sync_error
+    để admin có thể retry thủ công mà không chặn luồng duyệt campaign.
+    """
+    if campaign.is_onchain and campaign.blockchain_tx_hash:
+        print(f"ℹ️ [CHAIN SYNC] Campaign #{campaign.id} đã ở on-chain, bỏ qua.")
+        return
+
+    try:
+        org = campaign.organization
+        if not org:
+            raise Exception("Chiến dịch chưa gắn tổ chức — không thể tạo trên blockchain.")
+        wallet = (org.wallet_address or '').strip()
+        if not wallet:
+            raise Exception("Tổ chức chưa có địa chỉ ví Crypto (wallet_address) — không thể tạo trên blockchain.")
+        if not re.match(r'^0x[0-9a-fA-F]{40}$', wallet):
+            raise Exception(f"Địa chỉ ví tổ chức không hợp lệ (cần format 0x + 40 ký tự hex): {wallet}")
+
+        bc = BlockchainService()
+        result = bc.trigger_create_campaign(
+            campaign_id=campaign.id,
+            org_address=wallet,
+        )
+        tx_hash = result['tx_hash'] if isinstance(result, dict) else str(result)
+
+        campaign.is_onchain = True
+        campaign.blockchain_tx_hash = tx_hash
+        campaign.blockchain_synced_at = timezone.now()
+        campaign.blockchain_sync_error = None
+        campaign.save(update_fields=[
+            'is_onchain', 'blockchain_tx_hash',
+            'blockchain_synced_at', 'blockchain_sync_error',
+        ])
+        print(f"✅ [CHAIN SYNC] createCampaign(cid={campaign.id}, org={wallet}) OK, tx={tx_hash}")
+    except Exception as exc:
+        import traceback
+        err_msg = f"{type(exc).__name__}: {exc}"
+        print(f"❌ [CHAIN SYNC] Lỗi createCampaign #{campaign.id}: {err_msg}")
+        print(traceback.format_exc())
+        campaign.is_onchain = False
+        campaign.blockchain_sync_error = err_msg[:1000]
+        campaign.blockchain_synced_at = timezone.now()
+        campaign.save(update_fields=[
+            'is_onchain', 'blockchain_sync_error', 'blockchain_synced_at',
+        ])
+
+
 def _approve_campaign_with_blockchain(campaign, approver):
     campaign.status = 'active'
     campaign.approved_by = approver
     campaign.approved_at = timezone.now()
     campaign.save()
 
-    try:
-        if not campaign.organization or not campaign.organization.wallet_address:
-            raise Exception("Tổ chức chưa có địa chỉ ví Crypto (MetaMask).")
-        bc = BlockchainService()
-        bc.init_campaign(
-            campaign_id=campaign.id,
-            org_name=campaign.organization.name if campaign.organization else "Unknown",
-            org_address=campaign.organization.wallet_address if campaign.organization else "0x0000000000000000000000000000000000000000",
-        )
-    except Exception as e:
-        print(f"❌ [BLOCKCHAIN ERROR] Lỗi initCampaign #{campaign.id}: {e}")
+    # Đồng bộ on-chain NGAY sau khi duyệt (Admin Relayer pattern).
+    _sync_campaign_to_blockchain(campaign)
 
 # --- VIEW TRANG CHỦ ADMIN ---
 @login_required(login_url='admin_panel:dangnhap')
@@ -1010,7 +1053,20 @@ def them_chiendich(request):
             # 1️⃣ LƯU VÀO DATABASE SQL
             camp.save()
 
-            messages.success(request, f"Đã tạo chiến dịch '{camp.title}' thành công!")
+            # 2️⃣ NẾU SUPERUSER TẠO VỚI STATUS='active' → ĐỒNG BỘ ON-CHAIN NGAY
+            # (Admin Relayer pattern — backend gọi createCampaign(cid, org_addr)).
+            # Partner tạo với status='pending' thì chờ admin duyệt mới sync.
+            if camp.status == 'active':
+                _sync_campaign_to_blockchain(camp)
+                if camp.blockchain_sync_error:
+                    messages.warning(
+                        request,
+                        f"Chiến dịch '{camp.title}' đã lưu DB nhưng chưa đồng bộ on-chain: {camp.blockchain_sync_error[:200]}"
+                    )
+                else:
+                    messages.success(request, f"Đã tạo chiến dịch '{camp.title}' + đồng bộ on-chain (tx={camp.blockchain_tx_hash}).")
+            else:
+                messages.success(request, f"Đã tạo chiến dịch '{camp.title}' thành công! (Chờ Admin duyệt để sync blockchain.)")
 
         except Exception as e:
             messages.error(request, f"Lỗi khi thêm: {e}")
@@ -1092,44 +1148,21 @@ def xoa_chiendich(request, pk):
 
 @login_required
 def nap_pool(request):
+    """
+    [DEPRECATED ở contract v3]
+    Contract DCPManager v3 KHÔNG còn function `depositExchangePool` vì mô hình
+    token đã đổi: VNDT được mint theo fiatAmount trực tiếp trong recordDonation,
+    không còn ETH pool để swap.
+    View này chỉ hiện thông báo, không thực hiện giao dịch nào.
+    """
     if not request.user.is_superuser:
         messages.error(request, "Bạn không có quyền nạp Pool.")
         return redirect('admin_panel:quanlychiendich')
-
-    if request.method != 'POST':
-        return redirect('admin_panel:quanlychiendich')
-
-    amount_eth = request.POST.get('amount_eth')
-
-    try:
-        if not amount_eth:
-            raise Exception("Thiếu số ETH.")
-
-        amount_wei = int(Decimal(str(amount_eth)) * Decimal('1000000000000000000'))
-        bc = BlockchainService()
-        try:
-            chain_id = bc.w3.eth.chain_id
-            balance = bc.w3.eth.get_balance(settings.WALLET_ADDRESS)
-            print(f"ℹ️ [POOL] RPC: {settings.WEB3_PROVIDER_URL} | chainId: {chain_id}")
-            print(f"ℹ️ [POOL] Admin: {settings.WALLET_ADDRESS} | balance: {balance} wei")
-        except Exception:
-            pass
-        tx_hash = bc.deposit_exchange_pool(amount_wei)
-        print(f"✅ [POOL] Da gui tx nap Pool: {tx_hash}")
-        try:
-            receipt = bc.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-            if receipt and receipt.get('status') == 1:
-                print(f"✅ [POOL] Tx nap Pool thanh cong: {tx_hash}")
-                messages.success(request, f"Đã nạp {amount_eth} ETH vào Pool chung. Tx: {tx_hash}")
-            else:
-                print(f"❌ [POOL] Tx nap Pool bi revert: {tx_hash}")
-                messages.error(request, f"Giao dịch nạp Pool thất bại (revert). Tx: {tx_hash}")
-        except Exception:
-            print(f"⏳ [POOL] Tx nap Pool dang cho xac nhan: {tx_hash}")
-            messages.warning(request, f"Đã gửi giao dịch nạp Pool, đang chờ xác nhận. Tx: {tx_hash}")
-    except Exception as e:
-        messages.error(request, f"Lỗi nạp Pool: {e}")
-
+    messages.info(
+        request,
+        "Chức năng 'Nạp Pool ETH' đã gỡ bỏ ở contract v3. "
+        "Token VNDT giờ được mint trực tiếp theo số VND donor chuyển — không cần pool swap."
+    )
     return redirect('admin_panel:quanlychiendich')
 
 # --- QUẢN LÝ QUYÊN GÓP ---
@@ -1837,91 +1870,21 @@ def huy_giaingan(request, pk):
 
 @login_required
 def thu_hoi_gas(request):
+    """
+    [DEPRECATED ở contract v3]
+    Contract DCPManager v3 KHÔNG còn function `withdrawGasRecovery` —
+    Admin Relayer pattern: ví Admin tự trả gas từ ETH Sepolia riêng,
+    không cộng gas vào currentAmount và không thu hồi ngược.
+    View này chỉ hiện thông báo, không thực hiện giao dịch nào.
+    """
     if not request.user.is_superuser:
         messages.error(request, "Bạn không có quyền thực hiện.")
         return redirect('admin_panel:quanly_giaingan')
-
-    if request.method != 'POST':
-        return redirect('admin_panel:quanly_giaingan')
-
-    campaign_id = request.POST.get('campaign_id')
-    campaign = get_object_or_404(Campaign, pk=campaign_id)
-
-    # SERVER-SIDE VALIDATION: chỉ cho phép thu hồi khi chiến dịch đã hết hạn VÀ giải ngân hết
-    # c.end_date là DateField (date), dùng timezone.localdate() để tránh lỗi so sánh date vs datetime
-    today = timezone.localdate()
-    if not campaign.end_date or campaign.end_date >= today:
-        messages.error(request, "Không thể thu hồi gas: chiến dịch chưa hết hạn.")
-        return redirect('admin_panel:quanly_giaingan')
-
-    try:
-        bc = BlockchainService()
-        eth_vnd_rate = get_eth_vnd_rate()
-
-        stats = bc.get_campaign_onchain_stats(campaign.id)
-        total_recovered_vnd = _wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate)
-
-        # V2: Tổng gas admin đã chi = totalGasCost on-chain (đã bao gồm A+B+C qua recordGasCost)
-        total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
-        gas_onchain_cost_vnd = _wei_to_vnd(total_gas_cost_wei, eth_vnd_rate)
-
-        # Check chiến dịch đã giải ngân hết chưa (onchain_available ≤ ngưỡng)
-        available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
-        onchain_available_vnd = _wei_to_vnd(max(0, available_wei), eth_vnd_rate)
-        if onchain_available_vnd > FULLY_DISBURSED_THRESHOLD_VND:
-            messages.error(request, f"Không thể thu hồi gas: chiến dịch còn {int(onchain_available_vnd):,}đ chưa giải ngân hết.")
-            return redirect('admin_panel:quanly_giaingan')
-
-        # Legacy: donation cũ (luồng v1) không dùng recordGasCost - cộng riêng
-        gas_admin_sendeth_vnd = Donation.objects.filter(
-            campaign=campaign, admin_send_eth_gas_fee_vnd__isnull=False
-        ).aggregate(total=Sum('admin_send_eth_gas_fee_vnd'))['total'] or Decimal('0')
-        gas_disbursement_vnd = DisbursementProposal.objects.filter(
-            campaign=campaign, status='executed', disbursement_gas_fee_vnd__isnull=False
-        ).aggregate(total=Sum('disbursement_gas_fee_vnd'))['total'] or Decimal('0')
-        est_recovery_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
-
-        # Tổng gas cần thu hồi = gas on-chain (A+B+C v2) + legacy sendEth + disburse actual + 1 phí thu hồi
-        total_4_fees_vnd = gas_onchain_cost_vnd + gas_admin_sendeth_vnd + gas_disbursement_vnd + est_recovery_gas_vnd
-        remaining_gas_vnd = total_4_fees_vnd - total_recovered_vnd
-        if remaining_gas_vnd <= 0:
-            messages.warning(request, "Không có phí gas cần thu hồi cho chiến dịch này.")
-            return redirect('admin_panel:quanly_giaingan')
-
-        total_to_recover_vnd = remaining_gas_vnd
-        total_to_recover_eth = total_to_recover_vnd / eth_vnd_rate
-        total_to_recover_wei = int(total_to_recover_eth * Decimal('1000000000000000000'))
-
-        # available_wei đã tính ở trên
-        if total_to_recover_wei > available_wei:
-            total_to_recover_wei = available_wei
-            total_to_recover_eth = Decimal(str(total_to_recover_wei)) / Decimal('1000000000000000000')
-            total_to_recover_vnd = total_to_recover_eth * eth_vnd_rate
-            print(f"⚠️ [GAS RECOVERY] Giảm xuống {total_to_recover_wei} wei (giới hạn on-chain)")
-
-        print(f"💰 [GAS RECOVERY] Chiến dịch #{campaign.id}")
-        print(f"   ① Gas on-chain (v2 totalGasCost: A+B+C): {gas_onchain_cost_vnd:,.0f}")
-        print(f"   ② Gas sendEthToUser (legacy): {gas_admin_sendeth_vnd:,.0f}")
-        print(f"   ③ Gas executeDisbursement (actual): {gas_disbursement_vnd:,.0f}")
-        print(f"   ④ Gas thu hồi ước tính: {est_recovery_gas_vnd:,.0f}")
-        print(f"   = Tổng các phí: {total_4_fees_vnd:,.0f} VNĐ")
-        print(f"   - Đã thu hồi: {total_recovered_vnd:,.0f} VNĐ")
-        print(f"   = Còn thu hồi: {total_to_recover_vnd:,.0f} VNĐ = {total_to_recover_eth:.10f} ETH = {total_to_recover_wei} wei")
-
-        tx_hash = bc.withdraw_gas_recovery(
-            campaign_id=campaign.id,
-            amount_wei=total_to_recover_wei,
-        )
-
-        receipt = bc.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-        invalidate_campaign_cache(campaign.id)
-        if receipt and receipt.get('status') == 1:
-            messages.success(request, f"✅ Thu hồi thành công {total_to_recover_vnd:,.0f} VNĐ ({total_to_recover_eth:.8f} ETH). Tx: {tx_hash}")
-        else:
-            messages.error(request, f"Giao dịch thu hồi bị revert. Tx: {tx_hash}")
-
-    except Exception as e:
-        messages.error(request, f"Lỗi thu hồi gas: {e}")
-        print(f"❌ [GAS RECOVERY] Lỗi: {e}")
-
+    messages.info(
+        request,
+        "Chức năng 'Thu hồi gas' đã gỡ bỏ ở contract v3. "
+        "Admin Relayer pattern: ví Admin tự trả gas phí Sepolia, không cộng vào currentAmount campaign."
+    )
     return redirect('admin_panel:quanly_giaingan')
+
+

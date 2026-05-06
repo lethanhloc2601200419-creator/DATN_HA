@@ -1,17 +1,24 @@
 """
 Blockchain service — ADMIN RELAYER (GAS STATION) PATTERN.
 
-Tất cả các giao dịch on-chain (recordDonation, donateOnBehalf,
-recordBankDonation, executeDisbursement, withdrawGasRecovery...) đều được:
+Contract hiện tại: DCPManager v3 (Solidity, dùng OpenZeppelin Ownable).
+Các function on-chain:
+    - createCampaign(uint256 _cid, address _organization)  -- onlyOwner
+    - recordDonation(uint256 _cid, address _donor, uint256 _fiatAmount) -- onlyOwner
+    - proposeDisbursement(uint256 _cid, string _ipfsCid)
+    - approveDisbursement(uint256 _cid)  -- đủ 3 chữ ký (org + admin + supervisor)
+      → tự động _executeDisbursement: burn token + emit DisbursedAndBurned
+    - View: campaigns(uint256) → (organization, currentAmount, isDisbursed, ipfsCid, approvals)
+
+Admin Relayer pattern: mọi giao dịch write đều được
     1) Ký bằng private key của ví Admin (settings.WALLET_PRIVATE_KEY)
     2) Gửi trực tiếp lên Sepolia qua eth_sendRawTransaction
-    3) Admin trả gas fee bằng ETH của chính mình, sau đó thu hồi qua
-       withdrawGasRecovery trên contract.
+    3) Admin trả gas fee bằng ETH của chính mình.
 
 Đây KHÔNG phải ERC-4337 / Paymaster. Đây là "meta-transaction qua trung gian
-tin cậy" (trusted relayer) — đơn giản hơn, không cần bundler/EntryPoint,
-và tương thích với contract hiện tại (modifier `onlyAdmin` yêu cầu
-msg.sender == admin).
+tin cậy" (trusted relayer) — đơn giản hơn, không cần bundler/EntryPoint.
+Tương thích với contract hiện tại: `onlyOwner` yêu cầu msg.sender == owner
+(= địa chỉ deploy = WALLET_ADDRESS của backend).
 
 Gas pricing: ưu tiên EIP-1559 động (maxFeePerGas = 2*baseFee + priority)
 — chỉ dùng legacy gasPrice nếu settings.ADMIN_GAS_PRICE_GWEI được set thủ công.
@@ -19,6 +26,13 @@ Gas pricing: ưu tiên EIP-1559 động (maxFeePerGas = 2*baseFee + priority)
 Error surfacing: _send_transaction pre-flight bằng eth_call để bắt revert
 reason TRƯỚC khi burn gas; nếu tx mined nhưng revert, replay eth_call tại
 blockNumber đó để lấy reason thật — không còn generic "thao tác thất bại" nuốt lỗi.
+
+CÁC HÀM OBSOLETE (contract cũ v2, không còn tồn tại trên v3):
+    initCampaign, donateOnBehalf, recordBankDonation, recordGasCost,
+    withdrawGasRecovery, getCampaignStats, executeDisbursement,
+    deposit_exchange_pool.
+Nếu code cũ gọi → sẽ raise ABIFunctionNotFound hoặc NotImplementedError
+(xem các stub bên dưới).
 """
 from decimal import Decimal
 import time
@@ -195,75 +209,75 @@ class BlockchainService:
 
     # --- CÁC HÀM NGHIỆP VỤ ---
 
-    # 1. Khởi tạo chiến dịch trên Blockchain (gọi khi Admin DUYỆT chiến dịch)
-    def init_campaign(self, campaign_id, org_name, org_address):
-        func = self.contract.functions.initCampaign(
-            campaign_id, org_name, self.w3.to_checksum_address(org_address)
-        )
-        return self._send_transaction(func)
+    # ==========================================================
+    # 1. TẠO CHIẾN DỊCH ON-CHAIN
+    # ==========================================================
+    def trigger_create_campaign(self, campaign_id, org_address):
+        """
+        Gọi `createCampaign(uint256 _campaignId, address _organization)` trên
+        contract DCPManager v3.
 
-    # 2. LUỒNG MỚI: Ghi sao kê ngân hàng lên blockchain (Giao dịch A)
-    def record_bank_donation(self, campaign_id, donor_address, donor_name, amount_vnd,
-                             vnpay_ref, timestamp_unix):
+        - `campaign_id`: Django Campaign.id (Postgres PK) → dùng trực tiếp làm
+          on-chain ID, đảm bảo khớp 100% giữa DB và blockchain.
+        - `org_address`: địa chỉ ví nhận tiền của tổ chức (Organization.wallet_address).
+
+        Trả về dict {tx_hash, receipt, status} khi tx đã mine thành công.
+        Nếu pre-flight revert hoặc tx revert on-chain, _send_transaction sẽ
+        raise ContractLogicError với reason thật (VD: "Chien dich da ton tai",
+        "Dia chi to chuc khong hop le").
         """
-        Giao dịch A trong luồng async:
-        Ghi sao kê NH lên blockchain như một event để minh bạch.
-        donor_address có thể là ZERO_ADDRESS nếu user không có ví MetaMask.
-        """
-        addr = self.w3.to_checksum_address(donor_address) if donor_address else ZERO_ADDRESS
-        func = self.contract.functions.recordBankDonation(
+        if not org_address:
+            raise ValueError("org_address không được để trống khi tạo campaign on-chain.")
+        org_checksum = self.w3.to_checksum_address(org_address)
+        func = self.contract.functions.createCampaign(
             int(campaign_id),
-            addr,
-            str(donor_name or ''),
-            int(amount_vnd),
-            str(vnpay_ref or ''),
-            int(timestamp_unix),
+            org_checksum,
         )
-        return self._send_transaction(func)
-
-    # 3. LUỒNG MỚI: Admin tự động nạp ETH thay user vào contract (Giao dịch B)
-    def donate_on_behalf(self, campaign_id, donor_address, amount_e_wei):
-        """
-        Giao dịch B trong luồng async:
-        Admin wallet gọi donateOnBehalf, ETH đi thẳng từ ví Admin vào contract.
-        User KHÔNG cần MetaMask.
-        """
-        addr = self.w3.to_checksum_address(donor_address) if donor_address else ZERO_ADDRESS
-        func = self.contract.functions.donateOnBehalf(int(campaign_id), addr)
-        return self._send_transaction(func, value_wei=int(amount_e_wei))
-
-    # 4. LUỒNG MỚI: Ghi nhận gas đã chi lên contract để trừ khi giải ngân
-    def record_gas_cost(self, campaign_id, amount_wei, reason):
-        """
-        Ghi gas A+B hoặc gas giải ngân dự trù lên contract.
-        Giúp contract biết tổng phí admin đã chi → khi giải ngân trừ ra.
-        """
-        func = self.contract.functions.recordGasCost(
-            int(campaign_id), int(amount_wei), str(reason or '')
+        # Gas limit ~200k là đủ cho createCampaign (chỉ set 1 struct + emit event).
+        return self._send_transaction(
+            func,
+            gas_limit=200000,
+            wait_for_receipt=True,
         )
-        return self._send_transaction(func)
 
-    # 5. Thực thi giải ngân (sau khi vote thông qua)
-    def execute_disbursement(self, campaign_id, amount_wei):
-        func = self.contract.functions.executeDisbursement(campaign_id, int(amount_wei))
-        return self._send_transaction(func)
+    # Backward-compat alias: code cũ vẫn gọi init_campaign(cid, name, address).
+    # Tham số `org_name` bị bỏ vì contract v3 không lưu name nữa.
+    def init_campaign(self, campaign_id, org_name=None, org_address=None):
+        """
+        [DEPRECATED] Alias cho trigger_create_campaign. Contract v3 không còn
+        lưu org_name nên tham số này bị bỏ qua (giữ để code cũ khỏi vỡ).
+        """
+        return self.trigger_create_campaign(campaign_id, org_address)
 
-    def withdraw_gas_recovery(self, campaign_id, amount_wei):
-        func = self.contract.functions.withdrawGasRecovery(campaign_id, int(amount_wei))
-        return self._send_transaction(func)
-
+    # ==========================================================
+    # 2. VIEW: KIỂM TRA / LẤY STATE CHIẾN DỊCH
+    # ==========================================================
     def is_campaign_active(self, campaign_id):
+        """
+        Contract v3: campaign "tồn tại" ⇔ campaigns[cid].organization != 0x0.
+        "active" ở đây nghĩa là đã được createCampaign và chưa bị giải ngân.
+        """
         try:
-            c = self.contract.functions.campaigns(campaign_id).call()
-            return bool(c[6])
+            c = self.contract.functions.campaigns(int(campaign_id)).call()
+            org = c[0]
+            is_disbursed = bool(c[2])
+            return bool(org and org != ZERO_ADDRESS) and not is_disbursed
         except Exception:
             return False
 
     def get_campaign_onchain_stats(self, campaign_id, use_cache=True):
         """
-        Lay thong tin on-chain cua 1 chien dich (cached 2 min).
-        Su dung getCampaignStats() (v2):
-            (totalFund, totalGasCost, totalDisbursed, totalAdminRecovered, available, isActive)
+        Lấy thông tin on-chain của 1 chiến dịch (cached 2 min).
+
+        Contract v3 shape:
+            campaigns(uint256) → (organization, currentAmount, isDisbursed, ipfsCid, approvals)
+
+        Ở contract v3, `currentAmount` là số VND (VNDT 1:1) do token được đúc
+        theo fiat amount. Không còn khái niệm wei/ETH trong contract này.
+
+        Các key cũ (total_gas_cost_wei, total_admin_recovered_wei, available_wei…)
+        được giữ lại với giá trị 0 để code view cũ không bị KeyError. Chúng KHÔNG
+        còn ý nghĩa ở contract v3 và sẽ được dọn dần ở lần refactor tới.
         """
         now = time.time()
         if use_cache and campaign_id in _stats_cache:
@@ -271,50 +285,85 @@ class BlockchainService:
             if now - cached['ts'] < _STATS_CACHE_TTL:
                 return cached['value']
 
-        # Try new getCampaignStats() first, fallback to campaigns() mapping
-        try:
-            result = self.contract.functions.getCampaignStats(campaign_id).call()
-            stats = {
-                'organization_address': None,
-                'organization_name': None,
-                'total_fund_wei': int(result[0]),
-                'total_gas_cost_wei': int(result[1]),
-                # Backward-compat alias
-                'total_gas_subsidized_wei': int(result[1]),
-                'total_disbursed_wei': int(result[2]),
-                'total_admin_recovered_wei': int(result[3]),
-                'available_wei': int(result[4]),
-                'is_active': bool(result[5]),
-            }
-            # Enrich with org name/address from campaigns() mapping
-            try:
-                c = self.contract.functions.campaigns(campaign_id).call()
-                stats['organization_address'] = c[0]
-                stats['organization_name'] = c[1]
-            except Exception:
-                pass
-        except Exception:
-            # Fallback: dùng campaigns() mapping cũ
-            c = self.contract.functions.campaigns(campaign_id).call()
-            total_fund = int(c[2])
-            total_gas_cost = int(c[3])
-            total_disbursed = int(c[4])
-            total_admin_recovered = int(c[5])
-            available = max(0, total_fund - total_gas_cost - total_disbursed - total_admin_recovered)
-            stats = {
-                'organization_address': c[0],
-                'organization_name': c[1],
-                'total_fund_wei': total_fund,
-                'total_gas_cost_wei': total_gas_cost,
-                'total_gas_subsidized_wei': total_gas_cost,
-                'total_disbursed_wei': total_disbursed,
-                'total_admin_recovered_wei': total_admin_recovered,
-                'available_wei': available,
-                'is_active': bool(c[6]),
-            }
+        c = self.contract.functions.campaigns(int(campaign_id)).call()
+        organization = c[0]
+        current_amount = int(c[1])   # VND (token VNDT 1:1)
+        is_disbursed = bool(c[2])
+        ipfs_cid = c[3]
+        approvals = int(c[4])
+
+        exists = bool(organization and organization != ZERO_ADDRESS)
+
+        stats = {
+            'organization_address': organization if exists else None,
+            'organization_name': None,  # contract v3 không lưu name
+            'current_amount_vnd': current_amount,
+            'is_disbursed': is_disbursed,
+            'ipfs_cid': ipfs_cid,
+            'approvals': approvals,
+            'is_active': exists and not is_disbursed,
+            'exists': exists,
+            # ===== Các key legacy, KHÔNG còn ý nghĩa ở v3 =====
+            # Giữ = 0 để admin view cũ không crash. Sẽ được gỡ khi refactor.
+            'total_fund_wei': 0,
+            'total_gas_cost_wei': 0,
+            'total_gas_subsidized_wei': 0,
+            'total_disbursed_wei': 0,
+            'total_admin_recovered_wei': 0,
+            'available_wei': 0,
+        }
 
         _stats_cache[campaign_id] = {'value': stats, 'ts': now}
         return stats
+
+    # ==========================================================
+    # 3. LEGACY / OBSOLETE — contract v3 KHÔNG còn các function này.
+    # Gọi sẽ raise NotImplementedError với hướng dẫn migration.
+    # blockchain_processor.py (luồng async cũ) phụ thuộc các hàm này
+    # và đã nghỉ dùng — không bị kích hoạt trong luồng hiện tại.
+    # ==========================================================
+    _V3_REMOVED_MSG = (
+        "Function này đã bị gỡ khỏi DCPManager v3. "
+        "Luồng mới: createCampaign → recordDonation → propose/approveDisbursement. "
+        "Nếu đang chạy code cũ, hãy gỡ lệnh gọi này."
+    )
+
+    def record_bank_donation(self, *args, **kwargs):
+        raise NotImplementedError(f"record_bank_donation(): {self._V3_REMOVED_MSG}")
+
+    def donate_on_behalf(self, *args, **kwargs):
+        raise NotImplementedError(f"donate_on_behalf(): {self._V3_REMOVED_MSG}")
+
+    def record_gas_cost(self, *args, **kwargs):
+        raise NotImplementedError(f"record_gas_cost(): {self._V3_REMOVED_MSG}")
+
+    def execute_disbursement(self, *args, **kwargs):
+        # v3 tự động thực thi bên trong approveDisbursement khi đủ 3 chữ ký.
+        raise NotImplementedError(
+            "execute_disbursement(): Contract v3 tự động burn/giải ngân trong "
+            "approveDisbursement khi đủ 3 chữ ký (org + admin + supervisor). "
+            "Gọi approve_disbursement() thay thế."
+        )
+
+    def withdraw_gas_recovery(self, *args, **kwargs):
+        raise NotImplementedError(f"withdraw_gas_recovery(): {self._V3_REMOVED_MSG}")
+
+    def deposit_exchange_pool(self, *args, **kwargs):
+        raise NotImplementedError(f"deposit_exchange_pool(): {self._V3_REMOVED_MSG}")
+
+    # ==========================================================
+    # 4. GIẢI NGÂN (V3) — propose + approve
+    # ==========================================================
+    def propose_disbursement(self, campaign_id, ipfs_cid):
+        func = self.contract.functions.proposeDisbursement(
+            int(campaign_id), str(ipfs_cid or '')
+        )
+        return self._send_transaction(func, gas_limit=200000, wait_for_receipt=True)
+
+    def approve_disbursement(self, campaign_id):
+        """Đủ 3 chữ ký (org + admin + supervisor) → contract tự burn token."""
+        func = self.contract.functions.approveDisbursement(int(campaign_id))
+        return self._send_transaction(func, gas_limit=300000, wait_for_receipt=True)
 
     # 6. Lấy phí gas thực tế từ transaction receipt
     def get_transaction_gas_fee(self, tx_hash):
