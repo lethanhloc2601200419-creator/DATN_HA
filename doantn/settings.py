@@ -12,12 +12,25 @@ from dotenv import load_dotenv
 
 CSRF_TRUSTED_ORIGINS = [
     'https://web-production-e589d.up.railway.app',
+    'https://*.up.railway.app',
 ]
+
+# Railway (và nhiều PaaS khác) terminate TLS ở load balancer rồi forward HTTP
+# nội bộ về app. Django cần đọc header X-Forwarded-Proto để nhận biết request
+# gốc là HTTPS; nếu thiếu, cookie Secure + CSRF có thể lỗi 403 / redirect loop.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
 # Bắt buộc dùng HTTPS cho Cookie (Railway chạy HTTPS nên cái này là bắt buộc)
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_HTTPONLY = True
+# Để JS (fetch ở web3auth-bootstrap.js) đọc được csrftoken từ document.cookie
+# và gửi qua header X-CSRFToken. Nếu bật HttpOnly, JS không đọc được và các
+# endpoint CSRF-protected khác sẽ trả 403.
+CSRF_COOKIE_HTTPONLY = False
+# SameSite='Lax' là mặc định – đủ cho same-origin fetch từ chính domain Railway.
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

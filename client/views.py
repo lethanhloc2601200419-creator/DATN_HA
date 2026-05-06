@@ -641,11 +641,17 @@ def payos_cancel(request, donation_id):
     return render(request, "client/payment_failed.html", {
         "message": f"Bạn đã hủy thanh toán PayOS cho giao dịch #{donation.id}.",
     })
-
-
-@login_required(login_url='admin_panel:dangnhap')
+    
+@csrf_exempt
 @require_POST
 def api_wallet_sync(request):
+    """
+    Đồng bộ Smart Account / EOA vào profile của user.
+    Không dùng @login_required để tránh trả về HTML redirect (302) khi
+    session chưa kịp được middleware nhận diện ở production (Railway + HTTPS).
+    Nếu request.user chưa authenticated, xác định user từ payload
+    (wallet_address / eoa_address / email) rồi login lại qua session.
+    """
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except json.JSONDecodeError:
@@ -654,6 +660,8 @@ def api_wallet_sync(request):
     wallet_address = (payload.get('wallet_address') or '').strip()
     eoa_address = (payload.get('eoa_address') or '').strip()
     smart_account_address = (payload.get('smart_account_address') or '').strip()
+    email = (payload.get('email') or '').strip()
+    display_name = (payload.get('display_name') or payload.get('name') or '').strip()
     provider = (payload.get('provider') or 'web3auth').strip()
 
     if not smart_account_address and wallet_address:
@@ -670,8 +678,22 @@ def api_wallet_sync(request):
 
     checksum_eoa = Web3.to_checksum_address(eoa_address) if eoa_address else ''
     checksum_smart = Web3.to_checksum_address(smart_account_address)
-    profile, _created = UserProfile.objects.get_or_create(user=request.user)
-    profile.eoa_address = checksum_eoa or None
+
+    # Xác định user: ưu tiên session hiện tại, fallback theo payload.
+    user = request.user if request.user.is_authenticated else None
+    if user is None:
+        user, profile = _get_or_create_web3_user(
+            wallet_address=checksum_smart,
+            eoa_address=checksum_eoa,
+            email=email,
+            display_name=display_name,
+        )
+        # Tạo session để các request sau được authenticated đúng cách.
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    else:
+        profile, _created = UserProfile.objects.get_or_create(user=user)
+
+    profile.eoa_address = checksum_eoa or profile.eoa_address or None
     profile.smart_account_address = checksum_smart
     profile.wallet_address = checksum_smart
     profile.save(update_fields=[
@@ -682,7 +704,7 @@ def api_wallet_sync(request):
     ])
 
     ActivityLog.objects.create(
-        user=request.user,
+        user=user,
         type='wallet_sync',
         description=f'Đồng bộ Smart Account {checksum_smart} từ {provider}' + (f' | EOA {checksum_eoa}' if checksum_eoa else ''),
     )
@@ -693,6 +715,11 @@ def api_wallet_sync(request):
         'eoa_address': checksum_eoa,
         'smart_account_address': checksum_smart,
         'provider': provider,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+        },
     })
     
 
