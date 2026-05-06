@@ -57,6 +57,8 @@ contract DCPManager is Ownable {
     event DonationRecorded(uint256 indexed campaignId, address indexed donor, uint256 netAmount, uint256 fee);
     event DisbursementProposed(uint256 indexed campaignId, string ipfsCid);
     event DisbursementApproved(uint256 indexed campaignId, address approver);
+    // [ĐÃ SỬA - V4]: Tên event giữ nguyên cho tương thích ngược với listener Django,
+    // nhưng `amountBurned` giờ mang ý nghĩa `amountDisbursed` (không còn burn token).
     event DisbursedAndBurned(uint256 indexed campaignId, uint256 amountBurned, string ipfsCid);
 
     // Khi Deploy, ông cần truyền vào 2 địa chỉ ví: 1 của Giám sát, 1 của Quỹ nền tảng
@@ -115,8 +117,11 @@ contract DCPManager is Ownable {
             token.mint(treasuryWallet, fee); // Đúc phần phí đẩy về quỹ
         }
 
-        // Đúc tiền thực nhận và lưu trữ tại Contract này (đóng vai trò như kho bạc)
-        token.mint(address(this), netAmount);
+        // [ĐÃ SỬA - V4]: Đúc token THẲNG cho ví của người quyên góp.
+        // Token VNDT đóng vai trò như "kỷ niệm chương on-chain" (proof-of-donation),
+        // donor giữ mãi mãi trong ví — Etherscan sẽ hiển thị đúng ví donor ở trường 'To'.
+        // Kho bạc (address(this)) KHÔNG còn giữ token; luồng giải ngân không còn burn nữa.
+        token.mint(_donor, netAmount);
 
         // Ghi nhận số dư cho dự án & quyền lực vote cho người dùng
         campaigns[_campaignId].currentAmount += netAmount;
@@ -159,16 +164,19 @@ contract DCPManager is Ownable {
         }
     }
 
-    // Nội bộ tự động đốt token và chốt sổ
+    // [ĐÃ SỬA - V4]: Nội bộ CHỐT SỔ giải ngân (KHÔNG CÒN BURN).
+    // Lý do: token giờ đã được mint thẳng cho donor như kỷ niệm chương on-chain,
+    // nên kho bạc (address(this)) không còn giữ token nào để burn. Giải ngân chỉ
+    // cần đánh dấu isDisbursed = true và emit event để Django gọi API ngân hàng
+    // chuyển tiền VNĐ thật ra cho tổ chức. Token trong ví donor được giữ vĩnh viễn
+    // làm bằng chứng minh bạch (proof-of-donation / souvenir).
     function _executeDisbursement(uint256 _campaignId) internal {
         Campaign storage c = campaigns[_campaignId];
         c.isDisbursed = true;
-        uint256 amountToBurn = c.currentAmount;
+        uint256 amountDisbursed = c.currentAmount;
 
-        // Đốt lượng token trong kho bạc tương ứng để cân bằng với việc tiền VNĐ sẽ được xả từ ngân hàng ra
-        token.burn(address(this), amountToBurn);
-
-        // Bắn event để Django biết lệnh đốt thành công -> Gọi API ngân hàng chuyển tiền thật
-        emit DisbursedAndBurned(_campaignId, amountToBurn, c.ipfsCid);
+        // Bắn event để Django biết đã chốt sổ -> Gọi API ngân hàng chuyển tiền thật
+        // Giữ nguyên tên event DisbursedAndBurned để listener cũ không gãy.
+        emit DisbursedAndBurned(_campaignId, amountDisbursed, c.ipfsCid);
     }
 }

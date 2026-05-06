@@ -417,6 +417,19 @@ def _trigger_record_donation_bridge(donation):
         )
     donor_address = donation.donor_wallet_address or bc.get_fallback_donor_address()
 
+    # V4 ("Double Integrity"): recordDonation cần địa chỉ multisig vault để
+    # smart2 mint VNDT ký quỹ. MVP dùng chính ví tổ chức làm vault — đã set
+    # ở bước createCampaign, nên BẮT BUỘC phải khớp ở đây (nếu không contract
+    # sẽ revert với "multisig khong khop").
+    organization = getattr(donation.campaign, 'organization', None)
+    multisig_address = (organization.wallet_address or '').strip() if organization else ''
+    if not multisig_address:
+        raise Exception(
+            f"Campaign #{donation.campaign_id} chưa có wallet_address tổ chức → "
+            "không xác định được multisig vault để recordDonation. Hãy vào "
+            "'Quản lý tổ chức' cập nhật ví crypto rồi sync lại chiến dịch."
+        )
+
     donation.blockchain_status = 'processing'
     donation.blockchain_started_at = timezone.now()
     donation.blockchain_error = None
@@ -432,6 +445,7 @@ def _trigger_record_donation_bridge(donation):
     tx_result = bc.trigger_record_donation(
         campaign_id=donation.campaign_id,
         donor_address=donor_address,
+        multisig_address=multisig_address,
         fiat_amount=int(donation.amount),
     )
     tx_hash = tx_result['tx_hash']
@@ -758,27 +772,24 @@ def chitiet_chiendich(request, pk):
         bc = BlockchainService()
         eth_vnd_rate = get_eth_vnd_rate()
         stats = bc.get_campaign_onchain_stats(campaign.id)
-        # V2: dùng total_gas_cost_wei (contract mới); fallback total_gas_subsidized_wei
-        total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
-        gas_subsidized_vnd = _wei_to_vnd(total_gas_cost_wei, eth_vnd_rate)
-        gas_recovered_vnd = _wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate)
-        onchain_total_fund_vnd = _wei_to_vnd(stats['total_fund_wei'], eth_vnd_rate)
-        onchain_total_disbursed_vnd = _wei_to_vnd(stats['total_disbursed_wei'], eth_vnd_rate)
+        # V4 ("Double Integrity"): contract không còn lưu totalGasCost / totalDisbursed
+        # on-chain — gas do Admin Relayer tự trả từ ví riêng. Dùng trực tiếp
+        # current_amount_vnd (đã chia 10^18) làm tổng quỹ đã huy động on-chain.
+        onchain_total_fund_vnd = Decimal(str(stats.get('current_amount_vnd', 0)))
+        # V4: token không còn burn khi giải ngân, currentAmount không giảm —
+        # lấy disbursed từ SQL (DisbursementProposal đã execute).
+        onchain_total_disbursed_vnd = campaign.disbursed_amount
+        # Các key legacy giờ luôn = 0 ở V4 (không còn mô hình gas pool / admin recovery).
+        gas_subsidized_vnd = Decimal('0')
+        gas_recovered_vnd = Decimal('0')
         est_per_tx_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
-        # Chỉ cần 1 phí dự trù duy nhất: 1 lần executeDisbursement chuyển ETH contract→tổ chức
         est_disbursement_gas_vnd = est_per_tx_gas_vnd
-        est_recovery_gas_vnd = Decimal('0')  # KHÔNG cộng double, chỉ hiển thị nếu cần
-        # onchain_available: số tiền còn có thể giải ngân = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered - gas dự trù
-        est_disbursement_wei = int((est_disbursement_gas_vnd / eth_vnd_rate) * Decimal('1000000000000000000')) if eth_vnd_rate else 0
-        onchain_available_wei = max(
-            0,
-            stats['total_fund_wei']
-            - total_gas_cost_wei
-            - stats['total_disbursed_wei']
-            - stats['total_admin_recovered_wei']
-            - est_disbursement_wei,
+        est_recovery_gas_vnd = Decimal('0')
+        # onchain_available_vnd = quỹ on-chain - phần đã giải ngân (SQL) - gas dự trù
+        onchain_available_vnd = max(
+            Decimal('0'),
+            onchain_total_fund_vnd - onchain_total_disbursed_vnd - est_disbursement_gas_vnd,
         )
-        onchain_available_vnd = _wei_to_vnd(onchain_available_wei, eth_vnd_rate)
     except Exception:
         pass
 

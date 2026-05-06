@@ -96,7 +96,11 @@ PAYOS_CHECKSUM_KEY = os.getenv('PAYOS_CHECKSUM_KEY')
 
 # Blockchain Configuration (Ethereum Sepolia)
 SEPOLIA_RPC_URL = os.getenv('SEPOLIA_RPC_URL')
+# CONTRACT_ADDRESS = địa chỉ smart2.sol (DCPManager + Soulbound Badge).
+# VNDT_TOKEN_ADDRESS = địa chỉ smart1.sol (VNDT ERC20). Manager của smart1 phải
+# trỏ về smart2 để recordDonation có thể gọi vndt.mint(...) thành công.
 CONTRACT_ADDRESS = os.getenv('CONTRACT_ADDRESS')
+VNDT_TOKEN_ADDRESS = os.getenv('VNDT_TOKEN_ADDRESS')
 ADMIN_PRIVATE_KEY = os.getenv('ADMIN_PRIVATE_KEY')
 
 # Paymaster Configuration
@@ -266,9 +270,21 @@ WALLET_ADDRESS = os.getenv('WALLET_ADDRESS', '')
 WEB3_PROVIDER_URL = SEPOLIA_RPC_URL
 
 # 5. Mã ABI (loaded from file)
+# - SMART_CONTRACT_ABI : ABI của DCPManager (smart2.sol) — quản lý chiến dịch + SBT.
+# - VNDT_ABI           : ABI của VNDT ERC20 (smart1.sol) — chỉ để đọc balance/totalSupply
+#                        từ Django (write-path đi qua DCPManager.recordDonation).
 ABI_FILE_PATH = BASE_DIR / 'blockchain_assets' / 'contract_abi.json'
 with open(ABI_FILE_PATH, 'r') as f:
     SMART_CONTRACT_ABI = json.load(f)
+
+VNDT_ABI_FILE_PATH = BASE_DIR / 'blockchain_assets' / 'vndt_abi.json'
+try:
+    with open(VNDT_ABI_FILE_PATH, 'r') as f:
+        VNDT_ABI = json.load(f)
+except FileNotFoundError:
+    # Trong một số môi trường legacy có thể chưa có file này; để None để app vẫn boot,
+    # BlockchainService sẽ skip vndt_contract khi VNDT_ABI is None.
+    VNDT_ABI = None
 
 
 

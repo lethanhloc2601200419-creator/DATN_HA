@@ -88,10 +88,20 @@ def process_donation_blockchain(donation_id):
         donor_addr = donation.donor_wallet_address or bc.get_fallback_donor_address()
         amount_vnd = int(donation.amount)
 
-        print(f"🟦 [BG] recordDonation(cid={donation.campaign.id}, donor={donor_addr}, amount={amount_vnd} VND)...")
+        # V4: recordDonation cần multisig vault (ví tổ chức — đã set khi createCampaign).
+        organization = getattr(donation.campaign, 'organization', None)
+        multisig_addr = (organization.wallet_address or '').strip() if organization else ''
+        if not multisig_addr:
+            raise Exception(
+                f"Campaign #{donation.campaign.id} chưa có wallet_address tổ chức → "
+                "không xác định được multisig vault. Cập nhật ví tổ chức rồi retry."
+            )
+
+        print(f"🟦 [BG] recordDonation(cid={donation.campaign.id}, donor={donor_addr}, multisig={multisig_addr}, amount={amount_vnd} VND)...")
         tx_result = bc.trigger_record_donation(
             campaign_id=donation.campaign.id,
             donor_address=donor_addr,
+            multisig_address=multisig_addr,
             fiat_amount=amount_vnd,
         )
         tx_hash = tx_result['tx_hash'] if isinstance(tx_result, dict) else str(tx_result)

@@ -1,14 +1,24 @@
 """
 Blockchain service — ADMIN RELAYER (GAS STATION) PATTERN.
 
-Contract hiện tại: DCPManager v3 (Solidity, dùng OpenZeppelin Ownable).
-Các function on-chain:
-    - createCampaign(uint256 _cid, address _organization)  -- onlyOwner
-    - recordDonation(uint256 _cid, address _donor, uint256 _fiatAmount) -- onlyOwner
+Contract hiện tại: DCPManager v4 ("Double Integrity" — 2 contract tách rời).
+    - smart1.sol (VNDT)       : ERC20 token, mint/burn khoá theo `manager` =
+                                 address của smart2. Backend KHÔNG bao giờ gọi
+                                 mint trực tiếp ở đây.
+    - smart2.sol (DCPManager) : ERC721 Soulbound Badge + quản lý campaign.
+                                 recordDonation sẽ tự gọi VNDT.mint(multisig)
+                                 và _safeMint(donor, badgeId).
+
+Các function on-chain (smart2):
+    - createCampaign(uint256 _cid, address _org, address _multisigVault) onlyOwner
+    - recordDonation(uint256 _cid, address _donor, address _multisig,
+                     uint256 _fiatAmount) onlyOwner
     - proposeDisbursement(uint256 _cid, string _ipfsCid)
     - approveDisbursement(uint256 _cid)  -- đủ 3 chữ ký (org + admin + supervisor)
-      → tự động _executeDisbursement: burn token + emit DisbursedAndBurned
-    - View: campaigns(uint256) → (organization, currentAmount, isDisbursed, ipfsCid, approvals)
+      → tự động _executeDisbursement (CHỈ chốt sổ; KHÔNG burn token; donor giữ
+        SBT mãi mãi như proof-of-donation).
+    - View: getCampaign(uint256) → (organization, multisigVault, currentAmount,
+                                    isDisbursed, ipfsCid, approvals)
 
 Admin Relayer pattern: mọi giao dịch write đều được
     1) Ký bằng private key của ví Admin (settings.WALLET_PRIVATE_KEY)
@@ -41,6 +51,9 @@ from django.conf import settings
 import requests as http_req
 from web3.exceptions import LogTopicError, ContractLogicError
 
+# Hệ số quy đổi VND → đơn vị 18-decimals của VNDT (ERC20).
+_VNDT_DECIMALS = Decimal(10) ** 18
+
 # Module-level caches to avoid repeated network calls
 _rate_cache = {'value': None, 'ts': 0}
 _stats_cache = {}  # {campaign_id: {'value': stats_dict, 'ts': timestamp}}
@@ -59,11 +72,29 @@ class BlockchainService:
         if not self.w3.is_connected():
             raise Exception("Không thể kết nối tới mạng Blockchain Sepolia!")
 
-        # 2. Load Smart Contract
+        # 2. Load Smart Contract — DCPManager (smart2.sol)
         self.contract = self.w3.eth.contract(
             address=settings.SMART_CONTRACT_ADDRESS,
             abi=settings.SMART_CONTRACT_ABI
         )
+
+        # 2b. Load VNDT token contract (smart1.sol) — read-only side-channel
+        # cho việc kiểm tra balance/totalSupply. Backend KHÔNG mint trực tiếp
+        # ở đây vì manager đã được khoá về smart2 trên on-chain.
+        vndt_addr = getattr(settings, 'VNDT_TOKEN_ADDRESS', None)
+        vndt_abi = getattr(settings, 'VNDT_ABI', None)
+        if vndt_addr and vndt_abi:
+            try:
+                self.vndt_contract = self.w3.eth.contract(
+                    address=self.w3.to_checksum_address(vndt_addr),
+                    abi=vndt_abi,
+                )
+            except Exception as exc:
+                print(f"⚠️ [BLOCKCHAIN] Không load được VNDT contract: {exc}")
+                self.vndt_contract = None
+        else:
+            self.vndt_contract = None
+
         self.admin_address = self.w3.eth.account.from_key(settings.WALLET_PRIVATE_KEY).address
 
         try:
@@ -212,40 +243,47 @@ class BlockchainService:
     # ==========================================================
     # 1. TẠO CHIẾN DỊCH ON-CHAIN
     # ==========================================================
-    def trigger_create_campaign(self, campaign_id, org_address):
+    def trigger_create_campaign(self, campaign_id, org_address, multisig_vault=None):
         """
-        Gọi `createCampaign(uint256 _campaignId, address _organization)` trên
-        contract DCPManager v3.
+        Gọi `createCampaign(uint256 _cid, address _org, address _multisigVault)`
+        trên contract DCPManager v4.
 
-        - `campaign_id`: Django Campaign.id (Postgres PK) → dùng trực tiếp làm
-          on-chain ID, đảm bảo khớp 100% giữa DB và blockchain.
-        - `org_address`: địa chỉ ví nhận tiền của tổ chức (Organization.wallet_address).
+        - `campaign_id`   : Django Campaign.id (Postgres PK) → dùng trực tiếp làm
+                            on-chain ID.
+        - `org_address`   : địa chỉ ví của tổ chức (Organization.wallet_address) —
+                            dùng cho multisig 3 chữ ký lúc giải ngân.
+        - `multisig_vault`: ví nhận token VNDT khi có donation. Hiện tại MVP
+                            mặc định trùng `org_address` (nếu None) — có thể
+                            tách thành ví riêng nếu sau này cần.
 
         Trả về dict {tx_hash, receipt, status} khi tx đã mine thành công.
-        Nếu pre-flight revert hoặc tx revert on-chain, _send_transaction sẽ
-        raise ContractLogicError với reason thật (VD: "Chien dich da ton tai",
-        "Dia chi to chuc khong hop le").
         """
         if not org_address:
             raise ValueError("org_address không được để trống khi tạo campaign on-chain.")
         org_checksum = self.w3.to_checksum_address(org_address)
+        # MVP: nếu chưa cấu hình multisig riêng, dùng chính ví tổ chức làm vault.
+        vault_raw = multisig_vault or org_address
+        vault_checksum = self.w3.to_checksum_address(vault_raw)
+
         func = self.contract.functions.createCampaign(
             int(campaign_id),
             org_checksum,
+            vault_checksum,
         )
-        # Gas limit ~200k là đủ cho createCampaign (chỉ set 1 struct + emit event).
+        # Gas limit ~250k đủ cho createCampaign (set struct + emit event).
         return self._send_transaction(
             func,
-            gas_limit=200000,
+            gas_limit=250000,
             wait_for_receipt=True,
         )
 
     # Backward-compat alias: code cũ vẫn gọi init_campaign(cid, name, address).
-    # Tham số `org_name` bị bỏ vì contract v3 không lưu name nữa.
+    # Tham số `org_name` bị bỏ vì contract v3+ không lưu name nữa.
     def init_campaign(self, campaign_id, org_name=None, org_address=None):
         """
-        [DEPRECATED] Alias cho trigger_create_campaign. Contract v3 không còn
+        [DEPRECATED] Alias cho trigger_create_campaign. Contract v4 không còn
         lưu org_name nên tham số này bị bỏ qua (giữ để code cũ khỏi vỡ).
+        Không truyền multisig → mặc định = org_address.
         """
         return self.trigger_create_campaign(campaign_id, org_address)
 
@@ -254,13 +292,14 @@ class BlockchainService:
     # ==========================================================
     def is_campaign_active(self, campaign_id):
         """
-        Contract v3: campaign "tồn tại" ⇔ campaigns[cid].organization != 0x0.
+        Contract v4: campaign "tồn tại" ⇔ getCampaign(cid).organization != 0x0.
         "active" ở đây nghĩa là đã được createCampaign và chưa bị giải ngân.
         """
         try:
-            c = self.contract.functions.campaigns(int(campaign_id)).call()
+            c = self.contract.functions.getCampaign(int(campaign_id)).call()
+            # v4 tuple: (organization, multisigVault, currentAmount, isDisbursed, ipfsCid, approvals)
             org = c[0]
-            is_disbursed = bool(c[2])
+            is_disbursed = bool(c[3])
             return bool(org and org != ZERO_ADDRESS) and not is_disbursed
         except Exception:
             return False
@@ -269,15 +308,14 @@ class BlockchainService:
         """
         Lấy thông tin on-chain của 1 chiến dịch (cached 2 min).
 
-        Contract v3 shape:
-            campaigns(uint256) → (organization, currentAmount, isDisbursed, ipfsCid, approvals)
+        Contract v4 shape (getCampaign):
+            (organization, multisigVault, currentAmount, isDisbursed, ipfsCid, approvals)
 
-        Ở contract v3, `currentAmount` là số VND (VNDT 1:1) do token được đúc
-        theo fiat amount. Không còn khái niệm wei/ETH trong contract này.
+        `currentAmount` là số token VNDT NET (đã trừ phí, đơn vị 18 decimals).
+        Để hiển thị VND "người dùng", chia cho 10^18.
 
-        Các key cũ (total_gas_cost_wei, total_admin_recovered_wei, available_wei…)
-        được giữ lại với giá trị 0 để code view cũ không bị KeyError. Chúng KHÔNG
-        còn ý nghĩa ở contract v3 và sẽ được dọn dần ở lần refactor tới.
+        Các key legacy (total_gas_cost_wei, total_admin_recovered_wei, available_wei…)
+        được giữ = 0 để code view cũ không bị KeyError. Sẽ dọn ở lần refactor tới.
         """
         now = time.time()
         if use_cache and campaign_id in _stats_cache:
@@ -285,26 +323,31 @@ class BlockchainService:
             if now - cached['ts'] < _STATS_CACHE_TTL:
                 return cached['value']
 
-        c = self.contract.functions.campaigns(int(campaign_id)).call()
+        c = self.contract.functions.getCampaign(int(campaign_id)).call()
         organization = c[0]
-        current_amount = int(c[1])   # VND (token VNDT 1:1)
-        is_disbursed = bool(c[2])
-        ipfs_cid = c[3]
-        approvals = int(c[4])
+        multisig_vault = c[1]
+        current_amount_18 = int(c[2])         # token units (18 decimals)
+        is_disbursed = bool(c[3])
+        ipfs_cid = c[4]
+        approvals = int(c[5])
+
+        # Quy đổi về VND "face value" — chia cho 10^18.
+        current_amount_vnd = int(Decimal(current_amount_18) / _VNDT_DECIMALS)
 
         exists = bool(organization and organization != ZERO_ADDRESS)
 
         stats = {
             'organization_address': organization if exists else None,
-            'organization_name': None,  # contract v3 không lưu name
-            'current_amount_vnd': current_amount,
+            'organization_name': None,        # contract v4 không lưu name
+            'multisig_vault_address': multisig_vault if exists else None,
+            'current_amount_vnd': current_amount_vnd,
+            'current_amount_raw': current_amount_18,  # 18-decimals raw value
             'is_disbursed': is_disbursed,
             'ipfs_cid': ipfs_cid,
             'approvals': approvals,
             'is_active': exists and not is_disbursed,
             'exists': exists,
-            # ===== Các key legacy, KHÔNG còn ý nghĩa ở v3 =====
-            # Giữ = 0 để admin view cũ không crash. Sẽ được gỡ khi refactor.
+            # ===== Các key legacy, KHÔNG còn ý nghĩa ở v4 =====
             'total_fund_wei': 0,
             'total_gas_cost_wei': 0,
             'total_gas_subsidized_wei': 0,
@@ -379,41 +422,71 @@ class BlockchainService:
             'gas_fee_eth': gas_fee_eth,
         }
 
-    def get_fallback_donor_address(self):
-        return self.w3.to_checksum_address(self.admin_address)
+    # Cache treasuryWallet để tránh RPC call mỗi lần anonymous donation.
+    _treasury_cache = None
 
-    def trigger_record_donation(self, campaign_id, donor_address, fiat_amount):
+    def get_fallback_donor_address(self):
         """
-        Phase 2 bridge:
-        Gọi trực tiếp DCPManager.recordDonation(campaignId, donor, fiatAmount)
+        [V4 — mint-to-donor]
+        Với contract V4 token được mint THẲNG cho address này, nên KHÔNG được
+        fallback về admin_address (admin sẽ tích token từ các quyên góp ẩn danh,
+        đi ngược yêu cầu minh bạch).
+
+        Thay vào đó dùng `treasuryWallet` trên contract làm "sink" cho các
+        donation không có ví donor. Treasury là ví trung lập do chính contract
+        công bố, donor ẩn danh có thể tra cứu được.
+        """
+        if BlockchainService._treasury_cache is None:
+            try:
+                BlockchainService._treasury_cache = self.w3.to_checksum_address(
+                    self.contract.functions.treasuryWallet().call()
+                )
+            except Exception as exc:
+                print(f"⚠️ [FALLBACK] Không đọc được treasuryWallet, tạm dùng admin: {exc}")
+                return self.w3.to_checksum_address(self.admin_address)
+        return BlockchainService._treasury_cache
+
+    def trigger_record_donation(self, campaign_id, donor_address, multisig_address, fiat_amount):
+        """
+        Gọi `DCPManager.recordDonation(_cid, _donor, _multisigAddress, _fiatAmount)`
         và đợi receipt để chắc chắn giao dịch đã vào chain trước khi trả về.
 
-        LƯU Ý VỀ DECIMALS:
-        Token VNDT có 18 decimals (ERC20 chuẩn), nhưng giá trị nhập vào
-        `fiat_amount` là đơn vị VND "người dùng thấy" (vd: 2000 VND).
-        Contract mint đúng bằng số integer nhận được, nên nếu truyền 2000 sẽ
-        hiện 0.000000000000002 VNDT trên Etherscan.
-        => Nhân với 10^18 (Web3.to_wei(..., 'ether')) TRƯỚC khi gửi để
-        Etherscan hiển thị đúng "2000.0 VNDT".
-        """
-        donor = donor_address or self.admin_address
-        donor_checksum = self.w3.to_checksum_address(donor)
+        - `_donor`     → ví nhận **SBT badge** (proof-of-donation, không transfer được).
+        - `_multisig`  → ví nhận **token VNDT** (kho ký quỹ của campaign). Phải
+                         khớp với `multisigVault` đã set lúc createCampaign,
+                         nếu không contract sẽ revert.
+        - `_fiatAmount`→ số VND face value, sẽ được nhân 10^18 để khớp
+                         với 18-decimals của VNDT (Etherscan hiển thị "2000.0 VNDT"
+                         thay vì "0.000000000000002 VNDT").
 
-        # Chuyển fiat_amount (VND) → số nguyên 18 decimals.
-        # Dùng Decimal (đã import ở top file) để tránh sai số float
-        # khi amount là kiểu float/str.
-        amount_18 = int(Decimal(str(fiat_amount)) * Decimal(10) ** 18)
+        Nếu `donor_address` rỗng → dùng treasuryWallet làm sink (tuyệt đối
+        KHÔNG dùng admin_address để tránh admin tích badge ẩn danh).
+        """
+        if not multisig_address:
+            raise ValueError(
+                "multisig_address không được để trống — phải khớp "
+                "campaign.organization.wallet_address đã set khi createCampaign."
+            )
+
+        donor = donor_address or self.get_fallback_donor_address()
+        donor_checksum = self.w3.to_checksum_address(donor)
+        multisig_checksum = self.w3.to_checksum_address(multisig_address)
+
+        # Chuyển fiat_amount (VND face value) → số nguyên 18 decimals.
+        # Dùng Decimal (đã import ở top file) để tránh sai số float khi amount
+        # là kiểu float/str.
+        amount_18 = int(Decimal(str(fiat_amount)) * _VNDT_DECIMALS)
 
         func = self.contract.functions.recordDonation(
             int(campaign_id),
             donor_checksum,
+            multisig_checksum,
             amount_18,
         )
-        # _send_transaction() giờ đã tự replay eth_call nếu receipt.status != 1
-        # và raise ContractLogicError với reason thật. Không cần fallback generic nữa.
+        # Gas tăng nhẹ vì contract v4 mint cả ERC20 (cho multisig) + ERC721 SBT (cho donor).
         tx_result = self._send_transaction(
             func,
-            gas_limit=300000,
+            gas_limit=400000,
             wait_for_receipt=True,
         )
         return tx_result
@@ -425,13 +498,15 @@ class BlockchainService:
         }
 
     def get_campaign_disbursement_meta(self, campaign_id):
-        campaign_state = self.contract.functions.campaigns(int(campaign_id)).call()
+        campaign_state = self.contract.functions.getCampaign(int(campaign_id)).call()
+        # v4 tuple: (organization, multisigVault, currentAmount, isDisbursed, ipfsCid, approvals)
         return {
             'organization': campaign_state[0],
-            'current_amount': int(campaign_state[1]),
-            'is_disbursed': bool(campaign_state[2]),
-            'ipfs_cid': campaign_state[3],
-            'approvals': int(campaign_state[4]),
+            'multisig_vault': campaign_state[1],
+            'current_amount': int(campaign_state[2]),
+            'is_disbursed': bool(campaign_state[3]),
+            'ipfs_cid': campaign_state[4],
+            'approvals': int(campaign_state[5]),
         }
 
     def get_disbursed_and_burned_events(self, campaign_id=None, from_block=None, to_block='latest'):
