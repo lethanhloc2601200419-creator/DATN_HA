@@ -1117,7 +1117,7 @@ def api_webhook_bank_statement(request):
 @csrf_exempt
 @require_POST
 def payos_webhook_view(request):
-    # return JsonResponse({"error": 0, "message": "Ok", "data": None})
+    return JsonResponse({"error": 0, "message": "Ok", "data": None})
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except json.JSONDecodeError:
