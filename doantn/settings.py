@@ -9,6 +9,15 @@ from pathlib import Path
 import cloudinary
 from dotenv import load_dotenv
 
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://web-production-e589d.up.railway.app',
+]
+
+# Bắt buộc dùng HTTPS cho Cookie (Railway chạy HTTPS nên cái này là bắt buộc)
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
