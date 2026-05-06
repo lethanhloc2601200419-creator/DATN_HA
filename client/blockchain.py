@@ -1,9 +1,31 @@
+"""
+Blockchain service — ADMIN RELAYER (GAS STATION) PATTERN.
+
+Tất cả các giao dịch on-chain (recordDonation, donateOnBehalf,
+recordBankDonation, executeDisbursement, withdrawGasRecovery...) đều được:
+    1) Ký bằng private key của ví Admin (settings.WALLET_PRIVATE_KEY)
+    2) Gửi trực tiếp lên Sepolia qua eth_sendRawTransaction
+    3) Admin trả gas fee bằng ETH của chính mình, sau đó thu hồi qua
+       withdrawGasRecovery trên contract.
+
+Đây KHÔNG phải ERC-4337 / Paymaster. Đây là "meta-transaction qua trung gian
+tin cậy" (trusted relayer) — đơn giản hơn, không cần bundler/EntryPoint,
+và tương thích với contract hiện tại (modifier `onlyAdmin` yêu cầu
+msg.sender == admin).
+
+Gas pricing: ưu tiên EIP-1559 động (maxFeePerGas = 2*baseFee + priority)
+— chỉ dùng legacy gasPrice nếu settings.ADMIN_GAS_PRICE_GWEI được set thủ công.
+
+Error surfacing: _send_transaction pre-flight bằng eth_call để bắt revert
+reason TRƯỚC khi burn gas; nếu tx mined nhưng revert, replay eth_call tại
+blockNumber đó để lấy reason thật — không còn generic "thao tác thất bại" nuốt lỗi.
+"""
 from decimal import Decimal
 import time
 from web3 import Web3
 from django.conf import settings
 import requests as http_req
-from web3.exceptions import LogTopicError
+from web3.exceptions import LogTopicError, ContractLogicError
 
 # Module-level caches to avoid repeated network calls
 _rate_cache = {'value': None, 'ts': 0}
@@ -36,21 +58,100 @@ class BlockchainService:
         except Exception:
             pass
 
+    # ---------- Gas helpers ----------
+    def _build_gas_fields(self):
+        """
+        Trả về dict gas fields cho build_transaction().
+        - Nếu ADMIN_GAS_PRICE_GWEI được set → dùng legacy gasPrice (override chủ động).
+        - Ngược lại → ưu tiên EIP-1559 (maxFeePerGas / maxPriorityFeePerGas),
+          fallback sang legacy gasPrice nếu node không trả về baseFee.
+        """
+        fixed_gwei = getattr(settings, 'ADMIN_GAS_PRICE_GWEI', None)
+        if fixed_gwei:
+            return {'gasPrice': int(self.w3.to_wei(fixed_gwei, 'gwei'))}
+
+        # EIP-1559 path: baseFee * 2 + priority fee → đảm bảo tx được mine trên Sepolia
+        try:
+            latest = self.w3.eth.get_block('latest')
+            base_fee = latest.get('baseFeePerGas')
+            if base_fee:
+                try:
+                    priority_fee = int(self.w3.eth.max_priority_fee)
+                except Exception:
+                    priority_fee = self.w3.to_wei(1.5, 'gwei')
+                # max_fee = 2 * baseFee + priority, đủ buffer cho biến động baseFee
+                max_fee = int(base_fee) * 2 + priority_fee
+                return {
+                    'maxFeePerGas': max_fee,
+                    'maxPriorityFeePerGas': priority_fee,
+                }
+        except Exception as exc:
+            print(f"⚠️ [GAS] Không lấy được baseFeePerGas, fallback legacy gasPrice: {exc}")
+
+        return {'gasPrice': int(self.w3.eth.gas_price)}
+
+    def _extract_revert_reason(self, tx_data, block_identifier='latest'):
+        """
+        Replay giao dịch bằng eth_call để lấy lý do revert thật từ EVM.
+        Gọi khi receipt.status == 0 (tx đã mine nhưng revert).
+        """
+        replay_data = {
+            'from': tx_data.get('from', self.admin_address),
+            'to': tx_data['to'],
+            'data': tx_data.get('data', tx_data.get('input', '0x')),
+            'value': tx_data.get('value', 0),
+            'gas': tx_data.get('gas'),
+        }
+        try:
+            self.w3.eth.call(replay_data, block_identifier=block_identifier)
+            return 'unknown revert (eth_call did not raise)'
+        except ContractLogicError as exc:
+            return f'ContractLogicError: {exc}'
+        except Exception as exc:
+            return f'{type(exc).__name__}: {exc}'
+
     # Hàm gửi giao dịch (Dùng chung cho cả Donate và Rút tiền)
     def _send_transaction(self, function_call, value_wei=0, max_retries=3, gas_limit=2000000, wait_for_receipt=False):
-        fixed_gwei = getattr(settings, 'ADMIN_GAS_PRICE_GWEI', None)
-        gas_price = self.w3.to_wei(fixed_gwei, 'gwei') if fixed_gwei else self.w3.eth.gas_price
+        chain_id = self.w3.eth.chain_id
+        contract_address = self.contract.address
+        fn_name = getattr(function_call, 'fn_name', 'unknown')
 
-        for attempt in range(max_retries + 1):
-            nonce = self.w3.eth.get_transaction_count(self.admin_address, 'pending')
-            tx_data = function_call.build_transaction({
-                'chainId': 11155111,
-                'gas': gas_limit,
-                'gasPrice': int(gas_price),
-                'nonce': nonce,
+        print(
+            f"ℹ️ [TX/PRE] fn={fn_name} chainId={chain_id} contract={contract_address} "
+            f"admin={self.admin_address} value_wei={value_wei} gas_limit={gas_limit}"
+        )
+
+        # ----- Pre-flight eth_call: phát hiện revert TRƯỚC khi burn gas -----
+        # web3.py sẽ raise ContractLogicError với revert reason đã decode.
+        try:
+            function_call.call({
+                'from': self.admin_address,
                 'value': int(value_wei) if value_wei else 0,
             })
-            print(f"ℹ️ [TX] nonce={nonce} gasPrice={tx_data['gasPrice']}")
+        except ContractLogicError as exc:
+            print(f"❌ [TX/PREFLIGHT] Contract revert trước khi gửi: {exc}")
+            # Ném tiếp với prefix rõ ràng để view layer log thẳng ra Railway.
+            raise ContractLogicError(f"Pre-flight revert on {fn_name}: {exc}") from exc
+        except Exception as exc:
+            # RPC/network lỗi thì không chặn — chỉ log, vẫn thử gửi tx thật.
+            print(f"⚠️ [TX/PREFLIGHT] eth_call lỗi ngoài EVM, bỏ qua: {type(exc).__name__}: {exc}")
+
+        last_exc = None
+        for attempt in range(max_retries + 1):
+            nonce = self.w3.eth.get_transaction_count(self.admin_address, 'pending')
+            gas_fields = self._build_gas_fields()
+            tx_data = function_call.build_transaction({
+                'chainId': chain_id,
+                'gas': gas_limit,
+                'nonce': nonce,
+                'value': int(value_wei) if value_wei else 0,
+                **gas_fields,
+            })
+            gas_summary = (
+                f"gasPrice={tx_data['gasPrice']}" if 'gasPrice' in tx_data
+                else f"maxFeePerGas={tx_data.get('maxFeePerGas')} maxPriority={tx_data.get('maxPriorityFeePerGas')}"
+            )
+            print(f"ℹ️ [TX] nonce={nonce} {gas_summary}")
 
             signed_tx = self.w3.eth.account.sign_transaction(tx_data, settings.WALLET_PRIVATE_KEY)
             try:
@@ -60,18 +161,37 @@ class BlockchainService:
                     return tx_hash_hex
 
                 receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash_hex, timeout=180)
+                if int(receipt.status) != 1:
+                    # Tx đã mine nhưng revert → replay để lấy reason thật.
+                    reason = self._extract_revert_reason(
+                        tx_data,
+                        block_identifier=receipt.blockNumber,
+                    )
+                    print(f"❌ [TX] Mined but reverted. tx={tx_hash_hex} reason={reason}")
+                    raise ContractLogicError(
+                        f"{fn_name} reverted on-chain (tx={tx_hash_hex}): {reason}"
+                    )
                 return {
                     'tx_hash': tx_hash_hex,
                     'receipt': receipt,
                     'status': receipt.status,
                 }
+            except ContractLogicError:
+                # Đã có reason rõ ràng, không retry.
+                raise
             except Exception as e:
+                last_exc = e
                 msg = str(e).lower()
                 if attempt < max_retries and ('nonce too low' in msg or 'replacement transaction underpriced' in msg):
                     print(f"⚠️ [TX RETRY {attempt+1}/{max_retries}] {msg[:80]}... Đợi 5s rồi thử lại.")
                     time.sleep(5)
                     continue
+                print(f"❌ [TX] {type(e).__name__}: {e}")
                 raise
+
+        # Về mặt lý thuyết không reach, nhưng để an toàn:
+        if last_exc:
+            raise last_exc
 
     # --- CÁC HÀM NGHIỆP VỤ ---
 
@@ -226,13 +346,13 @@ class BlockchainService:
             donor_checksum,
             int(fiat_amount),
         )
+        # _send_transaction() giờ đã tự replay eth_call nếu receipt.status != 1
+        # và raise ContractLogicError với reason thật. Không cần fallback generic nữa.
         tx_result = self._send_transaction(
             func,
             gas_limit=300000,
             wait_for_receipt=True,
         )
-        if int(tx_result['status']) != 1:
-            raise Exception(f"recordDonation thất bại cho campaign #{campaign_id}")
         return tx_result
 
     def get_disbursement_approver_wallets(self):

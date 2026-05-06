@@ -1280,11 +1280,14 @@ def payos_webhook_view(request):
             blockchain_triggered = True
             print(f"✅ recordDonation on-chain OK, tx={tx_hash}")
         except Exception as exc:
-            print(f"⚠️ recordDonation on-chain thất bại: {exc}")
+            # In rõ type + message + traceback ngắn để Railway logs cho thấy EVM reason.
+            import traceback
+            print(f"⚠️ recordDonation on-chain thất bại: {type(exc).__name__}: {exc}")
+            print(traceback.format_exc())
             failed_donation = Donation.objects.get(pk=donation.pk)
             failed_donation.blockchain_status = 'failed'
             failed_donation.blockchain_completed_at = timezone.now()
-            failed_donation.blockchain_error = str(exc)[:500]
+            failed_donation.blockchain_error = f"{type(exc).__name__}: {exc}"[:500]
             failed_donation.save(update_fields=[
                 'blockchain_status',
                 'blockchain_completed_at',

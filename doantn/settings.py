@@ -227,10 +227,31 @@ CASSO_SECRET_KEY = os.getenv('CASSO_SECRET_KEY', '')
 # =====================================================
 # BLOCKCHAIN CONFIGURATION (Updated for Sepolia)
 # =====================================================
-# Gas price cố định (Gwei) - dùng cho mọi giao dịch blockchain + tính phí hiển thị
-# 0.1 Gwei ≈ vài trăm VND mỗi giao dịch (đủ cho Sepolia testnet)
-# Nếu giao dịch bị pending/kẹt, tăng giá trị này lên (VD: 1 hoặc 2)
-ADMIN_GAS_PRICE_GWEI = 0.1
+# ==========================================================================
+# ADMIN RELAYER (GAS STATION) PATTERN
+# --------------------------------------------------------------------------
+# Toàn bộ giao dịch on-chain (recordDonation, donateOnBehalf,
+# executeDisbursement, recordBankDonation, withdrawGasRecovery...) đều được
+# KÝ và GỬI bởi 1 ví Admin duy nhất (WALLET_PRIVATE_KEY). User cuối KHÔNG
+# cần có ETH / MetaMask — admin "trả gas hộ" rồi thu hồi qua cơ chế
+# withdrawGasRecovery trên contract.
+#
+# Đây KHÔNG phải ERC-4337 Paymaster; đây là "meta-transaction qua trung gian
+# tin cậy" — đơn giản, không cần bundler/EntryPoint, và hoạt động với contract
+# hiện tại đang dùng modifier `onlyAdmin` (require msg.sender == admin).
+# ==========================================================================
+
+# Gas pricing:
+# - KHÔNG hardcode gasPrice nữa. Khi biến này bị unset/rỗng/0, blockchain.py
+#   sẽ tự động dùng EIP-1559 động (maxFeePerGas = 2*baseFee + priorityFee)
+#   → Sepolia tự điều chỉnh theo tải mạng, tránh tx bị stuck vì underpriced.
+# - Chỉ bật lại (ví dụ 1.5) nếu cần override thủ công khi node Sepolia gặp vấn đề.
+_admin_gwei_raw = (os.getenv('ADMIN_GAS_PRICE_GWEI') or '').strip()
+try:
+    _admin_gwei_val = float(_admin_gwei_raw) if _admin_gwei_raw else 0.0
+except ValueError:
+    _admin_gwei_val = 0.0
+ADMIN_GAS_PRICE_GWEI = _admin_gwei_val if _admin_gwei_val > 0 else None
 
 # 1. Địa chỉ Smart Contract
 SMART_CONTRACT_ADDRESS = CONTRACT_ADDRESS
