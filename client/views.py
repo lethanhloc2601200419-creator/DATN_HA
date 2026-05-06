@@ -1243,13 +1243,18 @@ def payos_webhook_view(request):
         })
 
     # Cập nhật Donation + Campaign trong 1 transaction để tránh race.
+    # LƯU Ý: không được dùng select_related('donor') cùng select_for_update()
+    # vì `donor` là FK nullable → Postgres dùng LEFT OUTER JOIN, và Postgres
+    # không cho phép FOR UPDATE trên nullable side của outer join
+    # (lỗi: "FOR UPDATE cannot be applied to the nullable side of an outer join").
+    # Dùng `of=('self',)` để chỉ lock dòng Donation, không lock các bảng join.
     created = False
     try:
         with transaction.atomic():
             locked_donation = (
                 Donation.objects
                 .select_related('campaign', 'donor')
-                .select_for_update()
+                .select_for_update(of=('self',))
                 .get(pk=donation.pk)
             )
             created = _mark_payos_donation_completed(locked_donation, data)
