@@ -1147,33 +1147,81 @@ def api_webhook_bank_statement(request):
 @csrf_exempt
 @require_POST
 def payos_webhook_view(request):
-    return JsonResponse({"error": 0, "message": "Ok", "data": None})
+    """
+    Webhook PayOS gọi vào sau khi khách thanh toán thành công.
+
+    Lưu ý quan trọng:
+    - PayOS gửi 1 "verification ping" khi bạn đăng ký webhook URL trong dashboard.
+      Ping này có thể có `data = null` hoặc signature trống. BẮT BUỘC phải trả 200 OK
+      cho ping, nếu không PayOS sẽ từ chối đăng ký webhook.
+    - Với webhook thật, luôn cố gắng trả 200 OK để PayOS không retry liên tục.
+      Chỉ trả 4xx khi payload rõ ràng bị hỏng (không parse được JSON).
+    - Toàn bộ luồng đều log ra stdout để dễ debug trên Railway (xem `railway logs`).
+    """
+    raw_body = request.body.decode('utf-8', errors='replace')
+    print("\n========== PAYOS WEBHOOK HIT ==========")
+    print("REMOTE_ADDR:", request.META.get('REMOTE_ADDR'))
+    print("X-FORWARDED-FOR:", request.META.get('HTTP_X_FORWARDED_FOR'))
+    print("USER_AGENT:", request.META.get('HTTP_USER_AGENT'))
+    print("RAW_BODY:", raw_body[:2000])
+
     try:
-        payload = json.loads(request.body.decode('utf-8'))
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        payload = json.loads(raw_body) if raw_body else {}
+    except json.JSONDecodeError as exc:
+        print(f"❌ PAYOS WEBHOOK JSON parse error: {exc}")
+        # Trả 200 để PayOS không retry vô hạn với payload hỏng.
+        return JsonResponse({'success': False, 'message': 'Invalid JSON'}, status=200)
 
     signature = payload.get('signature')
-    data = payload.get('data') or {}
-    if not signature or not data:
-        return JsonResponse({'error': 'Missing signature or data'}, status=400)
+    data = payload.get('data')
+    print("PAYLOAD_KEYS:", list(payload.keys()))
+    print("SIGNATURE_PRESENT:", bool(signature))
+    print("DATA_TYPE:", type(data).__name__)
 
+    # PAYOS VERIFICATION PING: khi đăng ký webhook URL, PayOS gửi 1 request test
+    # với data rỗng/null hoặc không có signature. Phải trả 200 OK để URL được chấp nhận.
+    if not data or not isinstance(data, dict) or not signature:
+        print("ℹ️ PAYOS verification ping (no data/signature) — trả 200 OK để đăng ký webhook.")
+        print("=======================================\n")
+        return JsonResponse({
+            'success': True,
+            'code': '00',
+            'desc': 'Webhook URL registered.',
+            'message': 'ok',
+        })
+
+    # Verify HMAC signature để chắc chắn request đến từ PayOS.
     if not _verify_payos_signature(data, signature):
-        return JsonResponse({'error': 'Invalid signature'}, status=400)
+        print("❌ PAYOS WEBHOOK signature verification FAILED.")
+        print("EXPECTED:", _create_payos_signature(data))
+        print("RECEIVED:", signature)
+        print("DATA:", data)
+        print("=======================================\n")
+        # 200 để PayOS không retry — request coi như bỏ qua.
+        return JsonResponse({'success': False, 'message': 'Invalid signature'}, status=200)
 
     order_code = data.get('orderCode')
+    print(f"✅ Signature OK. orderCode={order_code}, code={data.get('code')}, success={payload.get('success')}")
     if not order_code:
-        return JsonResponse({'error': 'Missing orderCode'}, status=400)
+        print("⚠️ Webhook thiếu orderCode.")
+        print("=======================================\n")
+        return JsonResponse({'success': False, 'message': 'Missing orderCode'}, status=200)
 
     try:
         donation = Donation.objects.select_related('campaign', 'donor').get(order_code=order_code)
     except Donation.DoesNotExist:
-        return JsonResponse({'error': 'Donation not found'}, status=404)
+        print(f"⚠️ Không tìm thấy Donation với orderCode={order_code}.")
+        print("=======================================\n")
+        # 200 OK để PayOS ngừng retry; có thể đây là order của môi trường khác.
+        return JsonResponse({'success': False, 'message': 'Donation not found'}, status=200)
 
+    # Luôn đánh dấu đã nhận webhook, bất kể trạng thái thanh toán.
     donation.payos_webhook_received_at = timezone.now()
     donation.payos_payment_link_id = data.get('paymentLinkId') or donation.payos_payment_link_id
     donation.payos_reference = data.get('reference') or donation.payos_reference
-    donation.payos_transaction_id = data.get('transactionId') or data.get('reference') or donation.payos_transaction_id
+    donation.payos_transaction_id = (
+        data.get('transactionId') or data.get('reference') or donation.payos_transaction_id
+    )
     donation.save(update_fields=[
         'payos_webhook_received_at',
         'payos_payment_link_id',
@@ -1182,41 +1230,70 @@ def payos_webhook_view(request):
         'updated_at',
     ])
 
-    if payload.get('success') and data.get('code') == '00':
-        with transaction.atomic():
-            donation = Donation.objects.select_for_update().get(pk=donation.pk)
-            created = _mark_payos_donation_completed(donation, data)
-        tx_hash = donation.eth_tx_hash
-        blockchain_triggered = False
-        if created:
-            try:
-                donation = Donation.objects.select_related('campaign', 'donor').get(pk=donation.pk)
-                tx_hash = _trigger_record_donation_bridge(donation)
-                blockchain_triggered = True
-            except Exception as exc:
-                donation = Donation.objects.get(pk=donation.pk)
-                donation.blockchain_status = 'failed'
-                donation.blockchain_completed_at = timezone.now()
-                donation.blockchain_error = str(exc)[:500]
-                donation.save(update_fields=[
-                    'blockchain_status',
-                    'blockchain_completed_at',
-                    'blockchain_error',
-                    'updated_at',
-                ])
+    # Điều kiện PayOS xác nhận thanh toán thành công.
+    is_paid = bool(payload.get('success')) and str(data.get('code')) == '00'
+    if not is_paid:
+        print(f"ℹ️ Webhook không phải trạng thái PAID (success={payload.get('success')}, code={data.get('code')}).")
+        print("=======================================\n")
         return JsonResponse({
             'success': True,
             'orderCode': order_code,
-            'updated': created,
-            'blockchain_triggered': blockchain_triggered,
-            'tx_hash': tx_hash,
+            'updated': False,
+            'message': data.get('desc') or payload.get('desc') or 'Webhook received without successful payment state.',
         })
 
+    # Cập nhật Donation + Campaign trong 1 transaction để tránh race.
+    created = False
+    try:
+        with transaction.atomic():
+            locked_donation = (
+                Donation.objects
+                .select_related('campaign', 'donor')
+                .select_for_update()
+                .get(pk=donation.pk)
+            )
+            created = _mark_payos_donation_completed(locked_donation, data)
+            donation = locked_donation
+        print(f"✅ Donation #{donation.id} marked completed (created={created}).")
+    except Exception as exc:
+        print(f"❌ Lỗi khi đánh dấu donation completed: {exc}")
+        print("=======================================\n")
+        # Vẫn trả 200 để PayOS không retry — lỗi DB cần fix nội bộ, retry không giúp.
+        return JsonResponse({
+            'success': False,
+            'orderCode': order_code,
+            'message': f'Internal error: {exc}',
+        }, status=200)
+
+    # Gọi on-chain recordDonation chỉ khi donation mới vừa được chuyển sang completed.
+    tx_hash = donation.eth_tx_hash
+    blockchain_triggered = False
+    if created:
+        try:
+            fresh_donation = Donation.objects.select_related('campaign', 'donor').get(pk=donation.pk)
+            tx_hash = _trigger_record_donation_bridge(fresh_donation)
+            blockchain_triggered = True
+            print(f"✅ recordDonation on-chain OK, tx={tx_hash}")
+        except Exception as exc:
+            print(f"⚠️ recordDonation on-chain thất bại: {exc}")
+            failed_donation = Donation.objects.get(pk=donation.pk)
+            failed_donation.blockchain_status = 'failed'
+            failed_donation.blockchain_completed_at = timezone.now()
+            failed_donation.blockchain_error = str(exc)[:500]
+            failed_donation.save(update_fields=[
+                'blockchain_status',
+                'blockchain_completed_at',
+                'blockchain_error',
+                'updated_at',
+            ])
+
+    print("=======================================\n")
     return JsonResponse({
         'success': True,
         'orderCode': order_code,
-        'updated': False,
-        'message': data.get('desc') or payload.get('desc') or 'Webhook received without successful payment state.',
+        'updated': created,
+        'blockchain_triggered': blockchain_triggered,
+        'tx_hash': tx_hash,
     })
 
 
