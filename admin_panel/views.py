@@ -36,6 +36,7 @@ from django.utils.html import escape
 from client.blockchain import BlockchainService, get_eth_vnd_rate, invalidate_campaign_cache
 from client.blockchain_listener import sync_disbursement_proposal_status
 from admin_panel.disbursement_utils import estimate_gas_per_tx_vnd
+from admin_panel.blockchain_utils import sync_single_campaign
 
 WEI_IN_ETH = Decimal('1000000000000000000')
 # Ngưỡng coi chiến dịch đã giải ngân hết (để cho phép thu hồi gas 1 lần cuối)
@@ -218,60 +219,32 @@ def _get_disbursement_approver_context(user):
 
 def _sync_campaign_to_blockchain(campaign):
     """
-    Admin Relayer (Gas Station): backend tự gọi createCampaign(_cid, org_addr)
-    trên DCPManager v3 bằng ví Admin → on-chain campaignId = Django Campaign.id.
+    Wrapper backward-compat: delegate sang `sync_single_campaign` (blockchain_utils).
 
-    Idempotent: nếu campaign.is_onchain = True thì bỏ qua (đã sync rồi).
-    Mọi lỗi (thiếu ví, revert, RPC down) đều được lưu vào blockchain_sync_error
-    để admin có thể retry thủ công mà không chặn luồng duyệt campaign.
+    Logic thực tế đã được tách ra `admin_panel/blockchain_utils.py` để tái sử dụng
+    bởi management command và signal `post_save`. Hàm này giữ nguyên signature cũ
+    (nhận `campaign` instance, không trả về) để các call-site hiện tại không phải
+    sửa; sau khi RPC xong, refresh lại instance từ DB để caller đọc được giá trị
+    mới (blockchain_tx_hash, blockchain_sync_error…).
     """
-    if campaign.is_onchain and campaign.blockchain_tx_hash:
-        print(f"ℹ️ [CHAIN SYNC] Campaign #{campaign.id} đã ở on-chain, bỏ qua.")
-        return
-
+    sync_single_campaign(campaign.id)
     try:
-        org = campaign.organization
-        if not org:
-            raise Exception("Chiến dịch chưa gắn tổ chức — không thể tạo trên blockchain.")
-        wallet = (org.wallet_address or '').strip()
-        if not wallet:
-            raise Exception("Tổ chức chưa có địa chỉ ví Crypto (wallet_address) — không thể tạo trên blockchain.")
-        if not re.match(r'^0x[0-9a-fA-F]{40}$', wallet):
-            raise Exception(f"Địa chỉ ví tổ chức không hợp lệ (cần format 0x + 40 ký tự hex): {wallet}")
-
-        bc = BlockchainService()
-        result = bc.trigger_create_campaign(
-            campaign_id=campaign.id,
-            org_address=wallet,
-        )
-        tx_hash = result['tx_hash'] if isinstance(result, dict) else str(result)
-
-        campaign.is_onchain = True
-        campaign.blockchain_tx_hash = tx_hash
-        campaign.blockchain_synced_at = timezone.now()
-        campaign.blockchain_sync_error = None
-        campaign.save(update_fields=[
+        campaign.refresh_from_db(fields=[
             'is_onchain', 'blockchain_tx_hash',
             'blockchain_synced_at', 'blockchain_sync_error',
         ])
-        print(f"✅ [CHAIN SYNC] createCampaign(cid={campaign.id}, org={wallet}) OK, tx={tx_hash}")
-    except Exception as exc:
-        import traceback
-        err_msg = f"{type(exc).__name__}: {exc}"
-        print(f"❌ [CHAIN SYNC] Lỗi createCampaign #{campaign.id}: {err_msg}")
-        print(traceback.format_exc())
-        campaign.is_onchain = False
-        campaign.blockchain_sync_error = err_msg[:1000]
-        campaign.blockchain_synced_at = timezone.now()
-        campaign.save(update_fields=[
-            'is_onchain', 'blockchain_sync_error', 'blockchain_synced_at',
-        ])
+    except Exception:
+        # Trường hợp campaign đã bị xóa giữa chừng — bỏ qua refresh.
+        pass
 
 
 def _approve_campaign_with_blockchain(campaign, approver):
     campaign.status = 'active'
     campaign.approved_by = approver
     campaign.approved_at = timezone.now()
+    # Tắt auto-sync signal vì call-site này sẽ tự gọi sync đồng bộ ngay bên dưới.
+    # Nếu không tắt → signal spawn thread song song với RPC đồng bộ → double-call createCampaign.
+    campaign._skip_auto_sync = True
     campaign.save()
 
     # Đồng bộ on-chain NGAY sau khi duyệt (Admin Relayer pattern).
@@ -1051,6 +1024,10 @@ def them_chiendich(request):
                 camp.cover_image_url = fs.url(filename)
 
             # 1️⃣ LƯU VÀO DATABASE SQL
+            # Tắt auto-sync signal nếu ta tự gọi sync đồng bộ ngay bên dưới
+            # (tránh double-call createCampaign khi superuser tạo với status='active').
+            if camp.status == 'active':
+                camp._skip_auto_sync = True
             camp.save()
 
             # 2️⃣ NẾU SUPERUSER TẠO VỚI STATUS='active' → ĐỒNG BỘ ON-CHAIN NGAY

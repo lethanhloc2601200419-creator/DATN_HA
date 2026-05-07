@@ -32,7 +32,7 @@ Usage:
 from django.core.management.base import BaseCommand
 
 from admin_panel.models import Campaign
-from admin_panel.views import _sync_campaign_to_blockchain
+from admin_panel.blockchain_utils import sync_single_campaign
 
 
 class Command(BaseCommand):
@@ -114,7 +114,7 @@ class Command(BaseCommand):
                 if opts['force'] and not opts['reset_all']:
                     c.is_onchain = False
                     c.blockchain_tx_hash = None
-                _sync_campaign_to_blockchain(c)
+                sync_single_campaign(c.id)
                 c.refresh_from_db()
                 if c.is_onchain:
                     ok += 1
