@@ -292,12 +292,11 @@
                             </button>
                             {% endif %}
 
-                            {# ---- READY_TO_PAYOUT: Manual PayOS QR ---- #}
-                            {% if item.qr_code_url %}
-                            <button type="button" class="btn btn-sm btn-info fw-bold"
-                                    data-bs-toggle="modal" data-bs-target="#qrPayoutModal{{ item.obj.id }}">
-                                <i class="fas fa-qrcode"></i> QR Giải ngân
-                            </button>
+                            {# ---- READY_TO_PAYOUT: PayOS Checkout Link ---- #}
+                            {% if item.checkout_url %}
+                            <a href="{{ item.checkout_url }}" target="_blank" class="btn btn-sm btn-info fw-bold">
+                                <i class="fas fa-external-link-alt"></i> Thanh toán PayOS
+                            </a>
                             {% elif item.can_trigger_payout %}
                             <button type="button" class="btn btn-sm btn-success fw-bold"
                                     onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
@@ -702,29 +701,4 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
 <script src="{% static 'admin_panel/js/disbursement-proposal.js' %}"></script>
 {# V3 EIP-712 signing — expose window.V3Disbursement.{signAs, relayMultisig, triggerPayout, simulateWebhook}. #}
 <script src="{% static 'admin_panel/js/v3-disbursement-sign.js' %}"></script>
-
-{# Modals for PayOS QR payout #}
-{% for item in proposals %}
-{% if item.qr_code_url %}
-<div class="modal fade" id="qrPayoutModal{{ item.obj.id }}" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-qrcode"></i> Giải ngân thủ công - Đề xuất {{ item.obj.id }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center">
-                <p class="mb-3">Quét mã bằng App ngân hàng để giải ngân</p>
-                <img src="{{ item.qr_code_url }}" alt="PayOS QR" style="width: 200px; height: 200px; border: 1px solid #ddd;" />
-                <p class="mt-3 text-muted small">Sau khi thanh toán, PayOS sẽ tự động cập nhật trạng thái và thực hiện burn token on-chain.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-{% endfor %}
-
 {% endblock %}
