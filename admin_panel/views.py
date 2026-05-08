@@ -6,7 +6,9 @@ from django.db import transaction
 from django.contrib.auth import  login, authenticate,  logout
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.urls import reverse
 from django.utils import timezone
+from types import SimpleNamespace
 import random
 import requests
 import json
