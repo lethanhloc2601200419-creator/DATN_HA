@@ -1,0 +1,432 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h2 class="page-title">
+        <i class="fas fa-user-shield text-primary me-2"></i>
+        Cổng Giám sát viên — Ký duyệt Giải ngân (V3 EIP-712)
+    </h2>
+    <p class="text-muted mb-3">
+        Bạn đang đăng nhập với vai trò <strong class="text-primary">Giám sát viên (3rd-party)</strong>.
+        Nhiệm vụ của bạn: audit hóa đơn IPFS &amp; ký EIP-712 (off-chain, 0 gas) cho các đề xuất giải ngân đang chờ.
+    </p>
+
+    {# ============================================================ #}
+    {# WALLET STATUS BANNER — nếu profile thiếu wallet_address       #}
+    {# ============================================================ #}
+    {% if not wallet_configured %}
+    <div class="alert alert-warning d-flex align-items-center mb-3">
+        <i class="fas fa-exclamation-triangle fs-3 me-3"></i>
+        <div>
+            <strong>Chưa cấu hình địa chỉ ví trong hồ sơ.</strong><br>
+            Để ký EIP-712, bạn cần có <code>wallet_address</code> khớp với
+            <code>supervisorWallet()</code> on-chain trong hồ sơ người dùng.
+            Vui lòng liên hệ Admin hệ thống để cập nhật.
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info d-flex align-items-center mb-3">
+        <i class="fas fa-wallet fs-4 me-3"></i>
+        <div class="flex-grow-1">
+            <strong>Ví Supervisor đang dùng:</strong>
+            <code>{{ approver_context.supervisor_wallet|default:'—' }}</code>
+            <div class="small text-muted mt-1">
+                Đảm bảo MetaMask đang mở đúng ví này trước khi bấm "Ký duyệt".
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ============================================================ #}
+    {# STATS — 3-card focused cho supervisor                          #}
+    {# ============================================================ #}
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card admin-stat-card border-warning">
+                <div class="card-body text-center">
+                    <div class="metric-value text-warning">{{ stats.needs_me }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-signature me-1"></i> Cần tôi ký ngay
+                    </div>
+                    <div class="small text-muted mt-1">Pending &amp; chưa có sig của bạn</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card admin-stat-card">
+                <div class="card-body text-center">
+                    <div class="metric-value text-success">{{ stats.already_signed }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-check-circle me-1"></i> Đã ký
+                    </div>
+                    <div class="small text-muted mt-1">Chữ ký của bạn đã được ghi nhận</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card admin-stat-card">
+                <div class="card-body text-center">
+                    <div class="metric-value text-primary">{{ stats.completed_audited }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-check-double me-1"></i> Đã hoàn tất
+                    </div>
+                    <div class="small text-muted mt-1">Đã burn VNDT trên chain</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ============================================================ #}
+    {# FILTER TOOLBAR                                                 #}
+    {# ============================================================ #}
+    <div class="card admin-toolbar">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <input type="text" name="q" class="form-control"
+                           placeholder="Tìm tiêu đề, mục đích, chiến dịch, tổ chức..."
+                           value="{{ query }}">
+                </div>
+                <div class="col-md-4">
+                    <select name="status" class="form-select">
+                        <option value="">Tất cả trạng thái V3</option>
+                        <option value="needs_me" {% if selected_status == 'needs_me' %}selected{% endif %}>
+                            ⭐ Chỉ hiện cần tôi ký
+                        </option>
+                        <option value="pending_multisig" {% if selected_status == 'pending_multisig' %}selected{% endif %}>
+                            Chờ đủ 3 chữ ký
+                        </option>
+                        <option value="ready_to_payout" {% if selected_status == 'ready_to_payout' %}selected{% endif %}>
+                            Đã relay, chờ payout
+                        </option>
+                        <option value="fiat_transferred" {% if selected_status == 'fiat_transferred' %}selected{% endif %}>
+                            Fiat đã chuyển
+                        </option>
+                        <option value="completed_audited" {% if selected_status == 'completed_audited' %}selected{% endif %}>
+                            Đã hoàn tất
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Lọc
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ============================================================ #}
+    {# PROPOSALS LIST — CARD LAYOUT cho read-only + sign-only UI      #}
+    {# ============================================================ #}
+    <div class="card admin-shell-card">
+        <div class="card-header d-flex align-items-center">
+            <i class="fas fa-list-check me-1"></i> Danh sách đề xuất cần giám sát
+            <span class="badge bg-info ms-2">V3 EIP-712 Multisig</span>
+        </div>
+        <div class="card-body">
+            {% for item in proposals %}
+            <div class="card mb-3 {% if item.is_waiting_me %}border-warning border-2 shadow-sm{% else %}border-light{% endif %}">
+                <div class="card-body">
+                    <div class="row g-3">
+                        {# ---- LEFT: thông tin đề xuất ---- #}
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-start mb-2">
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1">
+                                        {{ item.obj.title }}
+                                        {% if item.is_waiting_me %}
+                                        <span class="badge bg-warning text-dark ms-2">
+                                            <i class="fas fa-hourglass-half"></i> Chờ bạn ký
+                                        </span>
+                                        {% elif item.already_signed %}
+                                        <span class="badge bg-success ms-2">
+                                            <i class="fas fa-check"></i> Đã ký
+                                        </span>
+                                        {% endif %}
+                                    </h5>
+                                    <div class="text-muted small">
+                                        Đề xuất #{{ item.obj.id }} ·
+                                        {{ item.obj.created_at|date:"d/m/Y H:i" }} ·
+                                        Tạo bởi:
+                                        {{ item.obj.created_by.get_full_name|default:item.obj.created_by.username|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-sm-6">
+                                    <div class="small text-muted">Chiến dịch</div>
+                                    <strong>{{ item.obj.campaign.title|truncatechars:50 }}</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="small text-muted">Tổ chức quản lý</div>
+                                    <strong>
+                                        {% if item.obj.campaign.organization %}
+                                        {{ item.obj.campaign.organization.name }}
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-sm-6">
+                                    <div class="small text-muted">Số tiền yêu cầu</div>
+                                    <div class="fw-bold text-danger fs-5">
+                                        {{ item.obj.amount_requested|intcomma }}đ
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="small text-muted">Đơn vị thụ hưởng</div>
+                                    <strong>{{ item.obj.recipient_name|default:"—" }}</strong>
+                                </div>
+                            </div>
+
+                            {% if item.obj.purpose %}
+                            <div class="small text-muted mt-2">Mục đích</div>
+                            <div>{{ item.obj.purpose }}</div>
+                            {% endif %}
+
+                            {% if item.obj.description %}
+                            <details class="mt-2">
+                                <summary class="small text-muted" style="cursor: pointer;">
+                                    Mô tả chi tiết
+                                </summary>
+                                <div class="mt-1 small">{{ item.obj.description|linebreaks }}</div>
+                            </details>
+                            {% endif %}
+                        </div>
+
+                        {# ---- RIGHT: sig progress + actions ---- #}
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <div class="small text-muted mb-1">Tiến độ chữ ký EIP-712</div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <strong class="fs-4 me-2">{{ item.sig_count }}/3</strong>
+                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                        {% widthratio item.sig_count 3 100 as sig_pct %}
+                                        <div class="progress-bar {% if item.sig_count == 3 %}bg-success{% else %}bg-warning{% endif %}"
+                                             style="width: {{ sig_pct }}%"></div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    {% if item.has_org_sig %}
+                                    <span class="badge bg-success" title="Tổ chức đã ký">Org ✓</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark border" title="Tổ chức chưa ký">Org</span>
+                                    {% endif %}
+                                    {% if item.has_supervisor_sig %}
+                                    <span class="badge bg-success" title="Giám sát đã ký">Sup ✓</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark border" title="Giám sát chưa ký">Sup</span>
+                                    {% endif %}
+                                    {% if item.has_admin_sig %}
+                                    <span class="badge bg-success" title="Admin đã ký">Adm ✓</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark border" title="Admin chưa ký">Adm</span>
+                                    {% endif %}
+                                </div>
+
+                                <hr class="my-3">
+
+                                {# ---- IPFS evidence link (MUST be visible) ---- #}
+                                <div class="small text-muted mb-1">
+                                    <i class="fas fa-file-invoice me-1"></i> Hóa đơn / Chứng từ
+                                </div>
+                                {% if item.obj.evidence_url %}
+                                {# Ưu tiên evidence_url (populate lúc tạo proposal, có thể là URL #}
+                                {# external không phải pinata gateway). Fallback về gateway default nếu thiếu. #}
+                                <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-success w-100 mb-2">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    Mở hóa đơn / minh chứng
+                                </a>
+                                {% if item.obj.ipfs_cid %}
+                                <div class="small text-muted text-break mb-2">
+                                    CID: <code>{{ item.obj.ipfs_cid|truncatechars:24 }}</code>
+                                </div>
+                                {% endif %}
+                                {% elif item.obj.ipfs_cid %}
+                                <div class="mb-2">
+                                    <a href="https://gateway.pinata.cloud/ipfs/{{ item.obj.ipfs_cid|urlencode }}"
+                                       target="_blank" rel="noopener"
+                                       class="btn btn-sm btn-outline-success w-100">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        Mở hóa đơn IPFS
+                                    </a>
+                                    <div class="small text-muted text-break mt-1">
+                                        CID: <code>{{ item.obj.ipfs_cid|truncatechars:24 }}</code>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="text-danger small mb-2">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Chưa có IPFS CID — đề nghị từ chối ký.
+                                </div>
+                                {% endif %}
+
+                                {# ---- V3 status badge ---- #}
+                                <div class="small text-muted mb-1">Trạng thái V3</div>
+                                <div class="mb-3">
+                                    {% if item.obj.v3_status == 'v3_not_started' or item.obj.v3_status == 'pending_multisig' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-signature"></i> Chờ ký
+                                    </span>
+                                    {% elif item.obj.v3_status == 'ready_to_payout' %}
+                                    <span class="badge bg-primary">
+                                        <i class="fas fa-paper-plane"></i> Đã relay — chờ payout
+                                    </span>
+                                    {% elif item.obj.v3_status == 'payout_processing' %}
+                                    <span class="badge bg-info text-dark">
+                                        <i class="fas fa-spinner fa-spin"></i> PayOS processing
+                                    </span>
+                                    {% elif item.obj.v3_status == 'fiat_transferred' %}
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-university"></i> Fiat đã chuyển
+                                    </span>
+                                    {% elif item.obj.v3_status == 'completed_audited' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-double"></i> Đã hoàn tất
+                                    </span>
+                                    {% elif item.obj.v3_status == 'payout_failed' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times-circle"></i> Payout failed
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span>
+                                    {% endif %}
+                                </div>
+
+                                {# ---- SIGN BUTTON — main action ---- #}
+                                {% if item.can_sign %}
+                                <button type="button" class="btn btn-warning w-100 fw-bold"
+                                        onclick="window.V3Disbursement.signAs({{ item.obj.id }}, 'supervisor')"
+                                        {% if not wallet_configured %}disabled title="Vui lòng cấu hình wallet_address trước"{% endif %}>
+                                    <i class="fas fa-signature"></i>
+                                    Ký duyệt (Sign EIP-712)
+                                </button>
+                                <div class="small text-muted mt-1 text-center">
+                                    Mở MetaMask → ký typed-data → 0 gas
+                                </div>
+                                {% elif item.already_signed %}
+                                <button type="button" class="btn btn-success w-100" disabled>
+                                    <i class="fas fa-check"></i> Bạn đã ký
+                                </button>
+                                {% elif not item.obj.ipfs_cid %}
+                                <button type="button" class="btn btn-outline-secondary w-100" disabled
+                                        title="Thiếu IPFS CID">
+                                    Không thể ký
+                                </button>
+                                {% else %}
+                                {# Đã qua phase pre-relay (ready_to_payout / fiat_transferred / completed_audited / payout_failed). #}
+                                <div class="text-muted small text-center">
+                                    <i class="fas fa-lock"></i> Đã qua phase ký
+                                </div>
+                                {% endif %}
+
+                                {# ---- Audit trail links (read-only) ---- #}
+                                {% if item.obj.multisig_confirmed_tx_hash %}
+                                <a href="https://sepolia.etherscan.io/tx/{{ item.obj.multisig_confirmed_tx_hash|urlencode }}"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-primary w-100 mt-2">
+                                    <i class="fas fa-link"></i> Xem relay tx
+                                </a>
+                                {% endif %}
+                                {% if item.obj.burn_tx_hash %}
+                                <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}"
+                                   target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-danger w-100 mt-2">
+                                    <i class="fas fa-fire"></i> Xem burn tx
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-inbox fs-1"></i>
+                <div class="mt-2">
+                    {% if selected_status == 'needs_me' %}
+                    Không có đề xuất nào đang chờ bạn ký. 🎉
+                    {% else %}
+                    Chưa có đề xuất giải ngân nào trong hệ thống.
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {# ============================================================ #}
+            {# PAGINATION — supervisor có thể audit hàng trăm proposal từ mọi org #}
+            {# ============================================================ #}
+            {% if paginator and paginator.num_pages > 1 %}
+            <nav aria-label="Proposal pagination" class="mt-3 d-flex justify-content-between align-items-center">
+                <div class="small text-muted">
+                    Hiển thị {{ page_obj.start_index }}–{{ page_obj.end_index }}
+                    trong tổng {{ paginator.count }} đề xuất
+                </div>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_status %}&status={{ selected_status|urlencode }}{% endif %}"
+                           aria-label="Previous">«</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">«</span></li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">
+                            {{ page_obj.number }} / {{ paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_status %}&status={{ selected_status|urlencode }}{% endif %}"
+                           aria-label="Next">»</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">»</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# V3 config + JS — EIP-712 signing script                       #}
+{# ============================================================ #}
+{{ disbursement_web3_config|json_script:"disbursement-proposal-config" }}
+<script>
+(() => {
+    const node = document.getElementById('disbursement-proposal-config');
+    if (!node) return;
+    const payload = JSON.parse(node.textContent);
+    payload.currentApproverRole = "{{ approver_context.approver_role|default:''|escapejs }}";
+    payload.approverWallets = {
+        admin: "{{ approver_context.admin_wallet|default:''|escapejs }}",
+        supervisor: "{{ approver_context.supervisor_wallet|default:''|escapejs }}"
+    };
+    node.textContent = JSON.stringify(payload);
+
+    // Simple toast fallback nếu page không có showToast globally.
+    if (typeof window.showToast !== 'function') {
+        window.showToast = function(msg, level) {
+            const kind = level || 'info';
+            console.log(`[toast/${kind}]`, msg);
+            alert(msg);
+        };
+    }
+})();
+</script>
+{# V3 EIP-712 signing — expose window.V3Disbursement.signAs(proposalId, 'supervisor') #}
+<script src="{% static 'admin_panel/js/v3-disbursement-sign.js' %}"></script>
+{% endblock %}

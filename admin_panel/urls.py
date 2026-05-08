@@ -37,6 +37,9 @@ urlpatterns = [
     # Giải ngân
     path('giaingan/', admin.quanly_giaingan, name='quanly_giaingan'),
     path('giaingan/them/', admin.tao_yeucau_giaingan, name='tao_yeucau_giaingan'),
+    # [V3] Cổng thông tin dành riêng cho Giám sát viên (3rd party).
+    # Chỉ user có ví trùng `supervisorWallet()` on-chain mới vào được.
+    path('giamsat/giaingan/', admin.giamsat_giaingan, name='giamsat_giaingan'),
     path('api/ipfs/upload/', admin.ipfs_upload_view, name='ipfs_upload_view'),
     path('api/disbursement/approve/', admin.sync_disbursement_approval, name='sync_disbursement_approval'),
     path('giaingan/duyet/<int:pk>/', admin.duyet_giaingan, name='duyet_giaingan'),

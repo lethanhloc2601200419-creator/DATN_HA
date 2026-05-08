@@ -300,7 +300,11 @@ def trangchu(request):
 # --- VIEW ĐĂNG NHẬP ---
 def dangnhap(request):
     if request.user.is_authenticated:
-        if request.user.is_superuser or Organization.objects.filter(manager=request.user).exists() or _get_disbursement_approver_context(request.user).get('approver_role') == 'supervisor':
+        # Supervisor → portal riêng (/admin/giamsat/giaingan/) thay vì trang chủ shared,
+        # để 3rd-party thấy ngay không gian làm việc của mình khi login.
+        if _get_disbursement_approver_context(request.user).get('approver_role') == 'supervisor':
+            return redirect('admin_panel:giamsat_giaingan')
+        if request.user.is_superuser or Organization.objects.filter(manager=request.user).exists():
             return redirect('admin_panel:trangchu')
         return redirect('client:trangchu')
 
@@ -324,7 +328,9 @@ def dangnhap(request):
 
         if user is not None:
             login(request, user)
-            if user.is_superuser or Organization.objects.filter(manager=user).exists() or _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
+            if _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
+                return redirect('admin_panel:giamsat_giaingan')
+            if user.is_superuser or Organization.objects.filter(manager=user).exists():
                 return redirect('admin_panel:trangchu')
             return redirect('client:trangchu')
 
@@ -1496,6 +1502,144 @@ def quanly_giaingan(request):
         'disbursement_web3_config': _build_disbursement_web3_config(request),
     }
     return render(request, 'admin_panel/quanly_giaingan.html', context)
+
+
+# ============================================================
+# [V3] CỔNG THÔNG TIN DÀNH RIÊNG CHO GIÁM SÁT VIÊN (3rd PARTY)
+# ------------------------------------------------------------
+# Khác biệt so với `quanly_giaingan` (admin + partner + supervisor share):
+#   - Hard-restricted: chỉ user có ví khớp `supervisorWallet()` on-chain
+#     mới vào được. Admin bị block (có portal riêng), partner bị block.
+#   - Read-only UI: KHÔNG có "Tạo yêu cầu giải ngân", KHÔNG có "Relay
+#     multisig" hay "Thực thi PayOS" (đã là đặc quyền admin).
+#   - Focused queryset: chia proposals thành "cần tôi ký" (uưu tiên) và
+#     "đã ký / đã qua" để giám sát viên tập trung vào task ngần nhất.
+#   - Cảnh báo khi profile.wallet_address bỏ trống (supervisor không
+#     verify được sig nếu không có địa chỉ ví lên DB).
+# ============================================================
+@login_required(login_url='admin_panel:dangnhap')
+def giamsat_giaingan(request):
+    user = request.user
+    approver_context = _get_disbursement_approver_context(user)
+    if approver_context.get('approver_role') != 'supervisor':
+        messages.error(
+            request,
+            "Trang này chỉ dành cho Giám sát viên. Ví đăng nhập của bạn không khớp "
+            "với supervisorWallet on-chain.",
+        )
+        return redirect('admin_panel:trangchu')
+
+    # ------------------------------------------------------------------
+    # 1. Supervisor wallet sanity: cảnh báo nếu profile thiếu wallet_address.
+    # Supervisor verify sig bằng `recover_eip712_signer()` → cần ví trong DB
+    # để FE auto-fill tài khoản MetaMask nên dialog ký khứng.
+    # ------------------------------------------------------------------
+    wallet_configured = bool(
+        hasattr(user, 'profile') and (
+            (user.profile.smart_account_address or '').strip()
+            or (user.profile.wallet_address or '').strip()
+            or (user.profile.eoa_address or '').strip()
+        )
+    )
+
+    q = _normalize_query(request.GET.get('q'))
+    # Supervisor thấy mọi proposal (third-party audit scope là global),
+    # không filter theo organization nào cả.
+    proposals_qs = (
+        DisbursementProposal.objects
+        .select_related('campaign', 'campaign__organization', 'created_by')
+        .prefetch_related('offchain_signatures')
+        .all()
+    )
+    if q:
+        proposals_qs = proposals_qs.filter(
+            Q(title__icontains=q)
+            | Q(purpose__icontains=q)
+            | Q(recipient_name__icontains=q)
+            | Q(campaign__title__icontains=q)
+            | Q(campaign__organization__name__icontains=q)
+        )
+
+    # Supervisor chỉ quan tâm pre-payout phases — sau khi đủ 3 sig + relay
+    # lên chain, trach nhiệm chuyển sang admin. Default filter = all V3 state
+    # để supervisor vẫn audit được lịch sử; có tab "Cần tôi ký" ở FE.
+    status_filter = request.GET.get('status', '')
+    if status_filter == 'pending_multisig':
+        proposals_qs = proposals_qs.filter(
+            v3_status__in=('v3_not_started', 'pending_multisig')
+        )
+    elif status_filter == 'needs_me':
+        # Pseudo-filter: pending multisig AND supervisor chưa ký. `.exclude()`
+        # qua reverse relation sinh NOT EXISTS subquery trong Django. Thêm
+        # `.distinct()` defensively để tránh JOIN duplication edge case.
+        proposals_qs = proposals_qs.filter(
+            v3_status__in=('v3_not_started', 'pending_multisig'),
+        ).exclude(offchain_signatures__role='supervisor').distinct()
+    elif status_filter:
+        proposals_qs = proposals_qs.filter(v3_status=status_filter)
+
+    proposals_qs = proposals_qs.order_by('-created_at')
+
+    # Pagination: supervisor thấy mọi proposal from all orgs → cần cap để tránh
+    # render 500+ card DOM. Stats vẫn tính trên FULL queryset (chưa slice).
+    from django.core.paginator import Paginator
+    full_qs = proposals_qs  # giữ reference cho stats dưới.
+    paginator = Paginator(proposals_qs, 20)
+    page_number = request.GET.get('page') or 1
+    page_obj = paginator.get_page(page_number)
+
+    # ------------------------------------------------------------------
+    # 2. Per-row metadata — giữ cutting surface vừa đủ cho supervisor:
+    #   * sig_count / has_*_sig — hiển thị progress x/3.
+    #   * can_sign / already_signed — control nút "Ký duyệt".
+    #   * is_waiting_me — ưu tiên tô sáng nếu proposal đang chờ ký.
+    # ------------------------------------------------------------------
+    proposals_data = []
+    for p in page_obj.object_list:
+        sigs_by_role = {s.role: s for s in p.offchain_signatures.all()}
+        sig_count = len(sigs_by_role)
+        already_signed = 'supervisor' in sigs_by_role
+        is_pre_relay = p.v3_status in ('v3_not_started', 'pending_multisig')
+        can_sign = is_pre_relay and not already_signed and bool(p.ipfs_cid)
+        is_waiting_me = can_sign  # UI accent
+        proposals_data.append({
+            'obj': p,
+            'sig_count': sig_count,
+            'has_org_sig': 'organization' in sigs_by_role,
+            'has_supervisor_sig': 'supervisor' in sigs_by_role,
+            'has_admin_sig': 'admin' in sigs_by_role,
+            'can_sign': can_sign,
+            'already_signed': already_signed,
+            'is_waiting_me': is_waiting_me,
+        })
+
+    # Stats: tính trên FULL queryset (full_qs) chứ không phải page. Khắc phục
+    # việc vars needs_me_count/already_signed_count vừa loop chỉ tính page hiện tại.
+    needs_me_total = full_qs.filter(
+        v3_status__in=('v3_not_started', 'pending_multisig'),
+    ).exclude(offchain_signatures__role='supervisor').distinct().count()
+    already_signed_total = full_qs.filter(offchain_signatures__role='supervisor').distinct().count()
+    stats = {
+        'needs_me': needs_me_total,
+        'already_signed': already_signed_total,
+        'completed_audited': full_qs.filter(v3_status='completed_audited').count(),
+        'total_requested': full_qs.aggregate(t=Sum('amount_requested'))['t'] or 0,
+    }
+
+    context = {
+        'proposals': proposals_data,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'role': 'supervisor',
+        'stats': stats,
+        'query': q,
+        'selected_status': status_filter,
+        'wallet_configured': wallet_configured,
+        'approver_context': approver_context,
+        'disbursement_web3_config': _build_disbursement_web3_config(request),
+        'current_url': request.get_full_path(),
+    }
+    return render(request, 'admin_panel/giamsat_giaingan.html', context)
 
 
 @login_required
