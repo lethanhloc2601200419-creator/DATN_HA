@@ -1,20 +1,25 @@
-import { createWalletClient, custom, encodeFunctionData, http, parseAbi } from "https://esm.sh/viem@2.31.4?bundle";
-import { createBundlerClient, createPaymasterClient } from "https://esm.sh/viem@2.31.4/account-abstraction?bundle";
-import { sepolia } from "https://esm.sh/viem@2.31.4/chains?bundle";
-import { alchemyTransport } from "https://esm.sh/@alchemy/common?bundle";
-import { estimateFeesPerGas } from "https://esm.sh/@alchemy/aa-infra?bundle";
-import { toNexusAccount, getMEEVersion, MEEVersion } from "https://esm.sh/@biconomy/abstractjs@1.0.48?bundle";
-
-// Security note: whitelist your production domain in the Alchemy dashboard
-// so this browser-side Policy ID cannot be reused from unauthorized origins.
+// ============================================================
+// V3 CREATE-DISBURSEMENT FORM — OFF-CHAIN ONLY
+// ------------------------------------------------------------
+// Phase 1 của workflow V3 đã thuần off-chain. Modal "Tạo yêu cầu
+// giải ngân" chỉ cần:
+//   1) Upload hóa đơn/chứng từ lên Pinata → nhận IPFS CID.
+//   2) Điền CID + gateway URL vào hidden inputs.
+//   3) Submit form natively cho Django lưu DisbursementProposal
+//      với v3_status='pending_multisig'.
+//
+// KHÔNG còn gọi Biconomy Nexus / Alchemy bundler / proposeDisbursement
+// on-chain ở bước này — 3 approver sẽ ký EIP-712 ở Phase 2 qua
+// v3-disbursement-sign.js, và smart3 chỉ ghi nhận khi đủ 3 sig.
+// ============================================================
 
 const configNode = document.getElementById("disbursement-proposal-config");
 const config = configNode ? JSON.parse(configNode.textContent) : null;
 const form = document.getElementById("disbursementProposalForm");
 
-if (!form || !config) {
-  // Nothing to initialize on pages that do not render the proposal modal.
-} else {
+console.log("[V3 Disbursement] proposal JS loaded", { hasForm: !!form, hasConfig: !!config, ipfsUploadUrl: config?.ipfsUploadUrl });
+
+if (form && config) {
   const submitButton = form.querySelector('button[type="submit"]');
   const statusBox = document.getElementById("disbursementStatusBox");
   const statusText = document.getElementById("disbursementStatusText");
@@ -22,7 +27,6 @@ if (!form || !config) {
   const invoiceInput = form.querySelector('input[name="invoice_file"]');
   const ipfsCidInput = form.querySelector('input[name="ipfs_cid"]');
   const ipfsGatewayInput = form.querySelector('input[name="ipfs_gateway_url"]');
-  const txHashInput = form.querySelector('input[name="proposal_tx_hash"]');
 
   function getCookie(name) {
     const value = `; ${document.cookie}`;
@@ -75,6 +79,7 @@ if (!form || !config) {
     payload.append("campaign_id", campaignId);
     payload.append("invoice_file", invoiceInput.files[0]);
 
+    console.log("[V3 Disbursement] Uploading to Pinata via", config.ipfsUploadUrl, "file:", invoiceInput.files[0]?.name);
     const response = await fetch(config.ipfsUploadUrl, {
       method: "POST",
       headers: {
@@ -84,108 +89,34 @@ if (!form || !config) {
       body: payload,
     });
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseErr) {
+      console.error("[V3 Disbursement] Pinata endpoint returned non-JSON:", parseErr);
+      throw new Error("Server IPFS trả response không hợp lệ (HTTP " + response.status + ").");
+    }
+    console.log("[V3 Disbursement] Pinata response:", { httpStatus: response.status, result });
     if (!response.ok || !result.ok) {
-      throw new Error(result.message || "Upload IPFS thất bại.");
+      throw new Error(result.message || "Upload IPFS thất bại (HTTP " + response.status + ").");
+    }
+    if (!result.cid) {
+      throw new Error("Pinata không trả về CID.");
     }
 
     return result;
   }
 
-  async function ensureWeb3Context() {
-    if (!window.dcpWeb3?.ensureConnected) {
-      throw new Error("Web3Auth chưa sẵn sàng trên trang này.");
-    }
-
-    const walletContext = await window.dcpWeb3.ensureConnected();
-    const synced = await window.dcpWeb3.syncWalletAddress({
-      eoaAddress: walletContext.eoaAddress,
-      smartAccountAddress: walletContext.smartAccountAddress,
-    });
-    window.dcpWeb3.updateWalletBadge(synced.smart_account_address);
-
-    return {
-      ...walletContext,
-      syncedSmartAccountAddress: synced.smart_account_address,
-    };
-  }
-
-  async function sendGaslessProposalTx({ provider, eoaAddress, smartAccountAddress, campaignId, ipfsCid }) {
-    if (!config.contractAddress) {
-      throw new Error("Thiếu CONTRACT_ADDRESS trong cấu hình frontend.");
-    }
-    if (!config.alchemyApiKey) {
-      throw new Error("Không đọc được Alchemy API key từ SEPOLIA_RPC_URL.");
-    }
-    if (!config.alchemyPolicyId) {
-      throw new Error("Thiếu ALCHEMY_POLICY_ID trong cấu hình frontend.");
-    }
-
-    const walletClient = createWalletClient({
-      account: eoaAddress,
-      chain: sepolia,
-      transport: custom(provider),
-    });
-
-    const account = await toNexusAccount({
-      signer: walletClient,
-      chainConfiguration: {
-        chain: sepolia,
-        transport: http(config.rpcTarget),
-        version: getMEEVersion(MEEVersion.V2_1_0),
-        accountAddress: smartAccountAddress || undefined,
-      },
-    });
-
-    const transport = alchemyTransport({ apiKey: config.alchemyApiKey });
-    const bundlerClient = createBundlerClient({
-      account,
-      chain: sepolia,
-      transport,
-      userOperation: {
-        estimateFeesPerGas,
-      },
-      paymaster: createPaymasterClient({ transport }),
-      paymasterContext: {
-        policyId: config.alchemyPolicyId,
-      },
-    });
-
-    const callData = encodeFunctionData({
-      abi: parseAbi(["function proposeDisbursement(uint256 _campaignId, string _ipfsCid)"]),
-      functionName: "proposeDisbursement",
-      args: [BigInt(campaignId), ipfsCid],
-    });
-
-    const userOpHash = await bundlerClient.sendUserOperation({
-      calls: [
-        {
-          to: config.contractAddress,
-          data: callData,
-          value: 0n,
-        },
-      ],
-    });
-
-    const receipt = await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    const transactionHash =
-      receipt?.receipt?.transactionHash ||
-      receipt?.transactionHash ||
-      receipt?.hash ||
-      "";
-
-    if (!transactionHash) {
-      throw new Error("Không lấy được transaction hash từ Alchemy bundler receipt.");
-    }
-
-    return {
-      userOpHash,
-      transactionHash,
-      smartAccountAddress: account.address,
-    };
-  }
+  // Guard flag để tránh vòng lặp vô hạn khi form.submit() được gọi
+  // lại chương trình sau khi đã upload IPFS xong.
+  let submittingNatively = false;
 
   form.addEventListener("submit", async (event) => {
+    if (submittingNatively) {
+      // Native submit pass — cho browser xử lý bình thường.
+      return;
+    }
+
     event.preventDefault();
     clearStatus();
 
@@ -204,27 +135,20 @@ if (!form || !config) {
     try {
       setStatus("Đang upload hóa đơn lên IPFS qua Pinata...", "info");
       const uploadResult = await uploadInvoice(campaignId);
-      ipfsCidInput.value = uploadResult.cid;
-      ipfsGatewayInput.value = uploadResult.gateway_url;
+      if (ipfsCidInput) ipfsCidInput.value = uploadResult.cid || "";
+      if (ipfsGatewayInput) ipfsGatewayInput.value = uploadResult.gateway_url || "";
+      console.log("[V3 Disbursement] CID populated into hidden inputs. Submitting form natively. cid=", uploadResult.cid);
 
-      setStatus("IPFS thành công. Đang kết nối Smart Account và gửi giao dịch gasless...", "info");
-      const walletContext = await ensureWeb3Context();
-      const txResult = await sendGaslessProposalTx({
-        provider: walletContext.provider,
-        eoaAddress: walletContext.eoaAddress,
-        smartAccountAddress: walletContext.syncedSmartAccountAddress || walletContext.smartAccountAddress,
-        campaignId,
-        ipfsCid: uploadResult.cid,
-      });
-
-      txHashInput.value = txResult.transactionHash;
-      window.dcpWeb3.updateWalletBadge(txResult.smartAccountAddress);
-      setStatus("Đã ghi đề xuất lên Sepolia. Hệ thống đang lưu hồ sơ vào Django...", "success");
+      setStatus("Upload IPFS thành công. Đang lưu yêu cầu vào hệ thống...", "success");
+      submittingNatively = true;
       form.submit();
     } catch (error) {
-      const message = error?.message || "Không thể tạo yêu cầu giải ngân gasless.";
+      console.error("[V3 Disbursement] submit failed:", error);
+      const message = error?.message || "Không thể tạo yêu cầu giải ngân.";
       setStatus(message, "danger");
-      window.dcpWeb3?.showToast?.(message, "error");
+      if (window.dcpWeb3?.showToast) {
+        window.dcpWeb3.showToast(message, "error");
+      }
       setSubmittingState(false);
     }
   });

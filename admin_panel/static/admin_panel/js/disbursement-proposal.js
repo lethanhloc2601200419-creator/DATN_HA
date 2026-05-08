@@ -17,6 +17,8 @@ const configNode = document.getElementById("disbursement-proposal-config");
 const config = configNode ? JSON.parse(configNode.textContent) : null;
 const form = document.getElementById("disbursementProposalForm");
 
+console.log("[V3 Disbursement] proposal JS loaded", { hasForm: !!form, hasConfig: !!config, ipfsUploadUrl: config?.ipfsUploadUrl });
+
 if (form && config) {
   const submitButton = form.querySelector('button[type="submit"]');
   const statusBox = document.getElementById("disbursementStatusBox");
@@ -77,6 +79,7 @@ if (form && config) {
     payload.append("campaign_id", campaignId);
     payload.append("invoice_file", invoiceInput.files[0]);
 
+    console.log("[V3 Disbursement] Uploading to Pinata via", config.ipfsUploadUrl, "file:", invoiceInput.files[0]?.name);
     const response = await fetch(config.ipfsUploadUrl, {
       method: "POST",
       headers: {
@@ -86,9 +89,19 @@ if (form && config) {
       body: payload,
     });
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseErr) {
+      console.error("[V3 Disbursement] Pinata endpoint returned non-JSON:", parseErr);
+      throw new Error("Server IPFS trả response không hợp lệ (HTTP " + response.status + ").");
+    }
+    console.log("[V3 Disbursement] Pinata response:", { httpStatus: response.status, result });
     if (!response.ok || !result.ok) {
-      throw new Error(result.message || "Upload IPFS thất bại.");
+      throw new Error(result.message || "Upload IPFS thất bại (HTTP " + response.status + ").");
+    }
+    if (!result.cid) {
+      throw new Error("Pinata không trả về CID.");
     }
 
     return result;
@@ -124,11 +137,13 @@ if (form && config) {
       const uploadResult = await uploadInvoice(campaignId);
       if (ipfsCidInput) ipfsCidInput.value = uploadResult.cid || "";
       if (ipfsGatewayInput) ipfsGatewayInput.value = uploadResult.gateway_url || "";
+      console.log("[V3 Disbursement] CID populated into hidden inputs. Submitting form natively. cid=", uploadResult.cid);
 
       setStatus("Upload IPFS thành công. Đang lưu yêu cầu vào hệ thống...", "success");
       submittingNatively = true;
       form.submit();
     } catch (error) {
+      console.error("[V3 Disbursement] submit failed:", error);
       const message = error?.message || "Không thể tạo yêu cầu giải ngân.";
       setStatus(message, "danger");
       if (window.dcpWeb3?.showToast) {
