@@ -1332,6 +1332,13 @@ def quanly_giaingan(request):
     q = _normalize_query(request.GET.get('q'))
     approver_context = _get_disbursement_approver_context(user)
 
+    # Handle PayOS redirect messages
+    payos_status = request.GET.get('status', '').upper()
+    if payos_status == 'PAID':
+        messages.success(request, "Thanh toán PayOS thành công! Hệ thống sẽ xử lý tiếp khi nhận webhook.")
+    elif payos_status == 'CANCELLED':
+        messages.warning(request, "Đã huỷ thanh toán PayOS.")
+
     if user.is_superuser:
         role = 'admin'
         proposals_qs = DisbursementProposal.objects.select_related(
@@ -1554,12 +1561,8 @@ def quanly_giaingan(request):
                 # luồng donation). Trỏ tới `/admin/giaingan/` (auth-protected) sẽ
                 # khiến PayOS success page crash với 'Application error: a
                 # server-side exception' khi PayOS Next.js validate/render URL.
-                return_url = request.build_absolute_uri(
-                    reverse('admin_panel:v3_payout_return', args=[p.id])
-                )
-                cancel_url = request.build_absolute_uri(
-                    reverse('admin_panel:v3_payout_cancel', args=[p.id])
-                )
+                return_url = request.build_absolute_uri('/admin/giaingan/')
+                cancel_url = request.build_absolute_uri('/admin/giaingan/')
 
                 description = f"DCP-DISB-{p.id}"[:25]
                 link = _payos_create_payment_link(
