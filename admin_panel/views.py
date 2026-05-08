@@ -1720,10 +1720,13 @@ def tao_yeucau_giaingan(request):
             proposal.purpose = request.POST.get('purpose')
             proposal.description = request.POST.get('description')
             proposal.recipient_name = request.POST.get('recipient_name')
+            # V3: Phase 1 là OFF-CHAIN thuần. KHÔNG còn yêu cầu eth_tx_hash /
+            # gasless propose on-chain — smart3 chỉ ghi nhận khi đủ 3 sig EIP-712
+            # ở Phase 3a (relay multisig). IPFS CID vẫn yêu cầu vì là minh chứng
+            # bắt buộc được hash vào typed-data của chữ ký.
             proposal.ipfs_cid = (request.POST.get('ipfs_cid') or '').strip() or None
-            proposal.eth_tx_hash = (request.POST.get('proposal_tx_hash') or '').strip() or None
-            if not proposal.ipfs_cid or not proposal.eth_tx_hash:
-                messages.error(request, "Thiếu IPFS CID hoặc transaction hash gasless. Vui lòng upload lại hóa đơn và ký giao dịch.")
+            if not proposal.ipfs_cid:
+                messages.error(request, "Thiếu IPFS CID. Vui lòng upload lại hóa đơn / chứng từ.")
                 return redirect('admin_panel:quanly_giaingan')
             proposal.evidence_url = request.POST.get('evidence_url', '')
             ipfs_gateway_url = (request.POST.get('ipfs_gateway_url') or '').strip()
@@ -1731,6 +1734,10 @@ def tao_yeucau_giaingan(request):
                 proposal.evidence_url = ipfs_gateway_url
             proposal.created_by = request.user
             proposal.status = 'pending'
+            # V3: đẩy thẳng vào trạng thái chờ ký multisig — bỏ qua luồng V2
+            # 'voting'/'approved'. Dashboard sẽ hiển thị nút "Ký duyệt" cho
+            # 3 approver ngay lập tức.
+            proposal.v3_status = 'pending_multisig'
 
             fs = FileSystemStorage()
             proof_urls = []

@@ -506,7 +506,7 @@
 
 {% if role != 'supervisor' %}
 {# ============================================================ #}
-{# CREATE MODAL — giữ nguyên flow upload IPFS + propose gasless. #}
+{# CREATE MODAL — V3 off-chain: upload IPFS → lưu DB. KHÔNG còn on-chain propose. #}
 {# ============================================================ #}
 <div class="modal fade" id="createModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -516,7 +516,6 @@
                 <input type="hidden" name="campaign_id" value="">
                 <input type="hidden" name="ipfs_cid" value="">
                 <input type="hidden" name="ipfs_gateway_url" value="">
-                <input type="hidden" name="proposal_tx_hash" value="">
                 <div class="modal-header admin-modal-header">
                     <h5 class="modal-title"><i class="fas fa-plus"></i> Tạo yêu cầu giải ngân</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -597,7 +596,7 @@
                         <div class="col-12 mb-3">
                             <label class="fw-bold">Hóa đơn / chứng từ để ghi IPFS *</label>
                             <input type="file" name="invoice_file" class="form-control" accept=".pdf,image/*" required>
-                            <div class="small text-muted mt-1">File này sẽ được upload lên Pinata trước, sau đó CID được đưa vào giao dịch <code>proposeDisbursement</code> gasless.</div>
+                            <div class="small text-muted mt-1">File này sẽ được upload lên Pinata để lấy IPFS CID. CID sau đó được hash vào typed-data EIP-712 ở bước ký duyệt.</div>
                         </div>
                     </div>
                 </div>
@@ -661,7 +660,6 @@
             proposalForm.querySelector('input[name="campaign_id"]').value = '';
             proposalForm.querySelector('input[name="ipfs_cid"]').value = '';
             proposalForm.querySelector('input[name="ipfs_gateway_url"]').value = '';
-            proposalForm.querySelector('input[name="proposal_tx_hash"]').value = '';
         }
         const statusBox = document.getElementById('disbursementStatusBox');
         const statusText = document.getElementById('disbursementStatusText');
@@ -695,8 +693,8 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
     node.textContent = JSON.stringify(payload);
 })();
 </script>
-{# Giữ disbursement-proposal.js để modal Tạo yêu cầu (IPFS upload + gasless proposeDisbursement) hoạt động. #}
-<script type="module" src="{% static 'admin_panel/js/disbursement-proposal.js' %}"></script>
+{# V3: disbursement-proposal.js chỉ upload IPFS rồi submit form native — KHÔNG còn gọi on-chain. #}
+<script src="{% static 'admin_panel/js/disbursement-proposal.js' %}"></script>
 {# V3 EIP-712 signing — expose window.V3Disbursement.{signAs, relayMultisig, triggerPayout, simulateWebhook}. #}
 <script src="{% static 'admin_panel/js/v3-disbursement-sign.js' %}"></script>
 {% endblock %}
