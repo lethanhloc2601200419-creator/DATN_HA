@@ -42,8 +42,8 @@
     return data;
   }
 
-  async function submitSignatureToBackend(body) {
-    const res = await fetch('/admin/api/v3/disbursement/submit-signature/', {
+  async function submitSignatureToBackend(proposalId, body) {
+    const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/submit-signature/`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -73,8 +73,7 @@
         method: 'eth_signTypedData_v4',
         params: [account, typedDataStr],
       });
-      const result = await submitSignatureToBackend({
-        proposal_id: proposalId,
+      const result = await submitSignatureToBackend(proposalId, {
         role,
         signer_address: account,
         signature,

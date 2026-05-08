@@ -2,12 +2,31 @@
 from django.urls import path
 from admin_panel import views as admin
 
-app_name = 'admin_panel' 
+app_name = 'admin_panel'
 urlpatterns = [
+    # ========== [V3] 2-layer disbursement (EIP-712 + PayOS + burn) ==========
+    # Đưa lên đầu để tránh bị catch bởi các route khác (như (?P<url>.*)$).
+    # Phase 2: FE lấy EIP-712 payload để ký → POST signature về backend.
+    path('api/v3/disbursement/<int:pk>/sign-payload/', admin.sign_payload_v3,
+         name='sign_payload_v3'),
+    path('api/v3/disbursement/<int:pk>/submit-signature/', admin.submit_signature_v3,
+         name='submit_signature_v3'),
+    # Phase 3a: Admin relayer submit 3 sigs lên smart3.
+    path('api/v3/disbursement/<int:pk>/relay-multisig/',
+         admin.v3_execute_multisig_relayer, name='v3_execute_multisig_relayer'),
+    # Phase 3b: Admin trigger PayOS payout.
+    path('api/v3/disbursement/<int:pk>/trigger-payout/',
+         admin.v3_trigger_payos_payout, name='v3_trigger_payos_payout'),
+    # Phase 4: PayOS webhook + dev-only simulate.
+    path('api/v3/payos/payout-webhook/', admin.v3_payos_payout_webhook,
+         name='v3_payos_payout_webhook'),
+    path('api/v3/disbursement/<int:pk>/simulate-webhook/',
+         admin.v3_simulate_webhook, name='v3_simulate_webhook'),
+
     path('trangchu/', admin.trangchu, name='trangchu'),
     path('dangnhap/', admin.dangnhap, name='dangnhap'),
     path('dangky/', admin.dangky, name='dangky'),
-    
+
     # Đăng xuất (Mới)
     path('dangxuat/', admin.dangxuat, name='dangxuat'),
     #chức năng
@@ -24,7 +43,7 @@ urlpatterns = [
     path('chuongtrinh/khoa/<int:pk>/', admin.khoa_chuongtrinh, name='khoa_chuongtrinh'), # Ẩn/Hiện
     path('chuongtrinh/xoa/<int:pk>/', admin.xoa_chuongtrinh, name='xoa_chuongtrinh'),
     path('quanlychiendich/', admin.quanlychiendich, name='quanlychiendich'),
-    path('chiendich/them/', admin.them_chiendich, name='them_chiendich'), 
+    path('chiendich/them/', admin.them_chiendich, name='them_chiendich'),
     path('chiendich/sua/<int:pk>/', admin.sua_chiendich, name='sua_chiendich'),
     # Các nút hành động: Duyệt, Hủy, Xóa
     path('chiendich/duyet/<int:pk>/', admin.duyet_chiendich, name='duyet_chiendich'),
@@ -46,22 +65,4 @@ urlpatterns = [
     path('giaingan/sync-onchain/<int:pk>/', admin.sync_disbursement_onchain, name='sync_disbursement_onchain'),
     path('giaingan/huy/<int:pk>/', admin.huy_giaingan, name='huy_giaingan'),
     path('giaingan/thu-hoi-gas/', admin.thu_hoi_gas, name='thu_hoi_gas'),
-
-    # ========== [V3] 2-layer disbursement (EIP-712 + PayOS + burn) ==========
-    # Phase 2: FE lấy EIP-712 payload để ký → POST signature về backend.
-    path('api/v3/disbursement/<int:pk>/sign-payload/', admin.sign_payload_v3,
-         name='sign_payload_v3'),
-    path('api/v3/disbursement/<int:pk>/submit-signature/', admin.submit_signature_v3,
-         name='submit_signature_v3'),
-    # Phase 3a: Admin relayer submit 3 sigs lên smart3.
-    path('api/v3/disbursement/<int:pk>/relay-multisig/',
-         admin.v3_execute_multisig_relayer, name='v3_execute_multisig_relayer'),
-    # Phase 3b: Admin trigger PayOS payout.
-    path('api/v3/disbursement/<int:pk>/trigger-payout/',
-         admin.v3_trigger_payos_payout, name='v3_trigger_payos_payout'),
-    # Phase 4: PayOS webhook + dev-only simulate.
-    path('api/v3/payos/payout-webhook/', admin.v3_payos_payout_webhook,
-         name='v3_payos_payout_webhook'),
-    path('api/v3/disbursement/<int:pk>/simulate-webhook/',
-         admin.v3_simulate_webhook, name='v3_simulate_webhook'),
 ]
