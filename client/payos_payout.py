@@ -23,6 +23,7 @@ PUBLIC API
     request_payout(proposal)            → dict {payout_id, status, ...}
     verify_webhook_signature(payload, sig) → bool
     parse_webhook(payload)              → dict {payout_id, bank_tx_id, status}
+    create_payment_link(...)            → dict {checkoutUrl, qrCode, paymentLinkId}
 
 ==================================================================
 """
@@ -30,10 +31,16 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json as _json
 import os
 import secrets
 import time
 from typing import Any, Dict
+
+import requests as _http_requests
+
+# Endpoint REST PayOS v2 — khớp với luồng donation (client/views.py) đang chạy ổn định.
+_PAYOS_API_BASE = 'https://api-merchant.payos.vn'
 
 
 # --------------------------------------------------------------------------
@@ -187,6 +194,43 @@ def _compute_hmac(payload: Dict[str, Any], checksum_key: str) -> str:
     return mac.hexdigest()
 
 
+# --------------------------------------------------------------------------
+# Helpers cho chữ ký HMAC-SHA256 của PayOS. Cấu hình CANONICAL phải KHỚP
+# tuyệt đối với cách PayOS verify phía server (và cũng khớp với luồng donation
+# ở `client/views.py::_build_payos_signature_payload`).
+#
+# Rule canonical:
+#   * Chỉ ký trên subset field: amount, cancelUrl, description, orderCode, returnUrl.
+#   * Sort keys ALPHABET — nếu lệch thứ tự → signature mismatch → PayOS trả code
+#     `20` ("Ma xac thuc khong hop le").
+#   * Value normalize: None / 'undefined' / 'null' → '', bool → 'true'/'false',
+#     còn lại str(value). Với số nguyên: str(100000) = "100000" (không có dấu ,).
+#   * Nối bằng '&': "amount=100000&cancelUrl=https://...&description=...".
+# --------------------------------------------------------------------------
+_SIGNATURE_FIELDS = ('amount', 'cancelUrl', 'description', 'orderCode', 'returnUrl')
+
+
+def _normalize_payos_value(value):
+    if value in (None, 'undefined', 'null'):
+        return ''
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    return str(value)
+
+
+def _build_payos_signature(payload: Dict[str, Any], checksum_key: str) -> str:
+    """HMAC-SHA256 hex theo chuẩn PayOS cho checkout link."""
+    canonical_parts = []
+    for key in sorted(_SIGNATURE_FIELDS):
+        canonical_parts.append(f"{key}={_normalize_payos_value(payload.get(key))}")
+    canonical = '&'.join(canonical_parts)
+    return hmac.new(
+        checksum_key.encode('utf-8'),
+        canonical.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def create_payment_link(
     client_id,
     api_key,
@@ -201,6 +245,10 @@ def create_payment_link(
     Tạo PayOS Payment Link (Checkout) cho luồng GIẢI NGÂN — mỗi Organization
     có bộ credentials (client_id / api_key / checksum_key) RIÊNG, không dùng
     credentials platform-wide của luồng donation.
+
+    Implementation dùng REST API trực tiếp (POST /v2/payment-requests) với HMAC
+    signature tự tính — KHỚP HỆT luồng donation (`client/views.py`) đang chạy
+    ổn định, tránh bug "Application error" trên trang success PayOS khi dùng SDK.
 
     Parameters
     ----------
@@ -253,69 +301,80 @@ def create_payment_link(
     description = (description or '')[:25] or f"DISBURSE{order_code_int}"[-25:]
 
     fallback_url = 'https://web-production-e589d.up.railway.app/admin/giaingan/'
-    payment_data = {
+    cancel_url_final = cancel_url or fallback_url
+    return_url_final = return_url or fallback_url
+
+    # expiredAt: 15 phút từ hiện tại (khớp luồng donation). PayOS cần int timestamp.
+    expired_at = int(time.time() + 15 * 60)
+
+    payload = {
         'orderCode': order_code_int,
         'amount': amount_int,
         'description': description,
-        'cancelUrl': cancel_url or fallback_url,
-        'returnUrl': return_url or fallback_url,
+        'buyerName': 'Quy to chuc',
+        'items': [
+            {
+                'name': description[:25] or 'Giai ngan',
+                'quantity': 1,
+                'price': amount_int,
+            }
+        ],
+        'cancelUrl': cancel_url_final,
+        'returnUrl': return_url_final,
+        'expiredAt': expired_at,
     }
+    # Ký HMAC trên subset 5 field → gắn vào payload['signature']. KHÔNG ký trên
+    # toàn payload vì PayOS server cũng chỉ verify subset này.
+    payload['signature'] = _build_payos_signature(payload, checksum_key)
 
     try:
-        from payos import PayOS
-        # SDK 1.1.0: `PaymentData` + `ItemData` nằm ở `payos.type` (không phải
-        # `payos.types`). Method `createPaymentLink` bắt buộc arg là instance
-        # `PaymentData`, pass dict sẽ raise ValueError trực tiếp.
-        from payos.type import PaymentData, ItemData
-    except ImportError as exc:
+        response = _http_requests.post(
+            f'{_PAYOS_API_BASE}/v2/payment-requests',
+            json=payload,
+            headers={
+                'x-client-id': client_id,
+                'x-api-key': api_key,
+                'Content-Type': 'application/json',
+            },
+            timeout=20,
+        )
+    except _http_requests.RequestException as exc:
+        # Network / DNS / timeout — in full traceback info để Railway logs thấy.
         print(
-            f"PAYOS ERROR: Python SDK 'payos' chưa được cài đặt hoặc sai version ({exc}). "
-            "Chạy `pip install payos==1.1.0` rồi deploy lại.",
+            f"PAYOS ERROR: network error khi gọi /v2/payment-requests cho orderCode={order_code_int} "
+            f"— {type(exc).__name__}: {exc}",
             flush=True,
         )
         return None
 
     try:
-        # Khởi tạo PayOS CLIENT RIÊNG theo credentials của Organization — đây là
-        # điểm khác biệt then chốt so với luồng donation (dùng settings platform-wide).
-        payos_client = PayOS(
-            client_id=client_id,
-            api_key=api_key,
-            checksum_key=checksum_key,
-        )
-        pd = PaymentData(
-            orderCode=payment_data['orderCode'],
-            amount=payment_data['amount'],
-            description=payment_data['description'],
-            cancelUrl=payment_data['cancelUrl'],
-            returnUrl=payment_data['returnUrl'],
-            items=[ItemData(name=description, quantity=1, price=amount_int)],
-        )
-        response = payos_client.createPaymentLink(pd)
-    except Exception as exc:
-        # In FULL error để dev biết PayOS từ chối vì lý do gì (wrong key, duplicate
-        # orderCode, IP whitelist, ...). flush=True để Railway logs hiện ngay.
+        response_payload = response.json()
+    except ValueError:
+        response_payload = {'raw_text': response.text[:500]}
+
+    # PayOS contract: code '00' = OK, các code khác là reject. Log FULL response
+    # để biết lý do (sai API key, duplicate orderCode, IP whitelist, ...).
+    if response.status_code >= 400 or response_payload.get('code') != '00' or 'data' not in response_payload:
+        try:
+            response_str = _json.dumps(response_payload, ensure_ascii=False)[:800]
+        except (TypeError, ValueError):
+            response_str = str(response_payload)[:800]
         print(
-            f"PAYOS ERROR: createPaymentLink failed for orderCode={order_code_int} "
-            f"amount={amount_int}đ — {type(exc).__name__}: {exc}",
+            f"PAYOS ERROR: createPaymentLink REJECTED orderCode={order_code_int} "
+            f"amount={amount_int}đ status={response.status_code} response={response_str}",
             flush=True,
         )
         return None
 
-    # SDK có thể trả về object (có attribute) hoặc dict — normalize về dict.
-    def _get(obj, key):
-        if isinstance(obj, dict):
-            return obj.get(key)
-        return getattr(obj, key, None)
-
-    checkout_url = _get(response, 'checkoutUrl')
-    qr_code = _get(response, 'qrCode')
-    payment_link_id = _get(response, 'paymentLinkId')
+    data = response_payload['data'] or {}
+    checkout_url = data.get('checkoutUrl')
+    qr_code = data.get('qrCode')
+    payment_link_id = data.get('paymentLinkId')
 
     if not checkout_url:
         print(
-            f"PAYOS ERROR: response thiếu checkoutUrl cho orderCode={order_code_int}. "
-            f"Raw response: {response!r}",
+            f"PAYOS ERROR: response code=00 nhưng thiếu checkoutUrl cho orderCode={order_code_int}. "
+            f"Raw data: {data!r}",
             flush=True,
         )
         return None
