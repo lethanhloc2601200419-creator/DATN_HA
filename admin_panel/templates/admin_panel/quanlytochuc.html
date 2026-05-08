@@ -156,14 +156,17 @@
                                     data-bs-toggle="modal" 
                                     data-bs-target="#editModal"
                                     onclick="fillEditForm(
-                                        '{{ org.id }}', 
-                                        '{{ org.name|escapejs }}', 
-                                        '{{ org.contact_phone|default_if_none:'' }}', 
+                                        '{{ org.id }}',
+                                        '{{ org.name|escapejs }}',
+                                        '{{ org.contact_phone|default_if_none:'' }}',
                                         '{{ org.bank_name|default_if_none:''|escapejs }}',
                                         '{{ org.bank_account_number|default_if_none:'' }}',
                                         '{{ org.bank_account_name|default_if_none:''|escapejs }}',
                                         '{{ org.description|default_if_none:''|escapejs }}',
-                                        '{{ org.wallet_address|default_if_none:'' }}'
+                                        '{{ org.wallet_address|default_if_none:'' }}',
+                                        '{{ org.payos_client_id|default_if_none:'' }}',
+                                        '{{ org.payos_api_key|default_if_none:'' }}',
+                                        '{{ org.payos_checksum_key|default_if_none:'' }}'
                                     )">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -259,6 +262,24 @@
                             <input type="text" name="wallet_address" class="form-control" placeholder="0x..." required>
                         </div>
 
+                        <div class="col-md-12 mb-3">
+                            <h6 class="admin-section-title text-warning">Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS Client ID</label>
+                                    <input type="text" name="payos_client_id" class="form-control" placeholder="Client ID">
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS API Key</label>
+                                    <input type="password" name="payos_api_key" class="form-control" placeholder="API Key">
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS Checksum Key</label>
+                                    <input type="password" name="payos_checksum_key" class="form-control" placeholder="Checksum Key">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-md-12">
                             <label>Mô tả / Giới thiệu</label>
                             <textarea name="description" class="form-control" rows="3"></textarea>
@@ -322,6 +343,24 @@
                             <label>Địa chỉ ví Crypto (MetaMask) *</label>
                             <input type="text" name="wallet_address" id="e_wallet_address" class="form-control" required>
                         </div>
+
+                        <div class="col-md-12 mb-3">
+                            <h6 class="admin-section-title text-warning">Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS Client ID</label>
+                                    <input type="text" name="payos_client_id" id="e_payos_client_id" class="form-control" placeholder="Client ID">
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS API Key</label>
+                                    <input type="password" name="payos_api_key" id="e_payos_api_key" class="form-control" placeholder="API Key">
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label>PayOS Checksum Key</label>
+                                    <input type="password" name="payos_checksum_key" id="e_payos_checksum_key" class="form-control" placeholder="Checksum Key">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -334,7 +373,7 @@
 </div>
 
 <script>
-    function fillEditForm(id, name, phone, bankName, bankAccount, accHolder, desc, walletAddress) {
+    function fillEditForm(id, name, phone, bankName, bankAccount, accHolder, desc, walletAddress, payosClientId, payosApiKey, payosChecksumKey) {
         document.getElementById('editForm').action = "/admin_panel/tochuc/sua/" + id + "/";
         document.getElementById('e_name').value = name;
         document.getElementById('e_phone').value = phone;
@@ -343,6 +382,9 @@
         document.getElementById('e_account_holder').value = accHolder;
         document.getElementById('e_description').value = desc;
         document.getElementById('e_wallet_address').value = walletAddress;
+        document.getElementById('e_payos_client_id').value = payosClientId || '';
+        document.getElementById('e_payos_api_key').value = payosApiKey || '';
+        document.getElementById('e_payos_checksum_key').value = payosChecksumKey || '';
     }
 
     document.getElementById('select-all-orgs')?.addEventListener('change', function() {

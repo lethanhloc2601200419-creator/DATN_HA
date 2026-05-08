@@ -131,7 +131,7 @@ def simulate_webhook_success(proposal) -> Dict[str, Any]:
     return payload
 
 
-def verify_webhook_signature(payload: Dict[str, Any], signature: str) -> bool:
+def verify_webhook_signature(payload: Dict[str, Any], signature: str, checksum_key: str) -> bool:
     """
     Xác minh HMAC webhook. Ở mock chỉ so sánh với HMAC tự sinh bằng secret local.
 
@@ -142,7 +142,7 @@ def verify_webhook_signature(payload: Dict[str, Any], signature: str) -> bool:
     """
     if not signature:
         return False
-    expected = _compute_hmac(payload)
+    expected = _compute_hmac(payload, checksum_key)
     # constant-time compare
     return hmac.compare_digest(expected, signature)
 
@@ -172,7 +172,7 @@ def parse_webhook(payload: Dict[str, Any]) -> Dict[str, Any]:
 # --------------------------------------------------------------------------
 # Internal helpers
 # --------------------------------------------------------------------------
-def _compute_hmac(payload: Dict[str, Any]) -> str:
+def _compute_hmac(payload: Dict[str, Any], checksum_key: str) -> str:
     """
     HMAC-SHA256 hex của canonical JSON (sorted keys), trừ field 'signature'.
     """
@@ -180,7 +180,7 @@ def _compute_hmac(payload: Dict[str, Any]) -> str:
     # Canonical = key=value sorted, nối bằng '&' (đơn giản, khớp mock doc).
     canonical = '&'.join(f"{k}={filtered[k]}" for k in sorted(filtered.keys()))
     mac = hmac.new(
-        PAYOS_PAYOUT_WEBHOOK_SECRET.encode('utf-8'),
+        checksum_key.encode('utf-8'),
         canonical.encode('utf-8'),
         hashlib.sha256,
     )

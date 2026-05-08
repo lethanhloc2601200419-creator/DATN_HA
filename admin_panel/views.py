@@ -656,6 +656,9 @@ def them_tochuc(request):
             org.bank_account_name = request.POST.get('account_holder')
             org.description = request.POST.get('description')
             org.wallet_address = request.POST.get('wallet_address')
+            org.payos_client_id = request.POST.get('payos_client_id')
+            org.payos_api_key = request.POST.get('payos_api_key')
+            org.payos_checksum_key = request.POST.get('payos_checksum_key')
             org.slug = slugify(org.name) + '-' + str(int(time.time()))
             
             if 'logo' in request.FILES:
@@ -682,7 +685,10 @@ def sua_tochuc(request, pk):
             org.bank_account_name = request.POST.get('account_holder')
             org.description = request.POST.get('description')
             org.wallet_address = request.POST.get('wallet_address')
-            
+            org.payos_client_id = request.POST.get('payos_client_id')
+            org.payos_api_key = request.POST.get('payos_api_key')
+            org.payos_checksum_key = request.POST.get('payos_checksum_key')
+
             if 'logo' in request.FILES:
                 org.logo_url = request.FILES['logo']
                 
@@ -2331,10 +2337,6 @@ def v3_payos_payout_webhook(request):
     except json.JSONDecodeError:
         return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
 
-    sig = payload.get('signature') or request.headers.get('X-PayOS-Signature', '')
-    if not _payos_verify_webhook(payload, sig):
-        return JsonResponse({'ok': False, 'message': 'Invalid signature.'}, status=401)
-
     parsed = _payos_parse_webhook(payload)
     order_code = parsed.get('orderCode')
     if not order_code:
@@ -2346,12 +2348,22 @@ def v3_payos_payout_webhook(request):
     except (ValueError, DisbursementProposal.DoesNotExist):
         return JsonResponse({'ok': False, 'message': f'Invalid orderCode or proposal not found.'}, status=400)
 
+    # Get organization's PayOS checksum key for verification
+    org = proposal.campaign.organization
+    checksum_key = org.payos_checksum_key
+    if not checksum_key:
+        return JsonResponse({'ok': False, 'message': 'Organization PayOS checksum key not configured.'}, status=500)
+
     # Idempotency: PayOS có thể retry webhook (network blip hay qua standard policy).
     # Nếu proposal đã ở state “fiat_transferred” hoặc “completed_audited” thì
     # bỏ qua — smart3 cũng sẽ revert, nhưng fail-fast tiết kiệm 1 RPC + 1 thread.
     if proposal.v3_status in ('fiat_transferred', 'completed_audited'):
         return JsonResponse({'ok': True, 'note': 'webhook already processed',
                              'v3_status': proposal.v3_status})
+
+    sig = payload.get('signature') or request.headers.get('X-PayOS-Signature', '')
+    if not _payos_verify_webhook(payload, sig, checksum_key):
+        return JsonResponse({'ok': False, 'message': 'Invalid signature.'}, status=401)
 
     if parsed['status'] != 'success':
         proposal.v3_status = 'payout_failed'

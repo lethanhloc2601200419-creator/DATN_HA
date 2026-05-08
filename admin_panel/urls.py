@@ -17,9 +17,9 @@ urlpatterns = [
     # Phase 3b: Admin trigger PayOS payout.
     path('api/v3/disbursement/<int:pk>/trigger-payout/',
          admin.v3_trigger_payos_payout, name='v3_trigger_payos_payout'),
-    # Phase 4: PayOS webhook + dev-only simulate.
-    path('api/v3/payos/payout-webhook/', admin.v3_payos_payout_webhook,
-         name='v3_payos_payout_webhook'),
+    # Phase 4: PayOS payout webhook (uses org's checksum key)
+    path('api/webhook/payos-payout/', admin.v3_payos_payout_webhook,
+         name='payos_payout_webhook'),
     path('api/v3/disbursement/<int:pk>/simulate-webhook/',
          admin.v3_simulate_webhook, name='v3_simulate_webhook'),
 
