@@ -35,6 +35,7 @@
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json' },
     });
+    console.log('Response text for sign-payload:', await res.clone().text());
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `GET sign-payload failed (${res.status})`);
@@ -52,6 +53,7 @@
       },
       body: JSON.stringify(body),
     });
+    console.log('Response text for submit-signature:', await res.clone().text());
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `POST submit-signature failed (${res.status})`);

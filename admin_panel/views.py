@@ -2040,26 +2040,26 @@ def _get_proposal_v3_eip712_payload(proposal, role, nonce=None, deadline=None):
     }
 
 
-@login_required
 def sign_payload_v3(request, pk):
     """GET: trả về EIP-712 typed-data để frontend ký qua MetaMask."""
-    proposal = get_object_or_404(
-        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'), pk=pk
-    )
-    role = request.GET.get('role', '').strip()
-    if role not in ('organization', 'supervisor', 'admin'):
-        return JsonResponse({'ok': False, 'message': 'role không hợp lệ.'}, status=400)
     try:
+        if not request.user.is_authenticated:
+            return JsonResponse({'ok': False, 'message': 'Session expired. Please login again.'}, status=401)
+
+        proposal = DisbursementProposal.objects.filter(pk=pk).first()
+        if not proposal:
+            return JsonResponse({'ok': False, 'message': f'Proposal {pk} not found.'}, status=404)
+
+        role = request.GET.get('role', '').strip()
+        if role not in ('organization', 'supervisor', 'admin'):
+            return JsonResponse({'ok': False, 'message': 'role không hợp lệ.'}, status=400)
+
         payload = _get_proposal_v3_eip712_payload(proposal, role)
-    except ValueError as exc:
-        return JsonResponse({'ok': False, 'message': str(exc)}, status=400)
-    except Exception as exc:
-        return JsonResponse({'ok': False, 'message': f'Lỗi build payload: {exc}'}, status=500)
-    return JsonResponse({'ok': True, **payload})
+        return JsonResponse({'ok': True, **payload})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'message': f'Internal error: {str(e)}'}, status=500)
 
 
-@login_required
-@csrf_exempt
 def submit_signature_v3(request, pk):
     """
     POST JSON body: {role, signer_address, signature, nonce,
@@ -2068,37 +2068,38 @@ def submit_signature_v3(request, pk):
     thì lưu vào DisbursementSignature (unique per (proposal, role)).
     Khi đủ 3 sig → chuyển v3_status='ready_to_payout'.
     """
-    if request.method != 'POST':
-        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
     try:
+        if not request.user.is_authenticated:
+            return JsonResponse({'ok': False, 'message': 'Session expired. Please login again.'}, status=401)
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+
         data = json.loads(request.body or '{}')
-    except json.JSONDecodeError:
-        return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
 
-    proposal = get_object_or_404(
-        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'),
-        pk=pk,
-    )
-    role = data.get('role')
-    signer = (data.get('signer_address') or '').strip()
-    signature = (data.get('signature') or '').strip()
-    nonce = data.get('nonce')
-    deadline = data.get('deadline')
-    recipient = (data.get('recipient') or '').strip()
-    amount_raw = data.get('amount_raw')
-    ipfs_cid = (data.get('ipfs_cid') or proposal.ipfs_cid or '').strip()
-    if not all([role, signer, signature, nonce is not None, deadline, recipient, amount_raw]):
-        return JsonResponse({'ok': False, 'message': 'Thiếu field bắt buộc.'}, status=400)
+        proposal = DisbursementProposal.objects.filter(pk=pk).first()
+        if not proposal:
+            return JsonResponse({'ok': False, 'message': f'Proposal {pk} not found.'}, status=404)
 
-    # Deadline validation: từ chối sig đã hết hạn ngay từ backend, không để DB rác.
-    # Contract sẽ revert sau này, nhưng fail-fast ở backend rẻ hơn.
-    if int(deadline) <= int(time.time()):
-        return JsonResponse({'ok': False,
-                             'message': f'Signature deadline đã hết hạn ({deadline}). '
-                                        'Người ký cần reload trang để lấy payload mới.'},
-                            status=400)
+        role = data.get('role')
+        signer = (data.get('signer_address') or '').strip()
+        signature = (data.get('signature') or '').strip()
+        nonce = data.get('nonce')
+        deadline = data.get('deadline')
+        recipient = (data.get('recipient') or '').strip()
+        amount_raw = data.get('amount_raw')
+        ipfs_cid = (data.get('ipfs_cid') or proposal.ipfs_cid or '').strip()
+        if not all([role, signer, signature, nonce is not None, deadline, recipient, amount_raw]):
+            return JsonResponse({'ok': False, 'message': 'Thiếu field bắt buộc.'}, status=400)
 
-    try:
+        # Deadline validation: từ chối sig đã hết hạn ngay từ backend, không để DB rác.
+        # Contract sẽ revert sau này, nhưng fail-fast ở backend rẻ hơn.
+        if int(deadline) <= int(time.time()):
+            return JsonResponse({'ok': False,
+                                 'message': f'Signature deadline đã hết hạn ({deadline}). '
+                                            'Người ký cần reload trang để lấy payload mới.'},
+                                status=400)
+
         bc = BlockchainService()
         typed_data = bc.build_eip712_typed_data(
             proposal_id=proposal.id, campaign_id=proposal.campaign_id,
@@ -2106,59 +2107,58 @@ def submit_signature_v3(request, pk):
             deadline=int(deadline), nonce=int(nonce), role=role,
         )
         recovered = bc.recover_eip712_signer(typed_data, signature)
-    except Exception as exc:
-        return JsonResponse({'ok': False, 'message': f'Verify sig thất bại: {exc}'}, status=400)
 
-    if recovered.lower() != signer.lower():
-        return JsonResponse({'ok': False,
-                             'message': f'Signer không khớp. Recovered={recovered}, claimed={signer}'},
-                            status=400)
+        if recovered.lower() != signer.lower():
+            return JsonResponse({'ok': False,
+                                 'message': f'Signer không khớp. Recovered={recovered}, claimed={signer}'},
+                                status=400)
 
-    # Verify signer_address đúng role on-chain.
-    try:
+        # Verify signer_address đúng role on-chain.
         wallets = bc.get_disbursement_approver_wallets()
-    except Exception as exc:
-        return JsonResponse({'ok': False, 'message': f'Không đọc role wallets on-chain: {exc}'}, status=502)
-    expected = {
-        'organization': (proposal.campaign.organization.wallet_address or '').lower(),
-        'supervisor': wallets['supervisor_wallet'].lower(),
-        'admin': wallets['admin_wallet'].lower(),
-    }[role]
-    if expected and recovered.lower() != expected:
-        return JsonResponse(
-            {'ok': False,
-             'message': f'Ví {recovered} không phải role {role} (expect {expected}).'},
-            status=403,
+        expected = {
+            'organization': (proposal.campaign.organization.wallet_address or '').lower(),
+            'supervisor': wallets['supervisor_wallet'].lower(),
+            'admin': wallets['admin_wallet'].lower(),
+        }[role]
+        if expected and recovered.lower() != expected:
+            return JsonResponse(
+                {'ok': False,
+                 'message': f'Ví {recovered} không phải role {role} (expect {expected}).'},
+                status=403,
+            )
+
+        sig_obj, created = DisbursementSignature.objects.update_or_create(
+            proposal=proposal, role=role,
+            defaults={
+                'signer_address': recovered,
+                'signature': signature,
+                'nonce': Decimal(str(nonce)),
+                'deadline': int(deadline),
+                'signed_amount': Decimal(str(amount_raw)),
+                'signed_recipient': recipient,
+                'signed_ipfs_cid': ipfs_cid,
+                'signed_by': request.user if request.user.is_authenticated else None,
+            },
         )
 
-    sig_obj, created = DisbursementSignature.objects.update_or_create(
-        proposal=proposal, role=role,
-        defaults={
-            'signer_address': recovered,
-            'signature': signature,
-            'nonce': Decimal(str(nonce)),
-            'deadline': int(deadline),
-            'signed_amount': Decimal(str(amount_raw)),
-            'signed_recipient': recipient,
-            'signed_ipfs_cid': ipfs_cid,
-            'signed_by': request.user if request.user.is_authenticated else None,
-        },
-    )
+        total_sigs = proposal.offchain_signatures.count()
+        if total_sigs >= 3 and proposal.v3_status in ('v3_not_started', 'pending_multisig'):
+            proposal.v3_status = 'ready_to_payout'
+        elif proposal.v3_status == 'v3_not_started':
+            proposal.v3_status = 'pending_multisig'
+        proposal.save(update_fields=['v3_status'])
 
-    total_sigs = proposal.offchain_signatures.count()
-    if total_sigs >= 3 and proposal.v3_status in ('v3_not_started', 'pending_multisig'):
-        proposal.v3_status = 'ready_to_payout'
-    elif proposal.v3_status == 'v3_not_started':
-        proposal.v3_status = 'pending_multisig'
-    proposal.save(update_fields=['v3_status'])
-
-    return JsonResponse({
-        'ok': True,
-        'created': created,
-        'total_sigs': total_sigs,
-        'v3_status': proposal.v3_status,
-        'ready_to_relay': total_sigs >= 3,
-    })
+        return JsonResponse({
+            'ok': True,
+            'created': created,
+            'total_sigs': total_sigs,
+            'v3_status': proposal.v3_status,
+            'ready_to_relay': total_sigs >= 3,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'ok': False, 'message': f'Internal error: {str(e)}'}, status=500)
 
 
 @login_required
