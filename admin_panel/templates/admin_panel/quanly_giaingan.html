@@ -293,9 +293,9 @@
                             {% endif %}
 
                             {# ---- READY_TO_PAYOUT: Manual PayOS QR ---- #}
-                            {% if qr_links and item.obj.id in qr_links %}
+                            {% if item.qr_code_url %}
                             <div class="text-center">
-                                <img src="{{ qr_links|key:item.obj.id|key:'qrCode' }}" alt="PayOS QR" style="width: 100px; height: 100px;" />
+                                <img src="{{ item.qr_code_url }}" alt="PayOS QR" style="width: 100px; height: 100px;" />
                                 <br>
                                 <small class="text-muted">Quét mã để giải ngân thủ công</small>
                             </div>

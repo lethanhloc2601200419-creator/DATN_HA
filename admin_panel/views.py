@@ -1465,7 +1465,7 @@ def quanly_giaingan(request):
             and bool(p.multisig_confirmed_tx_hash)
         )
 
-        proposals_data.append({
+        item = {
             'obj': p,
             'sig_count': sig_count,
             'sig_roles_have': sig_roles_have,
@@ -1478,12 +1478,9 @@ def quanly_giaingan(request):
             'can_relay_multisig': can_relay_multisig,
             'can_trigger_payout': can_trigger_payout,
             'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
-        })
+        }
 
-    # Generate PayOS QR for ready_to_payout proposals
-    qr_links = {}
-    for item in proposals_data:
-        p = item['obj']
+        # Generate PayOS QR for ready_to_payout proposals
         if p.v3_status == 'ready_to_payout':
             org = p.campaign.organization
             if org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
@@ -1496,9 +1493,12 @@ def quanly_giaingan(request):
                         str(p.id),
                         f'Payment for disbursement proposal {p.id}'
                     )
-                    qr_links[p.id] = link
+                    item['qr_code_url'] = link.get('qrCode')
+                    item['checkout_url'] = link.get('checkoutUrl')
                 except Exception as e:
                     logger.warning(f"Failed to create PayOS link for proposal {p.id}: {e}")
+
+        proposals_data.append(item)
 
     # V3 stats dashboard (count by v3_status, not legacy status).
     stats = {
@@ -1530,7 +1530,6 @@ def quanly_giaingan(request):
         'export_excel_url': _export_links(request)[1],
         'approver_context': approver_context,
         'disbursement_web3_config': _build_disbursement_web3_config(request),
-        'qr_links': qr_links,
     }
     return render(request, 'admin_panel/quanly_giaingan.html', context)
 
