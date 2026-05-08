@@ -2062,6 +2062,7 @@ def sign_payload_v3(request, pk):
             return JsonResponse({'ok': False, 'message': 'role không hợp lệ.'}, status=400)
 
         payload = _get_proposal_v3_eip712_payload(proposal, role)
+        logger.info(f">>> [V3 SIGN] Typed data: {payload['typed_data']}")
         logger.info(f"✅ [V3 SIGN] Trả về payload thành công cho PK={pk}")
         return JsonResponse({'ok': True, **payload})
     except Exception as e:
@@ -2119,6 +2120,7 @@ def submit_signature_v3(request, pk):
             amount_raw=int(amount_raw), recipient=recipient, ipfs_cid=ipfs_cid,
             deadline=int(deadline), nonce=int(nonce), role=role,
         )
+        logger.info(f">>> [V3 SUBMIT] Typed data: {typed_data}")
         recovered = bc.recover_eip712_signer(typed_data, signature)
 
         if recovered.lower() != signer.lower():

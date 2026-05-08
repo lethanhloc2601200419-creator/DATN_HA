@@ -582,7 +582,7 @@ class BlockchainService:
             'domain': {
                 'name': 'DisbursementExecutor',
                 'version': '1',
-                'chainId': int(self.w3.eth.chain_id),
+                'chainId': 11155111,  # Sepolia chainId
                 'verifyingContract': self.w3.to_checksum_address(verifying_contract),
             },
             'message': {
