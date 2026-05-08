@@ -40,9 +40,11 @@
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `GET sign-payload failed (${res.status})`);
     }
-    // Ensure chainId is explicitly set for Sepolia
+    // Ensure chainId and name are explicitly set
     if (data.typed_data && data.typed_data.domain) {
       data.typed_data.domain.chainId = 11155111;
+      data.typed_data.domain.name = 'DisbursementExecutor';
+      data.typed_data.domain.version = '1';
     }
     return data;
   }

@@ -567,7 +567,7 @@ class BlockchainService:
                     {'name': 'chainId', 'type': 'uint256'},
                     {'name': 'verifyingContract', 'type': 'address'},
                 ],
-                'DisbursementApproval': [
+                'Approval': [
                     {'name': 'ProposalId', 'type': 'uint256'},
                     {'name': 'CampaignId', 'type': 'uint256'},
                     {'name': 'Amount', 'type': 'uint256'},
@@ -578,10 +578,10 @@ class BlockchainService:
                     {'name': 'Role', 'type': 'string'},
                 ],
             },
-            'primaryType': 'DisbursementApproval',
+            'primaryType': 'Approval',
             'domain': {
-                'name': 'DCP',
-                'version': '1.0',
+                'name': 'DisbursementExecutor',
+                'version': '1',
                 'chainId': 11155111,  # Sepolia chainId
                 'verifyingContract': self.w3.to_checksum_address(verifying_contract),
             },
