@@ -158,7 +158,7 @@ class BlockchainService:
     # Hàm gửi giao dịch (Dùng chung cho cả Donate và Rút tiền)
     def _send_transaction(self, function_call, value_wei=0, max_retries=3, gas_limit=2000000, wait_for_receipt=False):
         chain_id = self.w3.eth.chain_id
-        contract_address = self.contract.address
+        contract_address = function_call.address
         fn_name = getattr(function_call, 'fn_name', 'unknown')
 
         print(
