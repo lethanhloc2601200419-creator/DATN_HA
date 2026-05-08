@@ -1480,8 +1480,8 @@ def quanly_giaingan(request):
             'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
         }
 
-        # Generate PayOS QR for ready_to_payout proposals
-        if p.v3_status == 'ready_to_payout':
+        # Generate PayOS QR only after successful relay (Phase 3a done)
+        if p.v3_status == 'ready_to_payout' and p.multisig_confirmed_tx_hash:
             org = p.campaign.organization
             if org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
                 try:
