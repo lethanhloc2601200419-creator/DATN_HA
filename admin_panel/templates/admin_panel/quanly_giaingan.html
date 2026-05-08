@@ -4,58 +4,77 @@
 
 {% block content %}
 <div class="container-fluid px-4">
-    <h2 class="page-title">Quản lý Giải ngân</h2>
+    <h2 class="page-title">Quản lý Giải ngân (V3 — EIP-712 Multisig + PayOS)</h2>
 
+    {# ============================================================ #}
+    {# V3 STATS DASHBOARD — 4 state chính theo v3_status.             #}
+    {# ============================================================ #}
     <div class="row g-3 mt-2 mb-4">
         <div class="col-md-3">
             <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="metric-value text-warning">{{ stats.pending }}</div>
-                    <div class="metric-label">Chờ duyệt</div>
+                    <div class="metric-value text-warning">{{ stats.pending_multisig }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-signature me-1"></i> Chờ ký duyệt
+                    </div>
+                    <div class="small text-muted mt-1">Pending_Multisig</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="metric-value text-primary">{{ stats.voting }}</div>
-                    <div class="metric-label">Đang bỏ phiếu</div>
+                    <div class="metric-value text-primary">{{ stats.ready_to_payout }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-paper-plane me-1"></i> Sẵn sàng giải ngân
+                    </div>
+                    <div class="small text-muted mt-1">Ready_to_Payout</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="metric-value text-success">{{ stats.executed }}</div>
-                    <div class="metric-label">Đã giải ngân</div>
+                    <div class="metric-value text-info">{{ stats.fiat_transferred }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-university me-1"></i> Đang xử lý Bank
+                    </div>
+                    <div class="small text-muted mt-1">Fiat_Transferred</div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card admin-stat-card">
                 <div class="card-body text-center">
-                    <div class="metric-value text-info">{{ stats.approved }}</div>
-                    <div class="metric-label">Đã thông qua</div>
+                    <div class="metric-value text-success">{{ stats.completed_audited }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-check-circle me-1"></i> Đã hoàn tất
+                    </div>
+                    <div class="small text-muted mt-1">Completed_&_Audited</div>
                 </div>
             </div>
         </div>
+        {% if stats.payout_failed %}
         <div class="col-md-3">
-            <div class="card admin-stat-card">
+            <div class="card admin-stat-card border-danger">
                 <div class="card-body text-center">
-                    <div class="metric-value text-danger">{{ stats.rejected }}</div>
-                    <div class="metric-label">Bị từ chối</div>
+                    <div class="metric-value text-danger">{{ stats.payout_failed }}</div>
+                    <div class="metric-label">
+                        <i class="fas fa-exclamation-triangle me-1"></i> Payout Failed
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        {% endif %}
+        <div class="col-md-6">
             <div class="card admin-stat-card">
-                <div class="card-body text-center">
-                    <div class="metric-value text-danger">{{ stats.total_disbursed|intcomma }}đ</div>
-                    <div class="metric-label">Tổng đã giải ngân</div>
+                <div class="card-body text-start">
+                    <div class="metric-value text-success">{{ stats.total_disbursed|intcomma }}đ</div>
+                    <div class="metric-label">Đã giải ngân & audit</div>
                 </div>
             </div>
         </div>
-        <div class="col-md-12">
+        <div class="col-md-6">
             <div class="card admin-stat-card">
                 <div class="card-body text-start">
                     <div class="metric-value text-primary">{{ stats.total_requested|intcomma }}đ</div>
@@ -65,7 +84,9 @@
         </div>
     </div>
 
-    <!-- Filter + Actions -->
+    {# ============================================================ #}
+    {# FILTER + ACTIONS                                               #}
+    {# ============================================================ #}
     <div class="card admin-toolbar">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-center">
@@ -74,12 +95,12 @@
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">Tất cả trạng thái</option>
-                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ duyệt</option>
-                        <option value="voting" {% if selected_status == 'voting' %}selected{% endif %}>Đang bỏ phiếu</option>
-                        <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Đã thông qua</option>
-                        <option value="executed" {% if selected_status == 'executed' %}selected{% endif %}>Đã giải ngân</option>
-                        <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Từ chối</option>
+                        <option value="">Tất cả V3 status</option>
+                        <option value="pending_multisig" {% if selected_status == 'pending_multisig' %}selected{% endif %}>Chờ ký duyệt</option>
+                        <option value="ready_to_payout" {% if selected_status == 'ready_to_payout' %}selected{% endif %}>Sẵn sàng giải ngân</option>
+                        <option value="fiat_transferred" {% if selected_status == 'fiat_transferred' %}selected{% endif %}>Đang xử lý Bank</option>
+                        <option value="completed_audited" {% if selected_status == 'completed_audited' %}selected{% endif %}>Đã hoàn tất</option>
+                        <option value="payout_failed" {% if selected_status == 'payout_failed' %}selected{% endif %}>Payout thất bại</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -109,103 +130,13 @@
         </div>
     </div>
 
-    <!-- Gas Recovery Section (Admin Only) -->
-    {% if role == 'admin' and campaigns_available %}
-    <div class="card admin-shell-card mb-4 border-warning">
-        <div class="card-header bg-warning text-dark">
-            <i class="fas fa-gas-pump me-1"></i> Thu hồi phí Gas cho Admin
-        </div>
-        <div class="card-body">
-            <p class="text-muted small mb-3">
-                Admin chỉ có thể thu hồi phí gas <strong>MỘT LẦN DUY NHẤT</strong> cho mỗi chiến dịch, khi:
-                <br>① Chiến dịch đã <strong>hết hạn</strong> (quá <code>end_date</code>)
-                <br>② Số tiền trong chiến dịch đã được <strong>giải ngân hết</strong> (on-chain available ≈ 0đ)
-            </p>
-            <div class="text-muted small mb-3">
-                <strong>Giải thích:</strong> Gas tạm ứng là chi phí admin đã trả thay khi ghi donate/giải ngân.
-                Vì chỉ thu hồi 1 lần nên phí dự trù thu hồi chỉ được reserve ở <em>lần tạo giải ngân đầu tiên</em>.
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm admin-table">
-                    <thead>
-                        <tr>
-                            <th>Chiến dịch</th>
-                            <th class="text-end">Tổng phí gas đã tạm ứng</th>
-                            <th class="text-end">Số dư chiến dịch</th>
-                            <th class="text-center" width="15%">Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for c in campaigns_available %}
-                        <tr>
-                            <td><strong>{{ c.obj.title|truncatechars:40 }}</strong></td>
-                            <td class="text-end text-danger fw-bold">
-                                {{ c.total_gas_vnd|intcomma }}đ
-                                <div class="small text-muted mt-1">
-                                    ① Gas on-chain (v2 totalGasCost: A+B+C): {{ c.gas_onchain_total_cost_vnd|intcomma }}đ
-                                </div>
-                                {% if c.gas_bank_record_vnd or c.gas_donate_onbehalf_vnd %}
-                                <div class="small text-muted">
-                                    Breakdown v2: ghi sao kê NH {{ c.gas_bank_record_vnd|intcomma }}đ · nạp ETH thay user {{ c.gas_donate_onbehalf_vnd|intcomma }}đ
-                                </div>
-                                {% endif %}
-                                {% if c.gas_admin_sendeth_vnd or c.gas_disbursement_actual_vnd %}
-                                <div class="small text-muted">
-                                    Legacy: cấp ETH cũ {{ c.gas_admin_sendeth_vnd|intcomma }}đ · giải ngân thực {{ c.gas_disbursement_actual_vnd|intcomma }}đ
-                                </div>
-                                {% endif %}
-                                <div class="small text-muted">
-                                    Dự trù giải ngân (1 tx): {{ c.est_disbursement_gas_vnd|intcomma }}đ
-                                </div>
-                                {% if c.gas_recovered_vnd %}
-                                <div class="small text-success">Đã thu hồi: {{ c.gas_recovered_vnd|intcomma }}đ</div>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                {{ c.onchain_total_fund_vnd|intcomma }}đ
-                                <div class="small text-muted">On-chain</div>
-                            </td>
-                            <td class="text-center">
-                                {% if c.can_recover_gas and c.total_gas_vnd > 0 %}
-                                <form action="{% url 'admin_panel:thu_hoi_gas' %}" method="POST" style="display:inline;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="campaign_id" value="{{ c.obj.id }}">
-                                    <button type="submit" class="btn btn-sm btn-warning"
-                                        onclick="return confirm('Thu hồi phí gas cho chiến dịch {{ c.obj.title|truncatechars:20 }}? Thao tác này chỉ có thể thực hiện 1 lần duy nhất!')">
-                                        <i class="fas fa-undo"></i> Thu hồi gas
-                                    </button>
-                                </form>
-                                {% elif c.total_gas_vnd > 0 %}
-                                    {% if not c.is_ended %}
-                                    <span class="badge bg-secondary" title="Chiến dịch chưa hết hạn">
-                                        <i class="fas fa-clock"></i> Chưa hết hạn
-                                    </span>
-                                    <div class="small text-muted mt-1">Hạn: {{ c.obj.end_date|date:"d/m/Y"|default:"chưa đặt" }}</div>
-                                    {% elif not c.fully_disbursed %}
-                                    <span class="badge bg-info text-dark" title="Chưa giải ngân hết">
-                                        <i class="fas fa-coins"></i> Còn quỹ khả dụng
-                                    </span>
-                                    <div class="small text-muted mt-1">Còn: {{ c.onchain_available_vnd|intcomma }}đ</div>
-                                    {% else %}
-                                    <span class="text-muted small">—</span>
-                                    {% endif %}
-                                {% else %}
-                                <span class="text-muted small">Không có gas</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Proposals Table -->
+    {# ============================================================ #}
+    {# PROPOSALS TABLE — V3 actions column                            #}
+    {# ============================================================ #}
     <div class="card admin-shell-card">
         <div class="card-header">
             <i class="fas fa-money-check-alt me-1"></i> Danh sách đề xuất giải ngân
+            <span class="badge bg-info ms-2">V3 EIP-712 Multisig</span>
         </div>
         <div class="card-body p-0">
             <form method="post">
@@ -216,21 +147,18 @@
                     <div class="col-md-4">
                         <select name="bulk_action" class="form-select">
                             <option value="">-- Bulk action --</option>
-                            {% if role == 'admin' %}
-                            <option value="approve">Duyệt nhiều dòng</option>
-                            {% endif %}
                             <option value="reject">Từ chối nhiều dòng</option>
                             <option value="delete">Xóa nhiều dòng</option>
                         </select>
                     </div>
-                    {% if role == 'admin' %}
-                    <div class="col-md-2">
-                        <input type="number" class="form-control" name="bulk_voting_days" min="1" max="30" value="7" title="Số ngày bỏ phiếu cho bulk duyệt">
-                    </div>
-                    {% endif %}
                     <div class="col-md-3">
                         <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các đề xuất đã chọn?')">Áp dụng</button>
                     </div>
+                    {% if role == 'admin' %}
+                    <div class="col-md-5 text-end small text-muted">
+                        <i class="fas fa-info-circle"></i> Admin acts as <strong>relayer</strong> — gas được Admin trả tự động khi submit multisig & burn.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             <div class="table-responsive">
@@ -239,12 +167,11 @@
                     <tr>
                         <th width="4%"><input type="checkbox" id="select-all-proposals"></th>
                         <th width="5%">ID</th>
-                        <th width="20%">Chiến dịch</th>
+                        <th width="22%">Chiến dịch</th>
                         <th width="15%">Tiêu đề</th>
                         <th width="12%">Số tiền</th>
-                        <th width="12%">Trạng thái</th>
-                        <th width="16%">Bỏ phiếu</th>
-                        <th width="20%">Hành động</th>
+                        <th width="14%">V3 Status</th>
+                        <th width="28%">Hành động</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -265,99 +192,163 @@
                             {% endif %}
                         </td>
                         <td class="fw-bold text-danger">{{ item.obj.amount_requested|intcomma }}đ</td>
-                        <td class="text-center">
-                            {% if item.obj.status == 'pending' %}
-                                <span class="badge bg-warning text-dark">Chờ duyệt</span>
-                                {% if item.obj.approval_count %}
-                                <br><small class="text-muted">{{ item.obj.approval_count }}/2 chữ ký on-chain</small>
-                                {% endif %}
-                            {% elif item.obj.status == 'voting' %}
-                                <span class="badge bg-primary">Đang bỏ phiếu</span>
-                                {% if item.obj.end_date %}
-                                <br><small class="text-muted">Hạn: {{ item.obj.end_date|date:"d/m H:i" }}</small>
-                                {% endif %}
-                            {% elif item.obj.status == 'approved' %}
-                                <span class="badge bg-info">Đã thông qua</span>
-                                <br><small class="text-muted">{{ item.obj.approval_count }}/2 chữ ký on-chain</small>
-                            {% elif item.obj.status == 'executed' %}
-                                <span class="badge bg-success">Đã giải ngân</span>
-                                {% if item.obj.executed_at %}
-                                <br><small class="text-muted">{{ item.obj.executed_at|date:"d/m/Y" }}</small>
-                                {% endif %}
-                            {% elif item.obj.status == 'rejected' %}
-                                <span class="badge bg-danger">Từ chối</span>
-                            {% endif %}
-                        </td>
+
+                        {# =============================================================== #}
+                        {# V3 STATUS COLUMN — hiển thị state theo v3_status + signature progress. #}
+                        {# =============================================================== #}
                         <td>
-                            {% if item.obj.status == 'voting' %}
-                            <div class="small mb-1">
-                                <span class="text-success">Đồng ý: {{ item.yes_pct|floatformat:0 }}%</span>
-                                <span class="text-muted">({{ item.votes_count }} phiếu)</span>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-success" style="width: {{ item.yes_pct }}%"></div>
-                                <div class="progress-bar bg-danger" style="width: {{ item.no_pct }}%"></div>
-                            </div>
-                            {% elif item.obj.status == 'executed' %}
-                            <span class="text-success small"><i class="fas fa-check-circle"></i> {{ item.yes_pct|floatformat:0 }}% đồng ý ({{ item.votes_count }} phiếu)</span>
-                            {% elif item.obj.status == 'rejected' and item.votes_count > 0 %}
-                            <span class="text-danger small"><i class="fas fa-times-circle"></i> {{ item.yes_pct|floatformat:0 }}% đồng ý ({{ item.votes_count }} phiếu)</span>
+                            {% if item.obj.v3_status == 'v3_not_started' or item.obj.v3_status == 'pending_multisig' %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-signature"></i> Chờ ký duyệt
+                                </span>
+                                <div class="mt-2 small">
+                                    <strong>{{ item.sig_count }}/3</strong> chữ ký EIP-712
+                                </div>
+                                <div class="progress mt-1" style="height: 6px;">
+                                    {% widthratio item.sig_count 3 100 as sig_pct %}
+                                    <div class="progress-bar bg-warning" style="width: {{ sig_pct }}%"></div>
+                                </div>
+                                <div class="mt-1 small">
+                                    {% if item.has_org_sig %}<span class="badge bg-success">Org ✓</span>{% else %}<span class="badge bg-light text-dark border">Org</span>{% endif %}
+                                    {% if item.has_supervisor_sig %}<span class="badge bg-success">Sup ✓</span>{% else %}<span class="badge bg-light text-dark border">Sup</span>{% endif %}
+                                    {% if item.has_admin_sig %}<span class="badge bg-success">Adm ✓</span>{% else %}<span class="badge bg-light text-dark border">Adm</span>{% endif %}
+                                </div>
+                            {% elif item.obj.v3_status == 'ready_to_payout' %}
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-paper-plane"></i> Sẵn sàng giải ngân
+                                </span>
+                                {% if item.obj.multisig_confirmed_at %}
+                                <div class="small text-muted mt-1">Multisig confirmed: {{ item.obj.multisig_confirmed_at|date:"d/m H:i" }}</div>
+                                {% endif %}
+                            {% elif item.obj.v3_status == 'payout_processing' %}
+                                <span class="badge bg-info text-dark">
+                                    <i class="fas fa-spinner fa-spin"></i> PayOS processing
+                                </span>
+                                {% if item.obj.payos_payout_id %}
+                                <div class="small text-muted mt-1 text-break">ID: <code>{{ item.obj.payos_payout_id|truncatechars:24 }}</code></div>
+                                {% endif %}
+                            {% elif item.obj.v3_status == 'fiat_transferred' %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-university"></i> Fiat đã chuyển
+                                </span>
+                                <div class="small text-muted mt-1">
+                                    <i class="fas fa-clock"></i> Chờ burn on-chain…
+                                </div>
+                            {% elif item.obj.v3_status == 'completed_audited' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check-double"></i> Đã hoàn tất
+                                </span>
+                                {% if item.obj.burn_completed_at %}
+                                <div class="small text-muted mt-1">Burn: {{ item.obj.burn_completed_at|date:"d/m H:i" }}</div>
+                                {% endif %}
+                            {% elif item.obj.v3_status == 'payout_failed' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times-circle"></i> Payout failed
+                                </span>
+                                {% if item.obj.payout_error %}
+                                <div class="small text-danger mt-1">{{ item.obj.payout_error|truncatechars:60 }}</div>
+                                {% endif %}
                             {% else %}
-                            <span class="text-muted small">—</span>
+                                <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span>
                             {% endif %}
                         </td>
+
+                        {# =============================================================== #}
+                        {# ACTIONS COLUMN — dynamic theo v3_status                         #}
+                        {# =============================================================== #}
                         <td>
-                            <div class="admin-actions">
+                            <div class="admin-actions flex-wrap">
+
+                            {# ---- Detail button luôn hiện ---- #}
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
+                                <i class="fas fa-eye"></i> Chi tiết
+                            </button>
+
+                            {# ---- IPFS evidence ---- #}
                             {% if item.obj.evidence_url %}
                             <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Mở hóa đơn IPFS">
-                                <i class="fas fa-file-invoice"></i>
+                                <i class="fas fa-file-invoice"></i> IPFS
                             </a>
                             {% endif %}
 
-                            {% if item.can_approve %}
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-primary js-disbursement-approve"
-                                data-proposal-id="{{ item.obj.id }}"
-                                data-campaign-id="{{ item.obj.campaign_id }}"
-                                data-title="{{ item.obj.title }}"
-                                data-role="{{ approver_context.approver_role }}"
-                                {% if item.already_approved %}disabled title="Bạn đã đồng bộ chữ ký cho đề xuất này"{% endif %}
-                            >
-                                <i class="fas fa-signature"></i>
-                                {% if item.already_approved %}Đã ký{% else %}Phê duyệt{% endif %}
+                            {# ---- PENDING_MULTISIG: Ký EIP-712 ---- #}
+                            {% if item.can_sign %}
+                            <button type="button" class="btn btn-sm btn-primary"
+                                    onclick="window.V3Disbursement.signAs({{ item.obj.id }}, '{{ item.can_sign_as }}')">
+                                <i class="fas fa-signature"></i> Ký duyệt ({{ item.can_sign_as|title }})
+                            </button>
+                            {% elif item.already_signed %}
+                            <button type="button" class="btn btn-sm btn-success" disabled title="Bạn đã ký rồi">
+                                <i class="fas fa-check"></i> Đã ký ({{ item.can_sign_as|title }})
                             </button>
                             {% endif %}
 
-                            {% if role == 'admin' and item.obj.status == 'pending' %}
-                            <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-danger"
+                            {# ---- Admin: Relay multisig khi đủ 3 sig ---- #}
+                            {% if item.can_relay_multisig %}
+                            <button type="button" class="btn btn-sm btn-warning"
+                                    onclick="window.V3Disbursement.relayMultisig({{ item.obj.id }})"
+                                    title="Submit 3 sigs lên smart3 (Admin trả gas)">
+                                <i class="fas fa-upload"></i> Relay lên chain
+                            </button>
+                            {% endif %}
+
+                            {# ---- READY_TO_PAYOUT: Admin Execute PayOS ---- #}
+                            {% if item.can_trigger_payout %}
+                            <button type="button" class="btn btn-sm btn-success fw-bold"
+                                    onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
+                                    style="box-shadow: 0 2px 8px rgba(40,167,69,0.4);">
+                                <i class="fas fa-paper-plane"></i> Thực thi PayOS
+                            </button>
+                            {% endif %}
+
+                            {# ---- FIAT_TRANSFERRED: chờ webhook (disabled) ---- #}
+                            {% if item.obj.v3_status == 'fiat_transferred' %}
+                            <button type="button" class="btn btn-sm btn-info" disabled>
+                                <i class="fas fa-spinner fa-spin"></i> Đang chờ Bank Webhook…
+                            </button>
+                            {% endif %}
+
+                            {# ---- PAYOUT_PROCESSING (DEV-ONLY): Simulate webhook ---- #}
+                            {# Gate bằng `debug` để không lộ nút này ra production UI. #}
+                            {% if debug and role == 'admin' and item.obj.v3_status == 'payout_processing' %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="window.V3Disbursement.simulateWebhook({{ item.obj.id }})"
+                                    title="[DEV] giả PayOS webhook success">
+                                <i class="fas fa-flask"></i> Simulate Webhook
+                            </button>
+                            {% endif %}
+
+                            {# ---- COMPLETED_AUDITED: 2 proof badges ---- #}
+                            {% if item.obj.v3_status == 'completed_audited' %}
+                                {% if item.obj.bank_tx_id %}
+                                <span class="badge bg-primary" title="Bank Transaction ID từ PayOS">
+                                    <i class="fas fa-university"></i> Bank: {{ item.obj.bank_tx_id|truncatechars:16 }}
+                                </span>
+                                {% endif %}
+                                {% if item.obj.burn_tx_hash %}
+                                <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-danger" title="Xem burn tx trên Etherscan">
+                                    <i class="fas fa-fire"></i> Burn Tx
+                                </a>
+                                {% endif %}
+                            {% endif %}
+
+                            {# ---- Admin có thể reject ở pre-payout phases ---- #}
+                            {# Dùng boolean `can_reject` đã compute ở view, tránh fragile string containment. #}
+                            {% if item.can_reject %}
+                            <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-outline-danger"
                                onclick="return confirm('Từ chối yêu cầu này?')">
                                 <i class="fas fa-times"></i> Từ chối
                             </a>
                             {% endif %}
 
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
-                                <i class="fas fa-eye"></i> Chi tiết
-                            </button>
-
-                            {% if item.obj.disbursement_eth_tx_hash %}
-                            <a href="https://sepolia.etherscan.io/tx/{{ item.obj.disbursement_eth_tx_hash }}" target="_blank"
-                               class="btn btn-sm btn-outline-primary" title="Xem trên Blockchain">
-                                <i class="fas fa-link"></i>
-                            </a>
-                            {% endif %}
-
-                            {% if role == 'admin' and item.obj.status == 'approved' %}
-                            <a href="{% url 'admin_panel:sync_disbursement_onchain' item.obj.id %}" class="btn btn-sm btn-outline-warning"
-                               onclick="return confirm('Đồng bộ trạng thái DisbursedAndBurned từ Sepolia cho đề xuất này?')">
-                                <i class="fas fa-sync-alt"></i> Đồng bộ Blockchain
-                            </a>
-                            {% endif %}
                             </div>
                         </td>
                     </tr>
 
-                    <!-- Detail Modal -->
+                    {# =============================================================== #}
+                    {# DETAIL MODAL — gồm V3 audit trail                                #}
+                    {# =============================================================== #}
                     <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
@@ -376,25 +367,112 @@
                                             {% if item.obj.ipfs_cid %}
                                             <p><strong>IPFS CID:</strong> <code>{{ item.obj.ipfs_cid }}</code></p>
                                             {% endif %}
-                                            <p><strong>Chữ ký Supervisor:</strong> {% if item.obj.supervisor_approval_tx_hash %}<span class="text-success">Đã có</span>{% else %}<span class="text-muted">Chưa có</span>{% endif %}</p>
-                                            <p><strong>Chữ ký Admin:</strong> {% if item.obj.admin_approval_tx_hash %}<span class="text-success">Đã có</span>{% else %}<span class="text-muted">Chưa có</span>{% endif %}</p>
                                         </div>
                                         <div class="col-md-6">
                                             <p><strong>Người tạo:</strong> {{ item.obj.created_by.get_full_name|default:item.obj.created_by.username }}</p>
                                             <p><strong>Ngày tạo:</strong> {{ item.obj.created_at|date:"d/m/Y H:i" }}</p>
-                                            {% if item.obj.approved_by %}
-                                            <p><strong>Người duyệt:</strong> {{ item.obj.approved_by.get_full_name|default:item.obj.approved_by.username }}</p>
-                                            <p><strong>Ngày duyệt:</strong> {{ item.obj.approved_at|date:"d/m/Y H:i" }}</p>
-                                            {% endif %}
-                                            {% if item.obj.end_date %}
-                                            <p><strong>Hạn bỏ phiếu:</strong> {{ item.obj.end_date|date:"d/m/Y H:i" }}</p>
-                                            {% endif %}
+                                            <p><strong>V3 Status:</strong> <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span></p>
                                             {% if item.obj.evidence_url %}
                                             <p><strong>Hóa đơn / minh chứng:</strong> <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener">Mở tài liệu</a></p>
                                             {% endif %}
-                                            <p><strong>Approval on-chain:</strong> {{ item.obj.approval_count }}/2</p>
                                         </div>
                                     </div>
+                                    <hr>
+
+                                    {# ---- V3 AUDIT TRAIL ---- #}
+                                    <h6 class="fw-bold mt-3"><i class="fas fa-list-check"></i> V3 Audit Trail</h6>
+                                    <div class="list-group mb-3">
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Phase 1 — Proposal + IPFS</strong>
+                                                    <div class="small text-muted">CID: <code>{{ item.obj.ipfs_cid|default:"—" }}</code></div>
+                                                </div>
+                                                <span class="badge bg-success">Done</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Phase 2 — 3 chữ ký EIP-712</strong>
+                                                    <div class="small text-muted">
+                                                        Organization {% if item.has_org_sig %}✅{% else %}⏳{% endif %} ·
+                                                        Supervisor {% if item.has_supervisor_sig %}✅{% else %}⏳{% endif %} ·
+                                                        Admin {% if item.has_admin_sig %}✅{% else %}⏳{% endif %}
+                                                    </div>
+                                                </div>
+                                                <span class="badge {% if item.sig_count == 3 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                                    {{ item.sig_count }}/3
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Phase 3a — Relay Multisig on-chain</strong>
+                                                    {% if item.obj.multisig_confirmed_tx_hash %}
+                                                    <div class="small">
+                                                        <a href="https://sepolia.etherscan.io/tx/{{ item.obj.multisig_confirmed_tx_hash|urlencode }}" target="_blank">
+                                                            {{ item.obj.multisig_confirmed_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
+                                                        </a>
+                                                    </div>
+                                                    {% else %}
+                                                    <div class="small text-muted">Chưa relay.</div>
+                                                    {% endif %}
+                                                </div>
+                                                <span class="badge {% if item.obj.multisig_confirmed_tx_hash %}bg-success{% else %}bg-light text-dark{% endif %}">
+                                                    {% if item.obj.multisig_confirmed_tx_hash %}Done{% else %}Waiting{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Phase 3b — PayOS Payout</strong>
+                                                    {% if item.obj.payos_payout_id %}
+                                                    <div class="small text-muted">payout_id: <code>{{ item.obj.payos_payout_id }}</code></div>
+                                                    {% endif %}
+                                                    {% if item.obj.bank_tx_id %}
+                                                    <div class="small">Bank Tx: <code>{{ item.obj.bank_tx_id }}</code></div>
+                                                    {% endif %}
+                                                </div>
+                                                <span class="badge {% if item.obj.bank_tx_id %}bg-success{% elif item.obj.payos_payout_id %}bg-info text-dark{% else %}bg-light text-dark{% endif %}">
+                                                    {% if item.obj.bank_tx_id %}Done{% elif item.obj.payos_payout_id %}Processing{% else %}Waiting{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>Phase 4 — Burn VNDT on-chain</strong>
+                                                    {% if item.obj.burn_tx_hash %}
+                                                    <div class="small">
+                                                        <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank">
+                                                            {{ item.obj.burn_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
+                                                        </a>
+                                                    </div>
+                                                    {% else %}
+                                                    <div class="small text-muted">Chưa burn.</div>
+                                                    {% endif %}
+                                                </div>
+                                                <span class="badge {% if item.obj.burn_tx_hash %}bg-success{% else %}bg-light text-dark{% endif %}">
+                                                    {% if item.obj.burn_tx_hash %}Burned 🔥{% else %}Waiting{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {% if item.obj.payout_error %}
+                                    <div class="alert alert-danger small">
+                                        <strong><i class="fas fa-exclamation-triangle"></i> Lỗi gần nhất:</strong><br>
+                                        {{ item.obj.payout_error }}
+                                    </div>
+                                    {% endif %}
+
                                     <hr>
                                     <p><strong>Mô tả chi tiết:</strong></p>
                                     <p>{{ item.obj.description|linebreaks }}</p>
@@ -415,7 +493,7 @@
 
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="admin-empty">Chưa có đề xuất giải ngân nào.</td>
+                        <td colspan="7" class="admin-empty">Chưa có đề xuất giải ngân nào.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -427,7 +505,9 @@
 </div>
 
 {% if role != 'supervisor' %}
-<!-- Create Modal -->
+{# ============================================================ #}
+{# CREATE MODAL — giữ nguyên flow upload IPFS + propose gasless. #}
+{# ============================================================ #}
 <div class="modal fade" id="createModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -458,55 +538,24 @@
                                            required>
                                     <div class="d-flex justify-content-between align-items-start pe-4">
                                         <div class="fw-bold text-dark">{{ c.obj.title }}</div>
-                                        {% if c.is_first_disbursement %}
-                                        <span class="badge bg-warning text-dark ms-2" style="margin-right: 24px;">LẦN ĐẦU</span>
-                                        {% else %}
-                                        <span class="badge bg-info text-dark ms-2" style="margin-right: 24px;">LẦN 2+</span>
-                                        {% endif %}
                                     </div>
                                     <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success">
                                         <div class="small text-muted">Số tiền tối đa có thể giải ngân</div>
                                         <div class="fw-bold text-success fs-5">{{ c.net_available|intcomma }}đ</div>
                                     </div>
                                     <div class="row g-2 mt-1 small">
-                                        <div class="col-6 col-md-3">
+                                        <div class="col-6 col-md-4">
                                             <div class="text-muted">Tổng quỹ</div>
                                             <div class="fw-bold text-primary">{{ c.onchain_total_fund_vnd|intcomma }}đ</div>
                                         </div>
-                                        <div class="col-6 col-md-3">
+                                        <div class="col-6 col-md-4">
                                             <div class="text-muted">On-chain avail</div>
                                             <div class="fw-bold">{{ c.onchain_available_vnd|intcomma }}đ</div>
                                         </div>
-                                        <div class="col-6 col-md-3">
-                                            <div class="text-muted">Gas đã chi</div>
-                                            <div class="text-danger">−{{ c.gas_onchain_total_cost_vnd|intcomma }}đ</div>
-                                        </div>
-                                        <div class="col-6 col-md-3">
+                                        <div class="col-6 col-md-4">
                                             <div class="text-muted">Đang khóa</div>
                                             <div class="text-warning">−{{ c.obj.locked_amount|intcomma }}đ</div>
                                         </div>
-                                    </div>
-                                    <div class="mt-2 p-2 rounded border border-warning small">
-                                        <div class="text-muted fw-bold mb-1">
-                                            <i class="fas fa-gas-pump text-warning"></i>
-                                            Phí gas dự trù = −{{ c.reserve_gas_vnd|intcomma }}đ
-                                        </div>
-                                        {% if c.is_first_disbursement %}
-                                        <div class="ps-3">
-                                            • Giải ngân (1 tx): <strong>{{ c.est_disbursement_gas_vnd|intcomma }}đ</strong><br>
-                                            • Thu hồi gas cuối chiến dịch: <strong>{{ c.est_recovery_gas_vnd|intcomma }}đ</strong>
-                                            <div class="text-muted" style="font-size: 0.8em;">
-                                                <em>(Thu hồi chỉ reserve 1 lần ở lần đầu này)</em>
-                                            </div>
-                                        </div>
-                                        {% else %}
-                                        <div class="ps-3">
-                                            • Chỉ giải ngân (1 tx): <strong>{{ c.est_disbursement_gas_vnd|intcomma }}đ</strong>
-                                            <div class="text-muted" style="font-size: 0.8em;">
-                                                <em>(Gas thu hồi đã reserve từ lần tạo giải ngân đầu tiên)</em>
-                                            </div>
-                                        </div>
-                                        {% endif %}
                                     </div>
                                 </label>
                                 {% empty %}
@@ -520,11 +569,6 @@
                                 .campaign-card:hover { background: var(--primary-100) !important; border-color: var(--primary-500) !important; }
                                 .campaign-card.selected { background: var(--primary-100) !important; border-color: var(--primary-700) !important; box-shadow: 0 0 0 2px var(--primary-500); }
                             </style>
-                            <div class="small text-muted mt-2">
-                                <strong>Công thức Khả dụng:</strong>
-                                <br>• <strong>Lần đầu</strong> = onchain_available − gas giải ngân − gas thu hồi − đang khóa (dự trù <strong>2 phí</strong>)
-                                <br>• <strong>Lần 2+</strong> = onchain_available − gas giải ngân − đang khóa (chỉ <strong>1 phí</strong>)
-                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="fw-bold">Số tiền giải ngân (VNĐ) *</label>
@@ -557,7 +601,7 @@
                         <div class="col-12 mb-3">
                             <label class="fw-bold">Hóa đơn / chứng từ để ghi IPFS *</label>
                             <input type="file" name="invoice_file" class="form-control" accept=".pdf,image/*" required>
-                            <div class="small text-muted mt-1">File này sẽ được upload lên Pinata trước, sau đó CID được đưa vào giao dịch `proposeDisbursement` gasless.</div>
+                            <div class="small text-muted mt-1">File này sẽ được upload lên Pinata trước, sau đó CID được đưa vào giao dịch <code>proposeDisbursement</code> gasless.</div>
                         </div>
                     </div>
                 </div>
@@ -573,7 +617,6 @@
 </div>
 {% endif %}
 
-<!-- JS: highlight card khi chọn + update max amount -->
 <script>
 (function() {
     const modal = document.getElementById('createModal');
@@ -586,13 +629,10 @@
     const radios = modal.querySelectorAll('.campaign-radio');
     radios.forEach(function(r) {
         r.addEventListener('change', function() {
-            // Bỏ highlight tất cả card, highlight card được chọn
             modal.querySelectorAll('.campaign-card').forEach(function(card) {
                 card.classList.remove('selected');
             });
             r.closest('.campaign-card').classList.add('selected');
-
-            // Update max amount hint + attribute
             const netAvail = r.dataset.netAvailable || '0';
             if (amountMax) amountMax.textContent = netAvail;
             if (amountHint) amountHint.style.display = 'block';
@@ -602,7 +642,6 @@
         });
     });
 
-    // Reset state khi đóng modal
     modal.addEventListener('hidden.bs.modal', function() {
         radios.forEach(function(r) { r.checked = false; });
         modal.querySelectorAll('.campaign-card').forEach(function(card) {
@@ -622,12 +661,8 @@
         }
         const statusBox = document.getElementById('disbursementStatusBox');
         const statusText = document.getElementById('disbursementStatusText');
-        if (statusBox) {
-            statusBox.className = 'alert alert-info d-none';
-        }
-        if (statusText) {
-            statusText.textContent = '';
-        }
+        if (statusBox) { statusBox.className = 'alert alert-info d-none'; }
+        if (statusText) { statusText.textContent = ''; }
     });
 })();
 
@@ -637,6 +672,10 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
     });
 });
 </script>
+
+{# ============================================================ #}
+{# V3 config + JS — EIP-712 signing, multisig relay, PayOS payout. #}
+{# ============================================================ #}
 {{ disbursement_web3_config|json_script:"disbursement-proposal-config" }}
 <script>
 (() => {
@@ -644,7 +683,6 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
     if (!node) return;
     const payload = JSON.parse(node.textContent);
     payload.ipfsUploadUrl = "{% url 'admin_panel:ipfs_upload_view' %}";
-    payload.disbursementApprovalSyncUrl = "{% url 'admin_panel:sync_disbursement_approval' %}";
     payload.currentApproverRole = "{{ approver_context.approver_role|default:''|escapejs }}";
     payload.approverWallets = {
         admin: "{{ approver_context.admin_wallet|default:''|escapejs }}",
@@ -653,37 +691,8 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
     node.textContent = JSON.stringify(payload);
 })();
 </script>
+{# Giữ disbursement-proposal.js để modal Tạo yêu cầu (IPFS upload + gasless proposeDisbursement) hoạt động. #}
 <script type="module" src="{% static 'admin_panel/js/disbursement-proposal.js' %}"></script>
-<script type="module" src="{% static 'admin_panel/js/disbursement-approval.js' %}"></script>
-
-<!-- Approve Modal -->
-<div class="modal fade" id="approveModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form id="approve_form" method="POST">
-                {% csrf_token %}
-                <div class="modal-header admin-modal-header">
-                    <h5 class="modal-title"><i class="fas fa-gavel"></i> Duyệt & Mở bỏ phiếu</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <strong>Đề xuất:</strong> <span id="approve_title"></span><br>
-                        <strong>Số tiền:</strong> <span id="approve_amount" class="text-danger fw-bold"></span>
-                    </div>
-                    <p>Sau khi duyệt, hệ thống sẽ mở bỏ phiếu cho tất cả nhà hảo tâm đã ủng hộ chiến dịch. Số tiền sẽ được khóa tạm thời.</p>
-                    <div class="mb-3">
-                        <label class="fw-bold">Số ngày bỏ phiếu *</label>
-                        <input type="number" name="voting_days" class="form-control" value="7" min="1" max="30" required>
-                        <small class="text-muted">Từ 1 đến 30 ngày. Sau thời gian này hệ thống sẽ tự chốt kết quả.</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Duyệt & Mở bỏ phiếu</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+{# V3 EIP-712 signing — expose window.V3Disbursement.{signAs, relayMultisig, triggerPayout, simulateWebhook}. #}
+<script src="{% static 'admin_panel/js/v3-disbursement-sign.js' %}"></script>
 {% endblock %}

@@ -1262,20 +1262,20 @@ def quanly_giaingan(request):
         role = 'admin'
         proposals_qs = DisbursementProposal.objects.select_related(
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
-        ).all()
+        ).prefetch_related('offchain_signatures').all()
         campaigns = Campaign.objects.filter(status='active')
     elif approver_context['approver_role'] == 'supervisor':
         role = 'supervisor'
         proposals_qs = DisbursementProposal.objects.select_related(
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
-        ).all()
+        ).prefetch_related('offchain_signatures').all()
         campaigns = Campaign.objects.none()
     elif user.managed_organizations.exists():
         role = 'partner'
         my_org = user.managed_organizations.first()
         proposals_qs = DisbursementProposal.objects.select_related(
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
-        ).filter(campaign__organization=my_org)
+        ).prefetch_related('offchain_signatures').filter(campaign__organization=my_org)
         campaigns = Campaign.objects.filter(organization=my_org, status='active')
     else:
         return redirect('client:trangchu')
@@ -1417,7 +1417,15 @@ def quanly_giaingan(request):
             Q(campaign__organization__name__icontains=q)
         )
     if status_filter:
-        proposals_qs = proposals_qs.filter(status=status_filter)
+        # V3: filter theo v3_status. Gộp 2 state gần nghĩa để UI đỡ rối.
+        if status_filter == 'pending_multisig':
+            proposals_qs = proposals_qs.filter(
+                v3_status__in=('v3_not_started', 'pending_multisig'))
+        elif status_filter == 'fiat_transferred':
+            proposals_qs = proposals_qs.filter(
+                v3_status__in=('payout_processing', 'fiat_transferred'))
+        else:
+            proposals_qs = proposals_qs.filter(v3_status=status_filter)
 
     if request.method == 'POST' and request.POST.get('bulk_action'):
         action = request.POST.get('bulk_action')
@@ -1479,36 +1487,82 @@ def quanly_giaingan(request):
         )
         return _export_table_response('giai_ngan', headers, rows, export_format)
 
+    # ========================================================
+    # V3 Row metadata: signature progress + role-eligibility per proposal.
+    # Organization: chỉ được ký proposal thuộc campaign của org mình.
+    # Supervisor / Admin: ký được mọi proposal.
+    # ========================================================
+    current_wallet = (approver_context.get('current_wallet') or '').lower()
+    my_org_id = None
+    if not user.is_superuser:
+        _my_org = user.managed_organizations.first() if user.is_authenticated else None
+        my_org_id = _my_org.id if _my_org else None
+
     proposals_data = []
     for p in proposals_qs:
-        votes = ProposalVote.objects.filter(proposal=p)
-        yes_power = votes.filter(is_agree=True).aggregate(t=Sum('voting_power'))['t'] or Decimal('0')
-        no_power = votes.filter(is_agree=False).aggregate(t=Sum('voting_power'))['t'] or Decimal('0')
-        total_voted = yes_power + no_power
-        can_approve = role in ('admin', 'supervisor') and p.status in ('pending', 'approved') and bool(p.ipfs_cid)
-        already_approved = False
+        sigs_by_role = {s.role: s for s in p.offchain_signatures.all()}
+        sig_count = len(sigs_by_role)
+        sig_roles_have = sorted(sigs_by_role.keys())
+
+        # Determine the V3 role user can sign for on THIS proposal.
+        can_sign_as = None
         if role == 'admin':
-            already_approved = bool(p.admin_approval_tx_hash)
+            can_sign_as = 'admin'
         elif role == 'supervisor':
-            already_approved = bool(p.supervisor_approval_tx_hash)
+            can_sign_as = 'supervisor'
+        elif role == 'partner' and my_org_id and p.campaign.organization_id == my_org_id:
+            # Org manager of the campaign's org — sign as organization.
+            can_sign_as = 'organization'
+
+        already_signed = can_sign_as is not None and can_sign_as in sigs_by_role
+        # Only show sign button in pre-relay phases.
+        can_sign = (
+            can_sign_as is not None
+            and not already_signed
+            and p.v3_status in ('v3_not_started', 'pending_multisig')
+            and bool(p.ipfs_cid)
+        )
+        # Admin relay button visible only when 3 sigs collected and not yet relayed.
+        can_relay_multisig = (
+            role == 'admin'
+            and sig_count >= 3
+            and not p.multisig_confirmed_tx_hash
+            and p.v3_status in ('pending_multisig', 'ready_to_payout')
+        )
+        # Admin payout trigger when ready_to_payout.
+        can_trigger_payout = (
+            role == 'admin' and p.v3_status == 'ready_to_payout'
+            and bool(p.multisig_confirmed_tx_hash)
+        )
+
         proposals_data.append({
             'obj': p,
-            'yes_power': yes_power,
-            'no_power': no_power,
-            'yes_pct': float(yes_power / total_voted * 100) if total_voted > 0 else 0,
-            'no_pct': float(no_power / total_voted * 100) if total_voted > 0 else 0,
-            'votes_count': votes.count(),
-            'can_approve': can_approve,
-            'already_approved': already_approved,
+            'sig_count': sig_count,
+            'sig_roles_have': sig_roles_have,
+            'has_org_sig': 'organization' in sigs_by_role,
+            'has_supervisor_sig': 'supervisor' in sigs_by_role,
+            'has_admin_sig': 'admin' in sigs_by_role,
+            'can_sign': can_sign,
+            'can_sign_as': can_sign_as,
+            'already_signed': already_signed,
+            'can_relay_multisig': can_relay_multisig,
+            'can_trigger_payout': can_trigger_payout,
+            'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
         })
 
+    # V3 stats dashboard (count by v3_status, not legacy status).
     stats = {
-        'pending': proposals_qs.filter(status='pending').count(),
-        'voting': proposals_qs.filter(status='voting').count(),
-        'approved': proposals_qs.filter(status='approved').count(),
-        'executed': proposals_qs.filter(status='executed').count(),
-        'rejected': proposals_qs.filter(status='rejected').count(),
-        'total_disbursed': proposals_qs.filter(status='executed').aggregate(t=Sum('amount_requested'))['t'] or 0,
+        'pending_multisig': proposals_qs.filter(
+            v3_status__in=('v3_not_started', 'pending_multisig')
+        ).count(),
+        'ready_to_payout': proposals_qs.filter(v3_status='ready_to_payout').count(),
+        'fiat_transferred': proposals_qs.filter(
+            v3_status__in=('payout_processing', 'fiat_transferred')
+        ).count(),
+        'completed_audited': proposals_qs.filter(v3_status='completed_audited').count(),
+        'payout_failed': proposals_qs.filter(v3_status='payout_failed').count(),
+        'total_disbursed': proposals_qs.filter(v3_status='completed_audited').aggregate(
+            t=Sum('amount_requested'))['t'] or 0,
         'total_requested': proposals_qs.aggregate(t=Sum('amount_requested'))['t'] or 0,
     }
 
