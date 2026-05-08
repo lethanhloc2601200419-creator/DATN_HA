@@ -640,6 +640,46 @@ class DisbursementProposal(models.Model):
     disbursement_gas_fee_wei = models.DecimalField(max_digits=30, decimal_places=0, null=True, blank=True, verbose_name='Gas admin trả cho executeDisbursement')
     disbursement_gas_fee_vnd = models.DecimalField(max_digits=15, decimal_places=0, null=True, blank=True, verbose_name='Phí gas giải ngân (VNĐ)')
 
+    # =====================================================
+    # V3 — LUỒNG MỚI: EIP-712 MULTISIG + PAYOS PAYOUT + BURN WITH BANK TX
+    # =====================================================
+    # Layer-1 workflow (song song với luồng cũ trên smart2):
+    #   pending_multisig → ready_to_payout → fiat_transferred → completed_audited
+    # Mỗi step được đánh dấu bằng timestamp + tx_hash riêng để audit rõ ràng.
+    V3_STATUS_CHOICES = [
+        ('v3_not_started', 'Chưa dùng luồng V3'),
+        ('pending_multisig', 'Chờ đủ 3 chữ ký EIP-712'),
+        ('ready_to_payout', 'Đã đủ 3 chữ ký - chờ chuyển fiat'),
+        ('payout_processing', 'Đang xử lý PayOS payout'),
+        ('fiat_transferred', 'Fiat đã chuyển - chờ burn VNDT'),
+        ('completed_audited', 'Hoàn tất + đã burn on-chain'),
+        ('payout_failed', 'PayOS payout thất bại'),
+    ]
+    v3_status = models.CharField(
+        max_length=30, choices=V3_STATUS_CHOICES, default='v3_not_started',
+        verbose_name='Trạng thái luồng V3 (EIP-712 + PayOS)'
+    )
+    # Phase 3a: MultisigConfirmed on smart3
+    multisig_confirmed_at = models.DateTimeField(blank=True, null=True,
+                                                 verbose_name='Thời điểm đủ 3 sig')
+    multisig_confirmed_tx_hash = models.CharField(max_length=100, blank=True, null=True,
+                                                  verbose_name='TxHash recordMultisigApproval')
+    signature_deadline = models.BigIntegerField(blank=True, null=True,
+                                                verbose_name='Unix deadline cho các chữ ký EIP-712')
+    # Phase 3b + 4: PayOS payout + on-chain burn
+    payos_payout_id = models.CharField(max_length=255, blank=True, null=True,
+                                       verbose_name='PayOS Payout ID')
+    payos_payout_requested_at = models.DateTimeField(blank=True, null=True)
+    bank_tx_id = models.CharField(max_length=255, blank=True, null=True,
+                                  verbose_name='Bank Transaction ID (từ PayOS webhook)')
+    fiat_transferred_at = models.DateTimeField(blank=True, null=True,
+                                               verbose_name='Thời điểm fiat đã chuyển')
+    burn_tx_hash = models.CharField(max_length=100, blank=True, null=True,
+                                    verbose_name='TxHash finalizeBurnWithBankTx')
+    burn_completed_at = models.DateTimeField(blank=True, null=True)
+    payout_error = models.TextField(blank=True, null=True,
+                                    verbose_name='Lỗi PayOS/burn gần nhất')
+
     executed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -651,6 +691,50 @@ class DisbursementProposal(models.Model):
         verbose_name = 'Đề xuất giải ngân'
         verbose_name_plural = 'Danh sách đề xuất giải ngân'
         ordering = ['-created_at']
+
+class DisbursementSignature(models.Model):
+    """
+    Lưu chữ ký EIP-712 off-chain của 1 trong 3 approver (organization /
+    supervisor / admin) cho 1 DisbursementProposal. Backend thu thập đủ 3 sig
+    rồi đóng gói gửi lên smart3.recordMultisigApproval() trong 1 tx duy nhất.
+
+    - Approver ký typed-data qua MetaMask (eth_signTypedData_v4) → KHÔNG tốn gas.
+    - Backend verify lại chữ ký bằng eth_account.messages.encode_typed_data
+      trước khi lưu để tránh DB chứa sig rác.
+    - `nonce` là số ngẫu nhiên per-signer, chống replay cross-proposal.
+    """
+    ROLE_CHOICES = [
+        ('organization', 'Tổ chức'),
+        ('supervisor', 'Giám sát viên'),
+        ('admin', 'Admin'),
+    ]
+
+    proposal = models.ForeignKey(
+        DisbursementProposal, on_delete=models.CASCADE, related_name='offchain_signatures'
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    signer_address = models.CharField(max_length=42, verbose_name='Địa chỉ ví đã ký')
+    signature = models.TextField(verbose_name='Signature (hex 0x...)')
+    nonce = models.DecimalField(max_digits=78, decimal_places=0,
+                                verbose_name='Nonce (uint256)')
+    deadline = models.BigIntegerField(verbose_name='Unix deadline')
+    # Snapshot các trường đã ký — để backend tái dựng digest khi relay.
+    signed_amount = models.DecimalField(max_digits=78, decimal_places=0,
+                                        verbose_name='Amount đã ký (uint256, raw 18 decimals)')
+    signed_recipient = models.CharField(max_length=42)
+    signed_ipfs_cid = models.CharField(max_length=255)
+    signed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'disbursement_signature'
+        unique_together = ('proposal', 'role')
+        verbose_name = 'Chữ ký EIP-712 giải ngân'
+        verbose_name_plural = 'Chữ ký EIP-712 giải ngân'
+
+    def __str__(self):
+        return f"Sig[{self.role}] proposal={self.proposal_id} by={self.signer_address[:10]}..."
+
 
 class ProposalVote(models.Model):
     proposal = models.ForeignKey(DisbursementProposal, on_delete=models.CASCADE, related_name='votes')

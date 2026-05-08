@@ -509,6 +509,167 @@ class BlockchainService:
             'approvals': int(campaign_state[5]),
         }
 
+    # ==========================================================
+    # 5. [V3] SMART3 — EIP-712 MULTISIG + BURN WITH BANK TX
+    # ==========================================================
+    #
+    # Luồng V3 (chạy song song, không thay luồng cũ smart2 ở trên):
+    #   Phase 3a: recordMultisigApproval(proposalId, ..., SigBundle)
+    #             → contract ecrecover 3 sigs → emit MultisigConfirmed.
+    #   Phase 4 : finalizeBurnWithBankTx(proposalId, multisigVault, bankTxId)
+    #             → contract gọi VNDT.burnWithBankTx → emit DisbursementFinalized.
+    #
+    # Để dùng được:
+    #   1. Deploy smart3.sol với constructor(_vndt, _dcpManager).
+    #   2. Ở smart1 (VNDT), gọi setBurner(<smart3_address>).
+    #   3. Set settings.SMART3_CONTRACT_ADDRESS + SMART3_CONTRACT_ABI.
+    # ==========================================================
+
+    @property
+    def smart3_contract(self):
+        """
+        Lazy-load contract smart3. Trả về None nếu chưa cấu hình —
+        caller phải check trước khi gọi để fail-fast với message dễ debug.
+        """
+        if getattr(self, '_smart3_contract_cache', None) is not None:
+            return self._smart3_contract_cache
+        addr = getattr(settings, 'SMART3_CONTRACT_ADDRESS', None)
+        abi = getattr(settings, 'SMART3_CONTRACT_ABI', None)
+        if not addr or not abi:
+            self._smart3_contract_cache = None
+            return None
+        self._smart3_contract_cache = self.w3.eth.contract(
+            address=self.w3.to_checksum_address(addr),
+            abi=abi,
+        )
+        return self._smart3_contract_cache
+
+    def build_eip712_typed_data(self, proposal_id, campaign_id, amount_raw,
+                                recipient, ipfs_cid, deadline, nonce, role):
+        """
+        Build payload EIP-712 typed-data để frontend ký bằng
+        `eth_signTypedData_v4`. Trả về dict có cấu trúc đúng chuẩn MetaMask.
+
+        - `amount_raw` là số nguyên 18-decimals (đã nhân 10^18 ở caller).
+        - `role` ∈ {'organization', 'supervisor', 'admin'} — phải khớp
+          exact với cách smart3 hash (case-sensitive bytes).
+        """
+        verifying_contract = getattr(settings, 'SMART3_CONTRACT_ADDRESS', '')
+        if not verifying_contract:
+            raise RuntimeError(
+                "SMART3_CONTRACT_ADDRESS chưa cấu hình — không build được EIP-712 payload."
+            )
+        return {
+            'types': {
+                'EIP712Domain': [
+                    {'name': 'name', 'type': 'string'},
+                    {'name': 'version', 'type': 'string'},
+                    {'name': 'chainId', 'type': 'uint256'},
+                    {'name': 'verifyingContract', 'type': 'address'},
+                ],
+                'DisbursementApproval': [
+                    {'name': 'proposalId', 'type': 'uint256'},
+                    {'name': 'campaignId', 'type': 'uint256'},
+                    {'name': 'amount', 'type': 'uint256'},
+                    {'name': 'recipient', 'type': 'address'},
+                    {'name': 'ipfsCid', 'type': 'string'},
+                    {'name': 'deadline', 'type': 'uint256'},
+                    {'name': 'nonce', 'type': 'uint256'},
+                    {'name': 'role', 'type': 'string'},
+                ],
+            },
+            'primaryType': 'DisbursementApproval',
+            'domain': {
+                'name': 'DisbursementExecutor',
+                'version': '1',
+                'chainId': int(self.w3.eth.chain_id),
+                'verifyingContract': self.w3.to_checksum_address(verifying_contract),
+            },
+            'message': {
+                'proposalId': int(proposal_id),
+                'campaignId': int(campaign_id),
+                'amount': int(amount_raw),
+                'recipient': self.w3.to_checksum_address(recipient),
+                'ipfsCid': str(ipfs_cid or ''),
+                'deadline': int(deadline),
+                'nonce': int(nonce),
+                'role': str(role),
+            },
+        }
+
+    def recover_eip712_signer(self, typed_data, signature):
+        """
+        Recover address từ typed-data + signature để verify TRƯỚC khi lưu DB.
+        Dùng eth_account.messages.encode_typed_data (web3.py >=6).
+        """
+        from eth_account import Account
+        from eth_account.messages import encode_typed_data
+        message = encode_typed_data(full_message=typed_data)
+        return Account.recover_message(message, signature=signature)
+
+    def record_multisig_approval(
+        self, proposal_id, campaign_id, amount_raw, recipient, ipfs_cid,
+        deadline, org_sig, supervisor_sig, admin_sig,
+        org_nonce, supervisor_nonce, admin_nonce,
+    ):
+        """
+        Phase 3a: Admin relayer submit 3 chữ ký EIP-712 lên smart3.
+        Contract verify bằng ecrecover → emit MultisigConfirmed.
+        Trả về dict {tx_hash, receipt, status}.
+        """
+        if self.smart3_contract is None:
+            raise RuntimeError(
+                "smart3 contract chưa cấu hình. Set SMART3_CONTRACT_ADDRESS + "
+                "SMART3_CONTRACT_ABI trong settings."
+            )
+        # Struct DisbursementPayload (6 "shared" fields that all 3 approvers
+        # signed identically). Solidity refactor từ 6 flat params → struct
+        # để fix "stack too deep" khi verify 3 chữ ký trong cùng function.
+        # Web3.py accept Solidity struct như positional tuple theo đúng
+        # thứ tự field đã khai báo trong .sol.
+        payload_tuple = (
+            int(proposal_id),
+            int(campaign_id),
+            int(amount_raw),
+            self.w3.to_checksum_address(recipient),
+            str(ipfs_cid or ''),
+            int(deadline),
+        )
+        def _sig_to_bytes(s):
+            # Handle both '0x...' and '0X...' prefixes (MetaMask uses lowercase,
+            # but some wallets/tests use uppercase) + bare hex.
+            if s.lower().startswith('0x'):
+                s = s[2:]
+            return bytes.fromhex(s)
+        sig_bundle = (
+            _sig_to_bytes(org_sig),
+            _sig_to_bytes(supervisor_sig),
+            _sig_to_bytes(admin_sig),
+            int(org_nonce),
+            int(supervisor_nonce),
+            int(admin_nonce),
+        )
+        func = self.smart3_contract.functions.recordMultisigApproval(
+            payload_tuple,
+            sig_bundle,
+        )
+        return self._send_transaction(func, gas_limit=500000, wait_for_receipt=True)
+
+    def finalize_burn_with_bank_tx(self, proposal_id, multisig_vault, bank_tx_id):
+        """
+        Phase 4: Sau khi PayOS webhook báo success, admin relayer gọi
+        smart3.finalizeBurnWithBankTx → smart3 gọi VNDT.burnWithBankTx
+        → burn token + emit event audit chứa bankTxId.
+        """
+        if self.smart3_contract is None:
+            raise RuntimeError("smart3 contract chưa cấu hình.")
+        func = self.smart3_contract.functions.finalizeBurnWithBankTx(
+            int(proposal_id),
+            self.w3.to_checksum_address(multisig_vault),
+            str(bank_tx_id),
+        )
+        return self._send_transaction(func, gas_limit=300000, wait_for_receipt=True)
+
     def get_disbursed_and_burned_events(self, campaign_id=None, from_block=None, to_block='latest'):
         filters = {}
         if campaign_id is not None:

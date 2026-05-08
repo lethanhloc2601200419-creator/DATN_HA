@@ -99,8 +99,9 @@ SEPOLIA_RPC_URL = os.getenv('SEPOLIA_RPC_URL')
 # CONTRACT_ADDRESS = địa chỉ smart2.sol (DCPManager + Soulbound Badge).
 # VNDT_TOKEN_ADDRESS = địa chỉ smart1.sol (VNDT ERC20). Manager của smart1 phải
 # trỏ về smart2 để recordDonation có thể gọi vndt.mint(...) thành công.
-CONTRACT_ADDRESS = os.getenv('CONTRACT_ADDRESS')
-VNDT_TOKEN_ADDRESS = os.getenv('VNDT_TOKEN_ADDRESS')
+# Default fallback = các contract đã deploy sẵn trên Sepolia (2026-03 release).
+CONTRACT_ADDRESS = os.getenv('CONTRACT_ADDRESS', '0x4F36121cC411c2e6Bea4e4a66C4BE78F3cc048E7')
+VNDT_TOKEN_ADDRESS = os.getenv('VNDT_TOKEN_ADDRESS', '0x05D913ECd54aC20401b096B10d0F4202098B38a4')
 ADMIN_PRIVATE_KEY = os.getenv('ADMIN_PRIVATE_KEY')
 
 # Paymaster Configuration
@@ -285,6 +286,25 @@ except FileNotFoundError:
     # Trong một số môi trường legacy có thể chưa có file này; để None để app vẫn boot,
     # BlockchainService sẽ skip vndt_contract khi VNDT_ABI is None.
     VNDT_ABI = None
+
+# =====================================================
+# [V3] DisbursementExecutor (smart3.sol) — EIP-712 multisig relayer
+# -----------------------------------------------------
+# Deploy smart3.sol riêng, rồi set 2 env:
+#   SMART3_CONTRACT_ADDRESS: address của smart3 trên Sepolia.
+#   SMART3_ABI_FILE        : đường dẫn tới ABI JSON (build từ Hardhat/Remix).
+# Nếu chưa deploy → giữ None để code V3 gate bằng check `if smart3_contract`.
+# =====================================================
+# Default fallback = smart3 đã deploy trên Sepolia (2026-03 release).
+# Owner = WALLET_ADDRESS (backend relayer) nên recordMultisigApproval +
+# finalizeBurnWithBankTx (onlyOwner) sẽ pass.
+SMART3_CONTRACT_ADDRESS = os.getenv('SMART3_CONTRACT_ADDRESS', '0x725aC680F90Ff7cf723B50aCA1B05e7F4028624c')
+_smart3_abi_path = BASE_DIR / 'blockchain_assets' / 'smart3_abi.json'
+try:
+    with open(_smart3_abi_path, 'r') as f:
+        SMART3_CONTRACT_ABI = json.load(f)
+except FileNotFoundError:
+    SMART3_CONTRACT_ABI = None
 
 
 

@@ -43,4 +43,22 @@ urlpatterns = [
     path('giaingan/sync-onchain/<int:pk>/', admin.sync_disbursement_onchain, name='sync_disbursement_onchain'),
     path('giaingan/huy/<int:pk>/', admin.huy_giaingan, name='huy_giaingan'),
     path('giaingan/thu-hoi-gas/', admin.thu_hoi_gas, name='thu_hoi_gas'),
+
+    # ========== [V3] 2-layer disbursement (EIP-712 + PayOS + burn) ==========
+    # Phase 2: FE lấy EIP-712 payload để ký → POST signature về backend.
+    path('api/v3/disbursement/<int:pk>/sign-payload/', admin.v3_get_sign_payload,
+         name='v3_get_sign_payload'),
+    path('api/v3/disbursement/submit-signature/', admin.v3_submit_signature,
+         name='v3_submit_signature'),
+    # Phase 3a: Admin relayer submit 3 sigs lên smart3.
+    path('api/v3/disbursement/<int:pk>/relay-multisig/',
+         admin.v3_execute_multisig_relayer, name='v3_execute_multisig_relayer'),
+    # Phase 3b: Admin trigger PayOS payout.
+    path('api/v3/disbursement/<int:pk>/trigger-payout/',
+         admin.v3_trigger_payos_payout, name='v3_trigger_payos_payout'),
+    # Phase 4: PayOS webhook + dev-only simulate.
+    path('api/v3/payos/payout-webhook/', admin.v3_payos_payout_webhook,
+         name='v3_payos_payout_webhook'),
+    path('api/v3/disbursement/<int:pk>/simulate-webhook/',
+         admin.v3_simulate_webhook, name='v3_simulate_webhook'),
 ]

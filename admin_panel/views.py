@@ -16,7 +16,7 @@ from django.db.models import Q, Sum
 from .models import (
     CampaignCategory, Organization, TargetProgram, Donation, Campaign,
     CampaignOccasion, DisbursementProposal, ProposalVote, CampaignDisbursement,
-    BankStatement, ActivityLog,
+    BankStatement, ActivityLog, DisbursementSignature,
 )
 from .forms import DonationForm
 from django.contrib.admin.views.decorators import staff_member_required
@@ -1863,5 +1863,383 @@ def thu_hoi_gas(request):
         "Admin Relayer pattern: ví Admin tự trả gas phí Sepolia, không cộng vào currentAmount campaign."
     )
     return redirect('admin_panel:quanly_giaingan')
+
+
+# ============================================================
+# [V3] 2-LAYER DISBURSEMENT WORKFLOW — EIP-712 MULTISIG + PAYOS + BURN
+# ------------------------------------------------------------
+# Phase 1: off-chain proposal + IPFS (đã có ở tao_yeucau_giaingan).
+# Phase 2: 3 bên ký EIP-712 qua MetaMask → gom vào DB.
+# Phase 3a: Admin submit 3 sigs lên smart3 → MultisigConfirmed.
+# Phase 3b: Admin trigger PayOS Payout (real bank transfer).
+# Phase 4: PayOS webhook → backend gọi finalizeBurnWithBankTx on-chain.
+# ============================================================
+import threading
+import secrets as _secrets
+from django.db import connection as _db_connection
+from client.payos_payout import (
+    request_payout as _payos_request_payout,
+    parse_webhook as _payos_parse_webhook,
+    verify_webhook_signature as _payos_verify_webhook,
+    PayoutRequestError,
+)
+# Tái sử dụng hằng số 18-decimals từ blockchain service, tránh duplicate.
+from client.blockchain import _VNDT_DECIMALS as _VNDT_DECIMALS_EXP
+
+
+def _get_proposal_v3_eip712_payload(proposal, role, nonce=None, deadline=None):
+    """
+    Build payload EIP-712 typed-data cho 1 approver ký. Trả về dict JSON-safe
+    để frontend nạp thẳng vào `eth_signTypedData_v4`.
+    """
+    if role not in ('organization', 'supervisor', 'admin'):
+        raise ValueError(f"role không hợp lệ: {role}")
+    bc = BlockchainService()
+    campaign = proposal.campaign
+    org = campaign.organization
+    if not org or not org.wallet_address:
+        raise ValueError("Organization chưa có wallet_address — không build được payload.")
+    recipient = org.wallet_address  # multisig vault = org wallet theo convention V4
+    amount_raw = int(Decimal(str(proposal.amount_requested)) * _VNDT_DECIMALS_EXP)
+    # ------------------------------------------------------------------
+    # Deadline phải DETERMINISTIC xuyên suốt 3 approvers vì smart3 yêu cầu
+    # cả 3 sig cùng payload (incl. deadline). Nếu dùng `time.time() + 7d`
+    # mỗi call GET → mỗi approver lấy deadline khác nhau → on-chain revert.
+    # Giải pháp: derive từ proposal.created_at (bất biến, không cần DB write).
+    # ------------------------------------------------------------------
+    default_deadline = int((proposal.created_at + timedelta(days=7)).timestamp())
+    deadline = int(deadline or proposal.signature_deadline or default_deadline)
+    if nonce is None:
+        # 128-bit random — đủ entropy, fits uint256.
+        nonce = int.from_bytes(_secrets.token_bytes(16), 'big')
+    typed_data = bc.build_eip712_typed_data(
+        proposal_id=proposal.id,
+        campaign_id=campaign.id,
+        amount_raw=amount_raw,
+        recipient=recipient,
+        ipfs_cid=proposal.ipfs_cid or '',
+        deadline=deadline,
+        nonce=nonce,
+        role=role,
+    )
+    return {
+        'typed_data': typed_data,
+        'nonce': str(nonce),
+        'deadline': deadline,
+        'amount_raw': str(amount_raw),
+        'recipient': recipient,
+        'ipfs_cid': proposal.ipfs_cid or '',
+        'role': role,
+    }
+
+
+@login_required
+def v3_get_sign_payload(request, pk):
+    """GET: trả về EIP-712 typed-data để frontend ký qua MetaMask."""
+    proposal = get_object_or_404(
+        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'), pk=pk
+    )
+    role = request.GET.get('role', '').strip()
+    if role not in ('organization', 'supervisor', 'admin'):
+        return JsonResponse({'ok': False, 'message': 'role không hợp lệ.'}, status=400)
+    try:
+        payload = _get_proposal_v3_eip712_payload(proposal, role)
+    except ValueError as exc:
+        return JsonResponse({'ok': False, 'message': str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'message': f'Lỗi build payload: {exc}'}, status=500)
+    return JsonResponse({'ok': True, **payload})
+
+
+@login_required
+@csrf_exempt
+def v3_submit_signature(request):
+    """
+    POST JSON body: {proposal_id, role, signer_address, signature, nonce,
+                     deadline, amount_raw, recipient, ipfs_cid}.
+    Backend recover signer từ typed-data + chữ ký → nếu khớp signer_address
+    thì lưu vào DisbursementSignature (unique per (proposal, role)).
+    Khi đủ 3 sig → chuyển v3_status='ready_to_payout'.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
+
+    proposal = get_object_or_404(
+        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'),
+        pk=data.get('proposal_id'),
+    )
+    role = data.get('role')
+    signer = (data.get('signer_address') or '').strip()
+    signature = (data.get('signature') or '').strip()
+    nonce = data.get('nonce')
+    deadline = data.get('deadline')
+    recipient = (data.get('recipient') or '').strip()
+    amount_raw = data.get('amount_raw')
+    ipfs_cid = (data.get('ipfs_cid') or proposal.ipfs_cid or '').strip()
+    if not all([role, signer, signature, nonce is not None, deadline, recipient, amount_raw]):
+        return JsonResponse({'ok': False, 'message': 'Thiếu field bắt buộc.'}, status=400)
+
+    # Deadline validation: từ chối sig đã hết hạn ngay từ backend, không để DB rác.
+    # Contract sẽ revert sau này, nhưng fail-fast ở backend rẻ hơn.
+    if int(deadline) <= int(time.time()):
+        return JsonResponse({'ok': False,
+                             'message': f'Signature deadline đã hết hạn ({deadline}). '
+                                        'Người ký cần reload trang để lấy payload mới.'},
+                            status=400)
+
+    try:
+        bc = BlockchainService()
+        typed_data = bc.build_eip712_typed_data(
+            proposal_id=proposal.id, campaign_id=proposal.campaign_id,
+            amount_raw=int(amount_raw), recipient=recipient, ipfs_cid=ipfs_cid,
+            deadline=int(deadline), nonce=int(nonce), role=role,
+        )
+        recovered = bc.recover_eip712_signer(typed_data, signature)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'message': f'Verify sig thất bại: {exc}'}, status=400)
+
+    if recovered.lower() != signer.lower():
+        return JsonResponse({'ok': False,
+                             'message': f'Signer không khớp. Recovered={recovered}, claimed={signer}'},
+                            status=400)
+
+    # Verify signer_address đúng role on-chain.
+    try:
+        wallets = bc.get_disbursement_approver_wallets()
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'message': f'Không đọc role wallets on-chain: {exc}'}, status=502)
+    expected = {
+        'organization': (proposal.campaign.organization.wallet_address or '').lower(),
+        'supervisor': wallets['supervisor_wallet'].lower(),
+        'admin': wallets['admin_wallet'].lower(),
+    }[role]
+    if expected and recovered.lower() != expected:
+        return JsonResponse(
+            {'ok': False,
+             'message': f'Ví {recovered} không phải role {role} (expect {expected}).'},
+            status=403,
+        )
+
+    sig_obj, created = DisbursementSignature.objects.update_or_create(
+        proposal=proposal, role=role,
+        defaults={
+            'signer_address': recovered,
+            'signature': signature,
+            'nonce': Decimal(str(nonce)),
+            'deadline': int(deadline),
+            'signed_amount': Decimal(str(amount_raw)),
+            'signed_recipient': recipient,
+            'signed_ipfs_cid': ipfs_cid,
+            'signed_by': request.user if request.user.is_authenticated else None,
+        },
+    )
+
+    total_sigs = proposal.offchain_signatures.count()
+    if total_sigs >= 3 and proposal.v3_status in ('v3_not_started', 'pending_multisig'):
+        proposal.v3_status = 'ready_to_payout'
+    elif proposal.v3_status == 'v3_not_started':
+        proposal.v3_status = 'pending_multisig'
+    proposal.save(update_fields=['v3_status'])
+
+    return JsonResponse({
+        'ok': True,
+        'created': created,
+        'total_sigs': total_sigs,
+        'v3_status': proposal.v3_status,
+        'ready_to_relay': total_sigs >= 3,
+    })
+
+
+@login_required
+def v3_execute_multisig_relayer(request, pk):
+    """
+    POST: Admin gom 3 chữ ký từ DB → gọi smart3.recordMultisigApproval() trong
+    1 tx duy nhất. Admin trả gas, 3 approvers KHÔNG tốn gas.
+    """
+    if not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'message': 'Chỉ admin được relay.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+    proposal = get_object_or_404(DisbursementProposal, pk=pk)
+    sigs = {s.role: s for s in proposal.offchain_signatures.all()}
+    missing = [r for r in ('organization', 'supervisor', 'admin') if r not in sigs]
+    if missing:
+        return JsonResponse({'ok': False, 'message': f'Thiếu chữ ký: {missing}'}, status=400)
+    # Sanity: cả 3 sig phải cùng amount/recipient/deadline/ipfs.
+    first = sigs['organization']
+    for r in ('supervisor', 'admin'):
+        s = sigs[r]
+        if (s.signed_amount != first.signed_amount or
+                s.signed_recipient.lower() != first.signed_recipient.lower() or
+                s.deadline != first.deadline or
+                s.signed_ipfs_cid != first.signed_ipfs_cid):
+            return JsonResponse(
+                {'ok': False,
+                 'message': f'Sig của {r} không khớp payload với organization — có thể đã bị tampering.'},
+                status=409,
+            )
+    try:
+        bc = BlockchainService()
+        result = bc.record_multisig_approval(
+            proposal_id=proposal.id,
+            campaign_id=proposal.campaign_id,
+            amount_raw=int(first.signed_amount),
+            recipient=first.signed_recipient,
+            ipfs_cid=first.signed_ipfs_cid,
+            deadline=first.deadline,
+            org_sig=sigs['organization'].signature,
+            supervisor_sig=sigs['supervisor'].signature,
+            admin_sig=sigs['admin'].signature,
+            org_nonce=int(sigs['organization'].nonce),
+            supervisor_nonce=int(sigs['supervisor'].nonce),
+            admin_nonce=int(sigs['admin'].nonce),
+        )
+    except Exception as exc:
+        proposal.payout_error = f'multisig relay fail: {exc}'[:1000]
+        proposal.save(update_fields=['payout_error'])
+        return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
+
+    proposal.multisig_confirmed_tx_hash = result.get('tx_hash')
+    proposal.multisig_confirmed_at = timezone.now()
+    proposal.v3_status = 'ready_to_payout'
+    proposal.save(update_fields=['multisig_confirmed_tx_hash', 'multisig_confirmed_at', 'v3_status'])
+    return JsonResponse({'ok': True, 'tx_hash': result.get('tx_hash'),
+                         'v3_status': proposal.v3_status})
+
+
+@login_required
+def v3_trigger_payos_payout(request, pk):
+    """Admin bấm 'Execute Disbursement' → gửi lệnh PayOS Payout (mock hiện tại)."""
+    if not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'message': 'Chỉ admin được trigger payout.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+    proposal = get_object_or_404(
+        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'), pk=pk
+    )
+    if proposal.v3_status != 'ready_to_payout':
+        return JsonResponse({'ok': False,
+                             'message': f'v3_status={proposal.v3_status}, cần ready_to_payout.'},
+                            status=409)
+    try:
+        result = _payos_request_payout(proposal)
+    except PayoutRequestError as exc:
+        proposal.payout_error = str(exc)[:1000]
+        proposal.v3_status = 'payout_failed'
+        proposal.save(update_fields=['payout_error', 'v3_status'])
+        return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
+    proposal.payos_payout_id = result['payout_id']
+    proposal.payos_payout_requested_at = timezone.now()
+    proposal.v3_status = 'payout_processing'
+    proposal.save(update_fields=['payos_payout_id', 'payos_payout_requested_at', 'v3_status'])
+    return JsonResponse({'ok': True, 'payout_id': result['payout_id'],
+                         'mock': result.get('mock', False),
+                         'v3_status': proposal.v3_status})
+
+
+def _run_finalize_burn_safe(proposal_id):
+    """Background worker: gọi smart3.finalizeBurnWithBankTx. Không raise."""
+    from admin_panel.models import DisbursementProposal as _DP
+    try:
+        p = _DP.objects.select_related('campaign', 'campaign__organization').get(pk=proposal_id)
+    except _DP.DoesNotExist:
+        print(f"⚠️ [V3/BURN] Proposal {proposal_id} not found")
+        return
+    try:
+        bc = BlockchainService()
+        vault = p.campaign.organization.wallet_address
+        res = bc.finalize_burn_with_bank_tx(p.id, vault, p.bank_tx_id)
+        p.burn_tx_hash = res.get('tx_hash')
+        p.burn_completed_at = timezone.now()
+        p.v3_status = 'completed_audited'
+        p.save(update_fields=['burn_tx_hash', 'burn_completed_at', 'v3_status'])
+        print(f"🔥 [V3/BURN] proposal={p.id} burn tx={res.get('tx_hash')}")
+    except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
+        p.payout_error = f'burn fail: {exc}'[:1000]
+        p.save(update_fields=['payout_error'])
+    finally:
+        try:
+            _db_connection.close()
+        except Exception:
+            pass
+
+
+@csrf_exempt
+def v3_payos_payout_webhook(request):
+    """
+    Endpoint PayOS gọi khi bank transfer xong. Backend verify sig → lưu
+    bank_tx_id + fiat_transferred_at → spawn thread burn on-chain.
+    Trả 200 ngay để PayOS không retry.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
+
+    sig = payload.get('signature') or request.headers.get('X-PayOS-Signature', '')
+    if not _payos_verify_webhook(payload, sig):
+        return JsonResponse({'ok': False, 'message': 'Invalid signature.'}, status=401)
+
+    parsed = _payos_parse_webhook(payload)
+    ref = parsed.get('reference_id') or ''
+    # reference_id format: proposal-<id>
+    try:
+        pid = int(ref.split('-', 1)[1])
+    except (IndexError, ValueError):
+        return JsonResponse({'ok': False, 'message': 'reference_id không hợp lệ.'}, status=400)
+
+    try:
+        proposal = DisbursementProposal.objects.get(pk=pid)
+    except DisbursementProposal.DoesNotExist:
+        return JsonResponse({'ok': False, 'message': f'Proposal {pid} not found.'}, status=404)
+
+    # Idempotency: PayOS có thể retry webhook (network blip hay qua standard policy).
+    # Nếu proposal đã ở state “fiat_transferred” hoặc “completed_audited” thì
+    # bỏ qua — smart3 cũng sẽ revert, nhưng fail-fast tiết kiệm 1 RPC + 1 thread.
+    if proposal.v3_status in ('fiat_transferred', 'completed_audited'):
+        return JsonResponse({'ok': True, 'note': 'webhook already processed',
+                             'v3_status': proposal.v3_status})
+
+    if parsed['status'] != 'success':
+        proposal.v3_status = 'payout_failed'
+        proposal.payout_error = f'PayOS status={parsed["status"]}'
+        proposal.save(update_fields=['v3_status', 'payout_error'])
+        return JsonResponse({'ok': True, 'note': 'recorded as failed'})
+
+    proposal.bank_tx_id = parsed['bank_tx_id']
+    proposal.fiat_transferred_at = timezone.now()
+    proposal.v3_status = 'fiat_transferred'
+    proposal.save(update_fields=['bank_tx_id', 'fiat_transferred_at', 'v3_status'])
+
+    # Phase 4: trigger burn on-chain trong background (tránh block webhook).
+    t = threading.Thread(target=_run_finalize_burn_safe, args=(proposal.id,),
+                         name=f'v3-burn-{proposal.id}', daemon=True)
+    transaction.on_commit(t.start)
+    return JsonResponse({'ok': True, 'bank_tx_id': parsed['bank_tx_id']})
+
+
+@login_required
+def v3_simulate_webhook(request, pk):
+    """[DEV-ONLY] Admin giả PayOS webhook success để test pipeline burn."""
+    if not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'message': 'Chỉ admin.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
+    from client.payos_payout import simulate_webhook_success
+    proposal = get_object_or_404(DisbursementProposal, pk=pk)
+    payload = simulate_webhook_success(proposal)
+    # Dùng thẳng handler với payload mock — bỏ qua CSRF vì đã login_required.
+    from django.test import RequestFactory
+    rf = RequestFactory()
+    fake_req = rf.post('/fake', data=json.dumps(payload), content_type='application/json')
+    return v3_payos_payout_webhook(fake_req)
 
 

@@ -19,6 +19,8 @@ from django.db import transaction
 from django.db.models import F
 import hashlib
 import hmac
+import threading
+import traceback
 import urllib.parse
 import json
 from decimal import Decimal
@@ -474,6 +476,78 @@ def _trigger_record_donation_bridge(donation):
         donation=donation,
     )
     return tx_hash
+
+
+def _run_record_donation_bridge_safe(donation_id):
+    """
+    Wrapper an toàn chạy `_trigger_record_donation_bridge` trong background thread.
+
+    Trách nhiệm:
+      • Load lại Donation từ DB bằng id (tránh dùng instance stale từ request cha).
+      • Bắt MỌI exception (Web3, RPC timeout, revert…) — thread không được crash
+        ngầm vì Gunicorn sẽ không thấy lỗi.
+      • Ghi lỗi vào `blockchain_status='failed'` + `blockchain_error` để FE polling
+        qua `api_donation_blockchain_status` biết và cho phép retry.
+      • Đóng DB connection cuối cùng (Django mở connection theo thread-local,
+        không auto-close khi thread phụ kết thúc → leak connection nếu bỏ qua).
+
+    Được gọi bên trong `transaction.on_commit` từ `payos_webhook_view` để:
+      - Thread chỉ start SAU khi donation đã commit status='completed' → đọc được
+        bản mới nhất.
+      - Nếu outer transaction rollback → thread không spawn → không có tx on-chain
+        mồ côi.
+    """
+    from django.db import connection
+    try:
+        try:
+            donation = Donation.objects.select_related('campaign', 'donor').get(pk=donation_id)
+        except Donation.DoesNotExist:
+            print(f"⚠️ [BG RECORD] Donation #{donation_id} không tồn tại (đã bị xóa?) — bỏ qua.")
+            return
+
+        try:
+            tx_hash = _trigger_record_donation_bridge(donation)
+            print(f"✅ [BG RECORD] Donation #{donation_id} recordDonation OK, tx={tx_hash}")
+        except Exception as exc:
+            # In rõ type + message + traceback để Railway logs thấy EVM revert reason.
+            print(f"❌ [BG RECORD] Donation #{donation_id} recordDonation FAIL: "
+                  f"{type(exc).__name__}: {exc}")
+            print(traceback.format_exc())
+            try:
+                failed = Donation.objects.get(pk=donation_id)
+                failed.blockchain_status = 'failed'
+                failed.blockchain_completed_at = timezone.now()
+                failed.blockchain_error = f"{type(exc).__name__}: {exc}"[:500]
+                failed.save(update_fields=[
+                    'blockchain_status',
+                    'blockchain_completed_at',
+                    'blockchain_error',
+                    'updated_at',
+                ])
+            except Exception as save_exc:
+                # Thậm chí việc ghi lỗi cũng fail (DB down…) — chỉ log, không raise.
+                print(f"❌ [BG RECORD] Không thể ghi blockchain_error vào DB: {save_exc}")
+    finally:
+        # Đóng DB connection thread-local để tránh leak.
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+
+def _spawn_record_donation_thread(donation_id):
+    """Spawn daemon thread chạy `_run_record_donation_bridge_safe`.
+
+    daemon=True để thread không chặn process shutdown (Gunicorn graceful stop).
+    """
+    thread = threading.Thread(
+        target=_run_record_donation_bridge_safe,
+        args=(donation_id,),
+        daemon=True,
+        name=f'record-donation-{donation_id}',
+    )
+    thread.start()
+    return thread
 
 # ==========================================
 # HELPER: Tính phí gas và lưu vào donation
@@ -1281,34 +1355,34 @@ def payos_webhook_view(request):
             'message': f'Internal error: {exc}',
         }, status=200)
 
-    # Gọi on-chain recordDonation chỉ khi donation mới vừa được chuyển sang completed.
+    # ==========================================================
+    # Gọi on-chain recordDonation TRONG BACKGROUND THREAD.
+    # ----------------------------------------------------------
+    # Lý do: `_trigger_record_donation_bridge` gọi `wait_for_transaction_receipt`
+    # của web3.py → block 10-30s chờ Sepolia confirm. Nếu chạy đồng bộ ở đây,
+    # Gunicorn worker sẽ bị CRITICAL WORKER TIMEOUT (default 30s) TRƯỚC KHI
+    # webhook kịp trả 200 OK cho PayOS → PayOS sẽ retry webhook vô hạn.
+    #
+    # Giải pháp: spawn daemon thread chạy trong nền và trả response ngay lập tức.
+    # Dùng `transaction.on_commit` để đảm bảo thread chỉ start SAU khi transaction
+    # đánh dấu donation='completed' đã commit (tránh thread đọc bản stale).
+    #
+    # FE polling endpoint `api_donation_blockchain_status` sẽ hiển thị trạng thái
+    # thực tế (processing / confirmed / failed) cho user.
+    # ==========================================================
     tx_hash = donation.eth_tx_hash
     blockchain_triggered = False
     if created:
-        try:
-            fresh_donation = Donation.objects.select_related('campaign', 'donor').get(pk=donation.pk)
-            tx_hash = _trigger_record_donation_bridge(fresh_donation)
-            blockchain_triggered = True
-            print(f"✅ recordDonation on-chain OK, tx={tx_hash}")
-        except Exception as exc:
-            # In rõ type + message + traceback ngắn để Railway logs cho thấy EVM reason.
-            import traceback
-            print(f"⚠️ recordDonation on-chain thất bại: {type(exc).__name__}: {exc}")
-            print(traceback.format_exc())
-            failed_donation = Donation.objects.get(pk=donation.pk)
-            failed_donation.blockchain_status = 'failed'
-            failed_donation.blockchain_completed_at = timezone.now()
-            failed_donation.blockchain_error = f"{type(exc).__name__}: {exc}"[:500]
-            failed_donation.save(update_fields=[
-                'blockchain_status',
-                'blockchain_completed_at',
-                'blockchain_error',
-                'updated_at',
-            ])
+        donation_id = donation.pk
+        transaction.on_commit(lambda: _spawn_record_donation_thread(donation_id))
+        blockchain_triggered = True
+        print(f"🧵 Đã schedule background recordDonation cho Donation #{donation_id} "
+              f"(chạy sau khi transaction commit).")
 
     print("=======================================\n")
     return JsonResponse({
         'success': True,
+        'code': '00',
         'orderCode': order_code,
         'updated': created,
         'blockchain_triggered': blockchain_triggered,
