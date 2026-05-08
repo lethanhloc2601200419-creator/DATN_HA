@@ -197,9 +197,26 @@ def create_payment_link(client_id, api_key, checksum_key, amount, order_code, de
             'qrCode': f'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://my.payos.vn/checkout?orderCode={order_code}',
             'paymentLinkId': f'mock-link-{order_code}',
         }
-    # TODO: Implement real PayOS API call to /v2/payment-requests
-    # Use client_id, api_key, checksum_key
-    # Return {'checkoutUrl': ..., 'qrCode': ..., 'paymentLinkId': ...}
+
+    # Real PayOS API call
+    try:
+        from payos import PayOS
+        payos_client = PayOS(client_id=client_id, api_key=api_key, checksum_key=checksum_key)
+        response = payos_client.createPaymentLink({
+            'orderCode': int(order_code),  # Ensure unique per org
+            'amount': int(amount),
+            'description': description,
+            'cancelUrl': 'https://web-production-e589d.up.railway.app/admin/giaingan/',  # Redirect back
+            'returnUrl': 'https://web-production-e589d.up.railway.app/admin/giaingan/',  # Redirect back
+        })
+        return {
+            'checkoutUrl': response['checkoutUrl'],
+            'qrCode': response['qrCode'],
+            'paymentLinkId': response['paymentLinkId'],
+        }
+    except Exception as e:
+        print(f"PAYOS ERROR: Failed to create payment link for orderCode {order_code}: {e}")
+        raise e
 
 
 class PayoutRequestError(Exception):
