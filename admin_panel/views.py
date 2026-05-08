@@ -2063,6 +2063,10 @@ def sign_payload_v3(request, pk):
 
         payload = _get_proposal_v3_eip712_payload(proposal, role)
         logger.info(f">>> [V3 SIGN] Typed data: {payload['typed_data']}")
+        from eth_account.messages import encode_typed_data
+        message = encode_typed_data(full_message=payload['typed_data'])
+        logger.info(f"EIP-712 Domain Separator: {message.domain_separator.hex()}")
+        logger.info(f"EIP-712 Message Hash: {message.message_hash.hex()}")
         logger.info(f"✅ [V3 SIGN] Trả về payload thành công cho PK={pk}")
         return JsonResponse({'ok': True, **payload})
     except Exception as e:
@@ -2121,6 +2125,10 @@ def submit_signature_v3(request, pk):
             deadline=int(deadline), nonce=int(nonce), role=role,
         )
         logger.info(f">>> [V3 SUBMIT] Typed data: {typed_data}")
+        from eth_account.messages import encode_typed_data
+        message = encode_typed_data(full_message=typed_data)
+        logger.info(f"EIP-712 Domain Separator: {message.domain_separator.hex()}")
+        logger.info(f"EIP-712 Message Hash: {message.message_hash.hex()}")
         recovered = bc.recover_eip712_signer(typed_data, signature)
 
         if recovered.lower() != signer.lower():
