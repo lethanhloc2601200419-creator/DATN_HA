@@ -2131,6 +2131,7 @@ def submit_signature_v3(request, pk):
 
         # Verify signer_address đúng role on-chain.
         wallets = bc.get_disbursement_approver_wallets()
+        logger.info(f"DEBUG WALLETS: Admin={wallets['admin_wallet']}, Sup={wallets['supervisor_wallet']}")
         expected = {
             'organization': (proposal.campaign.organization.wallet_address or '').lower(),
             'supervisor': wallets['supervisor_wallet'].lower(),
