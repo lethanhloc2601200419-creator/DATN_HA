@@ -629,6 +629,13 @@
                 card.classList.remove('selected');
             });
             r.closest('.campaign-card').classList.add('selected');
+            // 🐛 BUG FIX: sync hidden campaign_id với radio value — backend
+            // chỉ đọc `campaign_id`, nếu không set sẽ nhận ''  → Django
+            // raise "Field 'id' expected a number but got ''."
+            if (proposalForm) {
+                const hidden = proposalForm.querySelector('input[name="campaign_id"]');
+                if (hidden) hidden.value = r.value;
+            }
             // V3: data-available = available_amount (current_amount − in-flight V3 proposals).
             const available = r.dataset.available || '0';
             if (amountMax) amountMax.textContent = available;

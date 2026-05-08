@@ -1678,8 +1678,14 @@ def sync_disbursement_onchain(request, pk):
 def tao_yeucau_giaingan(request):
     if request.method == 'POST':
         try:
-            campaign_id = request.POST.get('campaign_id')
-            campaign = get_object_or_404(Campaign, pk=campaign_id)
+            campaign_id = (request.POST.get('campaign_id') or '').strip()
+            # Guard fail-fast: nếu UI quên sync hidden input thì backend trả
+            # message rõ ràng thay vì để Django raise ValueError thô
+            # ("Field 'id' expected a number but got ''.").
+            if not campaign_id or not campaign_id.isdigit():
+                messages.error(request, "Vui lòng chọn một chiến dịch trước khi gửi yêu cầu.")
+                return redirect('admin_panel:quanly_giaingan')
+            campaign = get_object_or_404(Campaign, pk=int(campaign_id))
 
             if not _can_manage_campaign_disbursement(request.user, campaign):
                 messages.error(request, "Bạn không có quyền tạo yêu cầu giải ngân cho chiến dịch này!")
