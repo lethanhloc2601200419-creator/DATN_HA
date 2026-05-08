@@ -90,7 +90,7 @@ class BlockchainService:
                     abi=vndt_abi,
                 )
             except Exception as exc:
-                print(f"⚠️ [BLOCKCHAIN] Không load được VNDT contract: {exc}")
+                print(f"⚠️ [BLOCKCHAIN] Không load được VNDT contract: {exc}", flush=True)
                 self.vndt_contract = None
         else:
             self.vndt_contract = None
@@ -99,7 +99,7 @@ class BlockchainService:
 
         try:
             if self.admin_address.lower() != settings.WALLET_ADDRESS.lower():
-                print(f"⚠️ [BLOCKCHAIN] WALLET_ADDRESS không khớp private key: {settings.WALLET_ADDRESS} != {self.admin_address}")
+                print(f"⚠️ [BLOCKCHAIN] WALLET_ADDRESS không khớp private key: {settings.WALLET_ADDRESS} != {self.admin_address}", flush=True)
         except Exception:
             pass
 
@@ -131,7 +131,7 @@ class BlockchainService:
                     'maxPriorityFeePerGas': priority_fee,
                 }
         except Exception as exc:
-            print(f"⚠️ [GAS] Không lấy được baseFeePerGas, fallback legacy gasPrice: {exc}")
+            print(f"⚠️ [GAS] Không lấy được baseFeePerGas, fallback legacy gasPrice: {exc}", flush=True)
 
         return {'gasPrice': int(self.w3.eth.gas_price)}
 
@@ -163,7 +163,8 @@ class BlockchainService:
 
         print(
             f"ℹ️ [TX/PRE] fn={fn_name} chainId={chain_id} contract={contract_address} "
-            f"admin={self.admin_address} value_wei={value_wei} gas_limit={gas_limit}"
+            f"admin={self.admin_address} value_wei={value_wei} gas_limit={gas_limit}",
+            flush=True
         )
 
         # ----- Pre-flight eth_call: phát hiện revert TRƯỚC khi burn gas -----
@@ -174,12 +175,12 @@ class BlockchainService:
                 'value': int(value_wei) if value_wei else 0,
             })
         except ContractLogicError as exc:
-            print(f"❌ [TX/PREFLIGHT] Contract revert trước khi gửi: {exc}")
+            print(f"❌ [TX/PREFLIGHT] Contract revert trước khi gửi: {exc}", flush=True)
             # Ném tiếp với prefix rõ ràng để view layer log thẳng ra Railway.
             raise ContractLogicError(f"Pre-flight revert on {fn_name}: {exc}") from exc
         except Exception as exc:
             # RPC/network lỗi thì không chặn — chỉ log, vẫn thử gửi tx thật.
-            print(f"⚠️ [TX/PREFLIGHT] eth_call lỗi ngoài EVM, bỏ qua: {type(exc).__name__}: {exc}")
+            print(f"⚠️ [TX/PREFLIGHT] eth_call lỗi ngoài EVM, bỏ qua: {type(exc).__name__}: {exc}", flush=True)
 
         last_exc = None
         for attempt in range(max_retries + 1):
@@ -196,7 +197,7 @@ class BlockchainService:
                 f"gasPrice={tx_data['gasPrice']}" if 'gasPrice' in tx_data
                 else f"maxFeePerGas={tx_data.get('maxFeePerGas')} maxPriority={tx_data.get('maxPriorityFeePerGas')}"
             )
-            print(f"ℹ️ [TX] nonce={nonce} {gas_summary}")
+            print(f"ℹ️ [TX] nonce={nonce} {gas_summary}", flush=True)
 
             signed_tx = self.w3.eth.account.sign_transaction(tx_data, settings.WALLET_PRIVATE_KEY)
             try:
@@ -212,7 +213,7 @@ class BlockchainService:
                         tx_data,
                         block_identifier=receipt.blockNumber,
                     )
-                    print(f"❌ [TX] Mined but reverted. tx={tx_hash_hex} reason={reason}")
+                    print(f"❌ [TX] Mined but reverted. tx={tx_hash_hex} reason={reason}", flush=True)
                     raise ContractLogicError(
                         f"{fn_name} reverted on-chain (tx={tx_hash_hex}): {reason}"
                     )
@@ -228,10 +229,10 @@ class BlockchainService:
                 last_exc = e
                 msg = str(e).lower()
                 if attempt < max_retries and ('nonce too low' in msg or 'replacement transaction underpriced' in msg):
-                    print(f"⚠️ [TX RETRY {attempt+1}/{max_retries}] {msg[:80]}... Đợi 5s rồi thử lại.")
+                    print(f"⚠️ [TX RETRY {attempt+1}/{max_retries}] {msg[:80]}... Đợi 5s rồi thử lại.", flush=True)
                     time.sleep(5)
                     continue
-                print(f"❌ [TX] {type(e).__name__}: {e}")
+                print(f"❌ [TX] {type(e).__name__}: {e}", flush=True)
                 raise
 
         # Về mặt lý thuyết không reach, nhưng để an toàn:
@@ -442,7 +443,7 @@ class BlockchainService:
                     self.contract.functions.treasuryWallet().call()
                 )
             except Exception as exc:
-                print(f"⚠️ [FALLBACK] Không đọc được treasuryWallet, tạm dùng admin: {exc}")
+                print(f"⚠️ [FALLBACK] Không đọc được treasuryWallet, tạm dùng admin: {exc}", flush=True)
                 return self.w3.to_checksum_address(self.admin_address)
         return BlockchainService._treasury_cache
 
@@ -699,12 +700,12 @@ def get_eth_vnd_rate():
         if response.ok:
             data = response.json()
             rate = Decimal(str(data['ethereum']['vnd']))
-            print(f"📈 Tỉ giá ETH/VND hiện tại: {rate:,.0f} VNĐ (cached 5 min)")
+            print(f"📈 Tỉ giá ETH/VND hiện tại: {rate:,.0f} VNĐ (cached 5 min)", flush=True)
             _rate_cache['value'] = rate
             _rate_cache['ts'] = now
             return rate
     except Exception as e:
-        print(f"⚠️ Không lấy được tỉ giá từ CoinGecko: {e}")
+        print(f"⚠️ Không lấy được tỉ giá từ CoinGecko: {e}", flush=True)
 
     if _rate_cache['value'] is not None:
         return _rate_cache['value']

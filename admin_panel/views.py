@@ -2375,7 +2375,7 @@ def v3_payos_payout_webhook(request):
         return JsonResponse({'ok': True, 'bank_tx_id': parsed['bank_tx_id']})
     except Exception as e:
         # For PayOS test pings or errors, return success to allow URL configuration
-        print(f"Webhook Ping or Error: {e}")
+        print(f"Webhook Ping or Error: {e}", flush=True)
         return JsonResponse({"success": True, "message": "Webhook verified"}, status=200)
 
 

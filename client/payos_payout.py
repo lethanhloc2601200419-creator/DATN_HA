@@ -215,7 +215,7 @@ def create_payment_link(client_id, api_key, checksum_key, amount, order_code, de
             'paymentLinkId': response['paymentLinkId'],
         }
     except Exception as e:
-        print(f"PAYOS ERROR: Failed to create payment link for orderCode {order_code}: {e}")
+        print(f"PAYOS ERROR: Failed to create payment link for orderCode {order_code}: {e}", flush=True)
         raise e
 
 
