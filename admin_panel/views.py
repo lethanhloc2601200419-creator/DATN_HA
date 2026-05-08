@@ -2041,7 +2041,7 @@ def _get_proposal_v3_eip712_payload(proposal, role, nonce=None, deadline=None):
 
 
 @login_required
-def v3_get_sign_payload(request, pk):
+def sign_payload_v3(request, pk):
     """GET: trả về EIP-712 typed-data để frontend ký qua MetaMask."""
     proposal = get_object_or_404(
         DisbursementProposal.objects.select_related('campaign', 'campaign__organization'), pk=pk
@@ -2060,9 +2060,9 @@ def v3_get_sign_payload(request, pk):
 
 @login_required
 @csrf_exempt
-def v3_submit_signature(request):
+def submit_signature_v3(request, pk):
     """
-    POST JSON body: {proposal_id, role, signer_address, signature, nonce,
+    POST JSON body: {role, signer_address, signature, nonce,
                      deadline, amount_raw, recipient, ipfs_cid}.
     Backend recover signer từ typed-data + chữ ký → nếu khớp signer_address
     thì lưu vào DisbursementSignature (unique per (proposal, role)).
@@ -2077,7 +2077,7 @@ def v3_submit_signature(request):
 
     proposal = get_object_or_404(
         DisbursementProposal.objects.select_related('campaign', 'campaign__organization'),
-        pk=data.get('proposal_id'),
+        pk=pk,
     )
     role = data.get('role')
     signer = (data.get('signer_address') or '').strip()

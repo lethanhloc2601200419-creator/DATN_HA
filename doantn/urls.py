@@ -22,8 +22,7 @@ from admin_panel import views as admin_views
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('admin_panel/', include('admin_panel.urls')),
+    path('admin/', include('admin_panel.urls')),
 
     # --- Google OAuth callback (root level to match Google Cloud Console) ---
     path('accounts/google/login/callback/', admin_views.google_callback, name='google_callback'),

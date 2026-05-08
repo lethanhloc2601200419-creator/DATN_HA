@@ -49,10 +49,10 @@ urlpatterns = [
 
     # ========== [V3] 2-layer disbursement (EIP-712 + PayOS + burn) ==========
     # Phase 2: FE lấy EIP-712 payload để ký → POST signature về backend.
-    path('api/v3/disbursement/<int:pk>/sign-payload/', admin.v3_get_sign_payload,
-         name='v3_get_sign_payload'),
-    path('api/v3/disbursement/submit-signature/', admin.v3_submit_signature,
-         name='v3_submit_signature'),
+    path('api/v3/disbursement/<int:pk>/sign-payload/', admin.sign_payload_v3,
+         name='sign_payload_v3'),
+    path('api/v3/disbursement/<int:pk>/submit-signature/', admin.submit_signature_v3,
+         name='submit_signature_v3'),
     # Phase 3a: Admin relayer submit 3 sigs lên smart3.
     path('api/v3/disbursement/<int:pk>/relay-multisig/',
          admin.v3_execute_multisig_relayer, name='v3_execute_multisig_relayer'),
