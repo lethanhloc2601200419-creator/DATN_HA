@@ -230,21 +230,8 @@ SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 CASSO_SECRET_KEY = os.getenv('CASSO_SECRET_KEY', '')
 
 # =====================================================
-# BLOCKCHAIN CONFIGURATION (Updated for Sepolia)
+# BLOCKCHAIN CONFIGURATION (HARDCODED FOR TESTING)
 # =====================================================
-# ==========================================================================
-# ADMIN RELAYER (GAS STATION) PATTERN
-# --------------------------------------------------------------------------
-# Toàn bộ giao dịch on-chain (recordDonation, donateOnBehalf,
-# executeDisbursement, recordBankDonation, withdrawGasRecovery...) đều được
-# KÝ và GỬI bởi 1 ví Admin duy nhất (WALLET_PRIVATE_KEY). User cuối KHÔNG
-# cần có ETH / MetaMask — admin "trả gas hộ" rồi thu hồi qua cơ chế
-# withdrawGasRecovery trên contract.
-#
-# Đây KHÔNG phải ERC-4337 Paymaster; đây là "meta-transaction qua trung gian
-# tin cậy" — đơn giản, không cần bundler/EntryPoint, và hoạt động với contract
-# hiện tại đang dùng modifier `onlyAdmin` (require msg.sender == admin).
-# ==========================================================================
 
 # Gas pricing:
 # - KHÔNG hardcode gasPrice nữa. Khi biến này bị unset/rỗng/0, blockchain.py
@@ -258,20 +245,27 @@ except ValueError:
     _admin_gwei_val = 0.0
 ADMIN_GAS_PRICE_GWEI = _admin_gwei_val if _admin_gwei_val > 0 else None
 
-# 1. Địa chỉ Smart Contract
+# 1. Token VNDT (smart1.sol)
+VNDT_TOKEN_ADDRESS = '0x05D913ECd54aC20401b096B10d0F4202098B38a4'
+
+# 2. DCP Manager (smart2.sol)
+CONTRACT_ADDRESS = '0x4F36121cC411c2e6Bea4e4a66C4BE78F3cc048E7'
 SMART_CONTRACT_ADDRESS = CONTRACT_ADDRESS
 
-# 2. Private Key ví Admin
+# 3. Disbursement Executor V3 (smart3.sol)
+SMART3_CONTRACT_ADDRESS = '0x725aC680F90Ff7cf723B50aCA1B05e7F4028624c'
+
+# 4. Private Key ví Admin
 WALLET_PRIVATE_KEY = ADMIN_PRIVATE_KEY
 
-# 3. Địa chỉ ví Admin (derived from private key if needed)
+# 5. Địa chỉ ví Admin (derived from private key if needed)
 WALLET_ADDRESS = os.getenv('WALLET_ADDRESS', '')
 
-# 4. Đường dẫn mạng Sepolia (RPC URL)
+# 6. Đường dẫn mạng Sepolia (RPC URL)
 WEB3_PROVIDER_URL = SEPOLIA_RPC_URL
 
-# 5. Mã ABI (loaded from file)
-# - SMART_CONTRACT_ABI : ABI của DCPManager (smart2.sol) — quản lý chiến dịch + SBT.
+# 7. Mã ABI (loaded from file)
+# - SMART_CONTRACT_ABI : ABI của DCPManager (smart2.sol) — quản lý campaign + SBT.
 # - VNDT_ABI           : ABI của VNDT ERC20 (smart1.sol) — chỉ để đọc balance/totalSupply
 #                        từ Django (write-path đi qua DCPManager.recordDonation).
 ABI_FILE_PATH = BASE_DIR / 'blockchain_assets' / 'contract_abi.json'
@@ -298,7 +292,6 @@ except FileNotFoundError:
 # Default fallback = smart3 đã deploy trên Sepolia (2026-03 release).
 # Owner = WALLET_ADDRESS (backend relayer) nên recordMultisigApproval +
 # finalizeBurnWithBankTx (onlyOwner) sẽ pass.
-SMART3_CONTRACT_ADDRESS = os.getenv('SMART3_CONTRACT_ADDRESS', '0x725aC680F90Ff7cf723B50aCA1B05e7F4028624c')
 _smart3_abi_path = BASE_DIR / 'blockchain_assets' / 'smart3_abi.json'
 try:
     with open(_smart3_abi_path, 'r') as f:

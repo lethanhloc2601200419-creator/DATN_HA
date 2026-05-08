@@ -2207,6 +2207,7 @@ def v3_execute_multisig_relayer(request, pk):
                 status=409,
             )
     try:
+        logger.info(f"Relay multisig for proposal {pk}, campaign {proposal.campaign_id}")
         bc = BlockchainService()
         result = bc.record_multisig_approval(
             proposal_id=proposal.id,
