@@ -2062,6 +2062,7 @@ def sign_payload_v3(request, pk):
             return JsonResponse({'ok': False, 'message': 'role không hợp lệ.'}, status=400)
 
         payload = _get_proposal_v3_eip712_payload(proposal, role)
+        logger.info(f"✅ [V3 SIGN] Trả về payload thành công cho PK={pk}")
         return JsonResponse({'ok': True, **payload})
     except Exception as e:
         logger.error(f"XXX [V3 SIGN] CRASH: {traceback.format_exc()}")

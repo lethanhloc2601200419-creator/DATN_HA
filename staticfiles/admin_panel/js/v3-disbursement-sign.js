@@ -35,6 +35,7 @@
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json' },
     });
+    console.log('Response text for sign-payload:', await res.clone().text());
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `GET sign-payload failed (${res.status})`);
@@ -42,8 +43,10 @@
     return data;
   }
 
-  async function submitSignatureToBackend(body) {
-    const res = await fetch('/admin/api/v3/disbursement/submit-signature/', {
+  async function submitSignatureToBackend(proposalId, body) {
+    const url = "/admin/api/v3/disbursement/" + proposalId + "/submit-signature/";
+    console.log(">>> CALLING URL:", url);
+    const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -52,6 +55,7 @@
       },
       body: JSON.stringify(body),
     });
+    console.log('Response text for submit-signature:', await res.clone().text());
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `POST submit-signature failed (${res.status})`);
@@ -73,8 +77,7 @@
         method: 'eth_signTypedData_v4',
         params: [account, typedDataStr],
       });
-      const result = await submitSignatureToBackend({
-        proposal_id: proposalId,
+      const result = await submitSignatureToBackend(proposalId, {
         role,
         signer_address: account,
         signature,

@@ -44,7 +44,9 @@
   }
 
   async function submitSignatureToBackend(proposalId, body) {
-    const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/submit-signature/`, {
+    const url = "/admin/api/v3/disbursement/" + proposalId + "/submit-signature/";
+    console.log(">>> CALLING URL:", url);
+    const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
