@@ -12,6 +12,8 @@ import requests
 import json
 from django.utils.text import slugify
 import time
+import logging
+import traceback
 from django.db.models import Q, Sum
 from .models import (
     CampaignCategory, Organization, TargetProgram, Donation, Campaign,
@@ -29,6 +31,8 @@ from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.files.storage import FileSystemStorage
 from django.utils.html import escape
+
+logger = logging.getLogger(__name__)
 
 # ========================================================
 # 🔥 IMPORT BLOCKCHAIN SERVICE (Thêm dòng này)
@@ -2043,11 +2047,14 @@ def _get_proposal_v3_eip712_payload(proposal, role, nonce=None, deadline=None):
 def sign_payload_v3(request, pk):
     """GET: trả về EIP-712 typed-data để frontend ký qua MetaMask."""
     try:
+        logger.info(f">>> [V3 SIGN] Request nhận được: PK={pk}, User={request.user}, Role={request.GET.get('role')}")
+
         if not request.user.is_authenticated:
             return JsonResponse({'ok': False, 'message': 'Session expired. Please login again.'}, status=401)
 
         proposal = DisbursementProposal.objects.filter(pk=pk).first()
         if not proposal:
+            logger.warning(f"!!! [V3 SIGN] Không tìm thấy Proposal ID={pk}")
             return JsonResponse({'ok': False, 'message': f'Proposal {pk} not found.'}, status=404)
 
         role = request.GET.get('role', '').strip()
@@ -2057,6 +2064,7 @@ def sign_payload_v3(request, pk):
         payload = _get_proposal_v3_eip712_payload(proposal, role)
         return JsonResponse({'ok': True, **payload})
     except Exception as e:
+        logger.error(f"XXX [V3 SIGN] CRASH: {traceback.format_exc()}")
         return JsonResponse({'ok': False, 'message': f'Internal error: {str(e)}'}, status=500)
 
 
@@ -2069,6 +2077,8 @@ def submit_signature_v3(request, pk):
     Khi đủ 3 sig → chuyển v3_status='ready_to_payout'.
     """
     try:
+        logger.info(f">>> [V3 SUBMIT] Body: {request.body}")
+
         if not request.user.is_authenticated:
             return JsonResponse({'ok': False, 'message': 'Session expired. Please login again.'}, status=401)
 
@@ -2100,6 +2110,8 @@ def submit_signature_v3(request, pk):
                                             'Người ký cần reload trang để lấy payload mới.'},
                                 status=400)
 
+        logger.info(">>> [V3 SUBMIT] Đang verify chữ ký...")
+
         bc = BlockchainService()
         typed_data = bc.build_eip712_typed_data(
             proposal_id=proposal.id, campaign_id=proposal.campaign_id,
@@ -2109,6 +2121,7 @@ def submit_signature_v3(request, pk):
         recovered = bc.recover_eip712_signer(typed_data, signature)
 
         if recovered.lower() != signer.lower():
+            logger.error(f"!!! [V3 SUBMIT] Signer mismatch: Rec={recovered}, Claimed={signer}")
             return JsonResponse({'ok': False,
                                  'message': f'Signer không khớp. Recovered={recovered}, claimed={signer}'},
                                 status=400)

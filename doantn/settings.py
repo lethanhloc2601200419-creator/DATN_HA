@@ -309,6 +309,27 @@ except FileNotFoundError:
 
 
 
+# Logging configuration for Railway console output
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'admin_panel.views': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
 # Ép Django trả đúng định dạng JS, chống lỗi MIME text/plain trên Arch Linux
 import mimetypes
 mimetypes.add_type("application/javascript", ".js", True)
