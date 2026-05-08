@@ -29,6 +29,7 @@ idna==3.11
 multidict==6.7.1
 oauthlib==3.3.1
 packaging==26.2
+payos==1.1.0
 parsimonious==0.10.0
 pillow==12.1.1
 propcache==0.4.1

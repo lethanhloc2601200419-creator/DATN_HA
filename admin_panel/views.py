@@ -1480,23 +1480,51 @@ def quanly_giaingan(request):
             'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
         }
 
-        # Generate PayOS QR only after successful relay (Phase 3a done)
+        # =============================================================
+        # PayOS Checkout link — CHỈ tạo khi đã relay multisig thành công
+        # (Phase 3a done). SỬ DỤNG CREDENTIALS RIÊNG CỦA ORGANIZATION, không
+        # dùng platform-wide keys của luồng donation.
+        # =============================================================
         if p.v3_status == 'ready_to_payout' and p.multisig_confirmed_tx_hash:
             org = p.campaign.organization
-            if org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
-                try:
-                    link = _payos_create_payment_link(
-                        org.payos_client_id,
-                        org.payos_api_key,
-                        org.payos_checksum_key,
-                        int(p.amount_requested),
-                        str(p.id),
-                        f'Payment for disbursement proposal {p.id}'
-                    )
+            if org and org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
+                # orderCode PayOS: phải là INTEGER unique, ≤ 9007199254740991.
+                # Format: `{proposal_id}{ms_timestamp % 100000}` — luôn < 10^15,
+                # tránh trùng với lần tạo link trước đó (PayOS từ chối duplicate).
+                order_code = int(f"{p.id}{int(time.time() * 1000) % 100000}")
+                # Redirect URL: ưu tiên settings.SITE_URL để local-dev không bị
+                # lạc sang production domain.
+                base_url = (getattr(settings, 'SITE_URL', '') or '').rstrip('/')
+                if not base_url:
+                    try:
+                        base_url = request.build_absolute_uri('/').rstrip('/')
+                    except Exception:
+                        base_url = ''
+                return_url = f"{base_url}/admin/giaingan/" if base_url else None
+                cancel_url = return_url
+
+                description = f"DCP-DISB-{p.id}"[:25]
+                link = _payos_create_payment_link(
+                    org.payos_client_id,
+                    org.payos_api_key,
+                    org.payos_checksum_key,
+                    int(p.amount_requested),
+                    order_code,
+                    description,
+                    cancel_url=cancel_url,
+                    return_url=return_url,
+                )
+                if link:
                     item['qr_code_url'] = link.get('qrCode')
                     item['checkout_url'] = link.get('checkoutUrl')
-                except Exception as e:
-                    logger.warning(f"Failed to create PayOS link for proposal {p.id}: {e}")
+                else:
+                    # Link thất bại — chi tiết lỗi đã được print(..., flush=True)
+                    # trong `create_payment_link`. Log thêm context ở warning level.
+                    logger.warning(
+                        f"Failed to create PayOS payment link for proposal {p.id} "
+                        f"(org={org.id}, orderCode={order_code}). "
+                        "Xem stdout logs để biết lý do PayOS reject."
+                    )
 
         proposals_data.append(item)
 

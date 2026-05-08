@@ -187,36 +187,149 @@ def _compute_hmac(payload: Dict[str, Any], checksum_key: str) -> str:
     return mac.hexdigest()
 
 
-def create_payment_link(client_id, api_key, checksum_key, amount, order_code, description):
+def create_payment_link(
+    client_id,
+    api_key,
+    checksum_key,
+    amount,
+    order_code,
+    description,
+    cancel_url=None,
+    return_url=None,
+):
     """
-    Tạo PayOS Payment Link cho admin scan QR và thanh toán thủ công.
-    """
-    if PAYOS_PAYOUT_MOCK:
-        return {
-            'checkoutUrl': f'https://my.payos.vn/checkout?orderCode={order_code}',
-            'qrCode': f'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://my.payos.vn/checkout?orderCode={order_code}',
-            'paymentLinkId': f'mock-link-{order_code}',
-        }
+    Tạo PayOS Payment Link (Checkout) cho luồng GIẢI NGÂN — mỗi Organization
+    có bộ credentials (client_id / api_key / checksum_key) RIÊNG, không dùng
+    credentials platform-wide của luồng donation.
 
-    # Real PayOS API call
+    Parameters
+    ----------
+    client_id / api_key / checksum_key : str
+        Credentials PayOS của Organization (lưu trong Organization model).
+    amount : int
+        Số tiền (VNĐ, integer).
+    order_code : int
+        Mã đơn hàng. BẮT BUỘC là integer duy nhất, tối đa 9007199254740991
+        (Number.MAX_SAFE_INTEGER của JS). Caller chịu trách nhiệm sinh
+        unique (thường dùng `int(f"{proposal.id}{int(time.time()*1000) % 100000}")`).
+    description : str
+        Mô tả giao dịch (PayOS giới hạn 25 ký tự).
+    cancel_url / return_url : str
+        URL redirect sau khi khách hủy / hoàn tất thanh toán.
+
+    Returns
+    -------
+    dict | None
+        `{'checkoutUrl', 'qrCode', 'paymentLinkId'}` nếu thành công.
+        `None` nếu PayOS reject — lỗi đã được in ra stdout với flush=True.
+        KHÔNG raise để caller (view) có thể render UI bình thường mà không
+        crash 500.
+    """
+    # Validate credentials trước khi gọi API — tránh roundtrip network vô ích.
+    if not (client_id and api_key and checksum_key):
+        print(
+            f"PAYOS ERROR: thiếu credentials cho orderCode={order_code} "
+            f"(client_id={bool(client_id)}, api_key={bool(api_key)}, checksum_key={bool(checksum_key)})",
+            flush=True,
+        )
+        return None
+
+    # PayOS yêu cầu orderCode là số nguyên ≤ 9007199254740991 (Number.MAX_SAFE_INTEGER).
+    try:
+        order_code_int = int(order_code)
+    except (TypeError, ValueError):
+        print(f"PAYOS ERROR: orderCode không phải số nguyên: {order_code!r}", flush=True)
+        return None
+    if order_code_int <= 0 or order_code_int > 9007199254740991:
+        print(
+            f"PAYOS ERROR: orderCode={order_code_int} vượt quá giới hạn "
+            f"(1..9007199254740991).",
+            flush=True,
+        )
+        return None
+
+    amount_int = int(amount)
+    # PayOS description giới hạn 25 ký tự; cắt ngay để tránh contract error.
+    description = (description or '')[:25] or f"DISBURSE{order_code_int}"[-25:]
+
+    fallback_url = 'https://web-production-e589d.up.railway.app/admin/giaingan/'
+    payment_data = {
+        'orderCode': order_code_int,
+        'amount': amount_int,
+        'description': description,
+        'cancelUrl': cancel_url or fallback_url,
+        'returnUrl': return_url or fallback_url,
+    }
+
     try:
         from payos import PayOS
-        payos_client = PayOS(client_id=client_id, api_key=api_key, checksum_key=checksum_key)
-        response = payos_client.createPaymentLink({
-            'orderCode': int(order_code),  # Ensure unique per org
-            'amount': int(amount),
-            'description': description,
-            'cancelUrl': 'https://web-production-e589d.up.railway.app/admin/giaingan/',  # Redirect back
-            'returnUrl': 'https://web-production-e589d.up.railway.app/admin/giaingan/',  # Redirect back
-        })
-        return {
-            'checkoutUrl': response['checkoutUrl'],
-            'qrCode': response['qrCode'],
-            'paymentLinkId': response['paymentLinkId'],
-        }
-    except Exception as e:
-        print(f"PAYOS ERROR: Failed to create payment link for orderCode {order_code}: {e}", flush=True)
-        raise e
+        # SDK 1.1.0: `PaymentData` + `ItemData` nằm ở `payos.type` (không phải
+        # `payos.types`). Method `createPaymentLink` bắt buộc arg là instance
+        # `PaymentData`, pass dict sẽ raise ValueError trực tiếp.
+        from payos.type import PaymentData, ItemData
+    except ImportError as exc:
+        print(
+            f"PAYOS ERROR: Python SDK 'payos' chưa được cài đặt hoặc sai version ({exc}). "
+            "Chạy `pip install payos==1.1.0` rồi deploy lại.",
+            flush=True,
+        )
+        return None
+
+    try:
+        # Khởi tạo PayOS CLIENT RIÊNG theo credentials của Organization — đây là
+        # điểm khác biệt then chốt so với luồng donation (dùng settings platform-wide).
+        payos_client = PayOS(
+            client_id=client_id,
+            api_key=api_key,
+            checksum_key=checksum_key,
+        )
+        pd = PaymentData(
+            orderCode=payment_data['orderCode'],
+            amount=payment_data['amount'],
+            description=payment_data['description'],
+            cancelUrl=payment_data['cancelUrl'],
+            returnUrl=payment_data['returnUrl'],
+            items=[ItemData(name=description, quantity=1, price=amount_int)],
+        )
+        response = payos_client.createPaymentLink(pd)
+    except Exception as exc:
+        # In FULL error để dev biết PayOS từ chối vì lý do gì (wrong key, duplicate
+        # orderCode, IP whitelist, ...). flush=True để Railway logs hiện ngay.
+        print(
+            f"PAYOS ERROR: createPaymentLink failed for orderCode={order_code_int} "
+            f"amount={amount_int}đ — {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return None
+
+    # SDK có thể trả về object (có attribute) hoặc dict — normalize về dict.
+    def _get(obj, key):
+        if isinstance(obj, dict):
+            return obj.get(key)
+        return getattr(obj, key, None)
+
+    checkout_url = _get(response, 'checkoutUrl')
+    qr_code = _get(response, 'qrCode')
+    payment_link_id = _get(response, 'paymentLinkId')
+
+    if not checkout_url:
+        print(
+            f"PAYOS ERROR: response thiếu checkoutUrl cho orderCode={order_code_int}. "
+            f"Raw response: {response!r}",
+            flush=True,
+        )
+        return None
+
+    print(
+        f"✅ PAYOS: tạo payment link OK — orderCode={order_code_int} amount={amount_int}đ "
+        f"url={checkout_url[:80]}...",
+        flush=True,
+    )
+    return {
+        'checkoutUrl': checkout_url,
+        'qrCode': qr_code,
+        'paymentLinkId': payment_link_id,
+    }
 
 
 class PayoutRequestError(Exception):
