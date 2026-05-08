@@ -1281,127 +1281,41 @@ def quanly_giaingan(request):
         return redirect('client:trangchu')
 
     # ========================================================
-    # LUỒNG V2: Công thức động theo số lần tạo giải ngân
-    #   onchain_available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
-    #   LẦN ĐẦU tạo giải ngân (chưa có proposal nào non-rejected):
-    #     net_available = onchain_available - est_disbursement_gas - est_recovery_gas - locked
-    #     (dự trù 2 phí: 1 cho tx giải ngân + 1 cho tx thu hồi gas cuối cùng)
-    #   LẦN 2 TRỞ ĐI:
-    #     net_available = onchain_available - est_disbursement_gas - locked
-    #     (chỉ dự trù 1 phí vì est_recovery_gas đã được reserve từ lần đầu)
-    #
-    #   Nút "Thu hồi gas" chỉ hiện khi: campaign đã hết hạn VÀ onchain_available ≈ 0
+    # V3 MATH — available_amount = current_amount - sum(in-flight V3 proposals).
+    # In-flight = mọi proposal CHƯA bị reject / payout_failed (tức đang giữ chỗ
+    # trong quỹ, bao gồm cả completed_audited vì tiền đã chuyển khỏi quỹ).
+    # Không còn trừ gas/locked như V2 vì Admin trả gas silent ngoài quỹ và
+    # không còn cơ chế voting-lock nữa.
     # ========================================================
-    campaigns_with_available = []
-    bc = None
-    eth_vnd_rate = None
-    est_disbursement_gas_vnd = Decimal('0')
-    est_recovery_gas_vnd = Decimal('0')
-
-    # Breakdown hiển thị - Luồng v2 mới (gas A/B đã recordGasCost vào contract)
-    bank_record_gas_map = {
-        row['campaign_id']: (row['total'] or Decimal('0'))
-        for row in Donation.objects.filter(bank_record_gas_vnd__isnull=False).values('campaign_id').annotate(total=Sum('bank_record_gas_vnd'))
-    }
-    donate_onbehalf_gas_map = {
-        row['campaign_id']: (row['total'] or Decimal('0'))
-        for row in Donation.objects.filter(donate_onbehalf_gas_vnd__isnull=False).values('campaign_id').annotate(total=Sum('donate_onbehalf_gas_vnd'))
-    }
-    # Legacy (luồng cũ) - giữ để tương thích với donation cũ
-    admin_sendeth_gas_map = {
-        row['campaign_id']: (row['total'] or Decimal('0'))
-        for row in Donation.objects.filter(admin_send_eth_gas_fee_vnd__isnull=False).values('campaign_id').annotate(total=Sum('admin_send_eth_gas_fee_vnd'))
-    }
-    disbursement_gas_map = {
-        row['campaign_id']: (row['total'] or Decimal('0'))
-        for row in DisbursementProposal.objects.filter(status='executed').values('campaign_id').annotate(total=Sum('disbursement_gas_fee_vnd'))
-    }
-    # Map: chiến dịch đã có proposal non-rejected chưa? (để xác định lần đầu / lần 2+)
-    non_rejected_proposal_ids = set(
-        DisbursementProposal.objects.exclude(status='rejected').values_list('campaign_id', flat=True)
+    V3_IN_FLIGHT_STATUSES = (
+        'v3_not_started',      # default cho proposal mới nhưng chưa sign — vẫn giữ chỗ
+        'pending_multisig',
+        'ready_to_payout',
+        'payout_processing',
+        'fiat_transferred',
+        'completed_audited',
     )
+    # 1 query duy nhất: gom SUM(amount_requested) theo campaign_id cho mọi proposal
+    # chưa rejected/failed. Tránh N+1 khi picker có nhiều campaign.
+    in_flight_map = {
+        row['campaign_id']: (row['total'] or Decimal('0'))
+        for row in DisbursementProposal.objects
+            .exclude(status='rejected')
+            .exclude(v3_status='payout_failed')
+            .filter(v3_status__in=V3_IN_FLIGHT_STATUSES)
+            .values('campaign_id')
+            .annotate(total=Sum('amount_requested'))
+    }
 
-    try:
-        bc = BlockchainService()
-        eth_vnd_rate = get_eth_vnd_rate()
-        est_gas_vnd, _est_gas_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
-        est_disbursement_gas_vnd = est_gas_vnd
-        est_recovery_gas_vnd = est_gas_vnd  # cùng công thức ước tính (1 tx on-chain)
-    except Exception:
-        bc = None
-        eth_vnd_rate = None
-
-    today = timezone.localdate()  # datetime.date - so sánh với end_date (DateField)
+    campaigns_with_available = []
     for c in campaigns:
-        gas_bank_record_vnd = bank_record_gas_map.get(c.id, Decimal('0'))
-        gas_donate_onbehalf_vnd = donate_onbehalf_gas_map.get(c.id, Decimal('0'))
-        gas_admin_sendeth_vnd = admin_sendeth_gas_map.get(c.id, Decimal('0'))  # legacy
-        gas_disbursement_actual_vnd = disbursement_gas_map.get(c.id, Decimal('0'))
-        gas_onchain_total_cost_vnd = Decimal('0')  # totalGasCost on-chain (đã cộng dồn)
-        gas_recovered_vnd = Decimal('0')
-        onchain_total_fund_vnd = c.current_amount
-        # SQL fallback: CHƯA trừ locked ở đây (locked sẽ trừ 1 lần duy nhất khi tính net_available)
-        onchain_available_vnd = max(Decimal('0'), c.current_amount - c.disbursed_amount)
-
-        # Lần đầu tạo giải ngân? (chưa có proposal nào non-rejected cho campaign này)
-        is_first_disbursement = c.id not in non_rejected_proposal_ids
-
-        if bc and eth_vnd_rate:
-            try:
-                stats = bc.get_campaign_onchain_stats(c.id)
-                # Dùng total_gas_cost_wei (v2); fallback total_gas_subsidized_wei (alias backward-compat)
-                total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
-                # onchain_available = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered
-                available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
-                gas_onchain_total_cost_vnd = _round_vnd(_wei_to_vnd(total_gas_cost_wei, eth_vnd_rate))
-                gas_recovered_vnd = _round_vnd(_wei_to_vnd(stats['total_admin_recovered_wei'], eth_vnd_rate))
-                onchain_total_fund_vnd = _round_vnd(_wei_to_vnd(stats['total_fund_wei'], eth_vnd_rate))
-                onchain_available_vnd = _round_vnd(_wei_to_vnd(max(0, available_wei), eth_vnd_rate))
-            except Exception:
-                pass
-
-        # Công thức động:
-        #   lần đầu → trừ 2 phí (disbursement + recovery)
-        #   lần 2+  → chỉ trừ 1 phí (disbursement)
-        if is_first_disbursement:
-            reserve_gas_vnd = _round_vnd(est_disbursement_gas_vnd) + _round_vnd(est_recovery_gas_vnd)
-        else:
-            reserve_gas_vnd = _round_vnd(est_disbursement_gas_vnd)
-        net_available = onchain_available_vnd - reserve_gas_vnd - c.locked_amount
-
-        # Nút "Thu hồi gas" chỉ hiện khi campaign đã hết hạn VÀ đã giải ngân hết
-        # (onchain_available = 0 nghĩa là không còn tiền để giải ngân tiếp)
-        # Lưu ý: c.end_date là DateField (date) nên so với today (date) thay vì now (datetime)
-        is_ended = bool(c.end_date) and c.end_date < today
-        fully_disbursed = onchain_available_vnd <= FULLY_DISBURSED_THRESHOLD_VND
-        can_recover_gas = is_ended and fully_disbursed
-
-        # total_gas_vnd chỉ để hiển thị "tổng phí gas đã chi + dự trù"
-        total_gas_display_vnd = gas_onchain_total_cost_vnd + _round_vnd(gas_admin_sendeth_vnd) + _round_vnd(gas_disbursement_actual_vnd) + reserve_gas_vnd
+        in_flight_amount = in_flight_map.get(c.id, Decimal('0'))
+        raw_available = (c.current_amount or Decimal('0')) - in_flight_amount
+        available_amount = _round_vnd(max(Decimal('0'), raw_available))
         campaigns_with_available.append({
             'obj': c,
-            'total_gas_vnd': _round_vnd(total_gas_display_vnd),
-            # Luồng v2 breakdown
-            'gas_bank_record_vnd': _round_vnd(gas_bank_record_vnd),
-            'gas_donate_onbehalf_vnd': _round_vnd(gas_donate_onbehalf_vnd),
-            'gas_onchain_total_cost_vnd': gas_onchain_total_cost_vnd,
-            # Legacy
-            'gas_admin_sendeth_vnd': _round_vnd(gas_admin_sendeth_vnd),
-            'gas_disbursement_actual_vnd': _round_vnd(gas_disbursement_actual_vnd),
-            # Gas dự trù (động theo lần)
-            'est_disbursement_gas_vnd': _round_vnd(est_disbursement_gas_vnd),
-            'est_recovery_gas_vnd': _round_vnd(est_recovery_gas_vnd),
-            'reserve_gas_vnd': reserve_gas_vnd,
-            'is_first_disbursement': is_first_disbursement,
-            # Onchain info
-            'onchain_available_vnd': onchain_available_vnd,
-            'gas_recovered_vnd': gas_recovered_vnd,
-            'onchain_total_fund_vnd': _round_vnd(onchain_total_fund_vnd),
-            'net_available': max(Decimal('0'), _round_vnd(net_available)),
-            # Điều kiện thu hồi gas
-            'can_recover_gas': can_recover_gas,
-            'is_ended': is_ended,
-            'fully_disbursed': fully_disbursed,
+            'in_flight_amount': _round_vnd(in_flight_amount),
+            'available_amount': available_amount,
         })
 
     campaign_filter = request.GET.get('campaign')
@@ -1773,42 +1687,24 @@ def tao_yeucau_giaingan(request):
 
             amount_raw = (request.POST.get('amount_requested', '0') or '0').replace(',', '')
             amount = _round_vnd(Decimal(amount_raw))
-            total_gas_fees = Decimal('0')
 
-            # Xác định lần tạo giải ngân (lần đầu hay lần 2+)
-            is_first_disbursement = not DisbursementProposal.objects.filter(
-                campaign=campaign
-            ).exclude(status='rejected').exists()
+            # V3 MATH: available = current_amount - sum(amount_requested for in-flight V3 proposals).
+            # Khớp với logic của campaigns_with_available ở trang danh sách.
+            V3_IN_FLIGHT_STATUSES = (
+                'v3_not_started', 'pending_multisig', 'ready_to_payout',
+                'payout_processing', 'fiat_transferred', 'completed_audited',
+            )
+            in_flight_sum = DisbursementProposal.objects.filter(
+                campaign=campaign,
+                v3_status__in=V3_IN_FLIGHT_STATUSES,
+            ).exclude(status='rejected').exclude(v3_status='payout_failed').aggregate(
+                t=Sum('amount_requested'))['t'] or Decimal('0')
+            available = _round_vnd(max(Decimal('0'), (campaign.current_amount or Decimal('0')) - in_flight_sum))
 
-            # Bắt đầu với SQL fallback: onchain_available = current - disbursed (chưa trừ locked)
-            onchain_available_vnd = max(Decimal('0'), campaign.current_amount - campaign.disbursed_amount)
-            est_per_tx = Decimal('0')
-            gas_onchain_cost_vnd = Decimal('0')
-
-            try:
-                bc = BlockchainService()
-                eth_vnd_rate = get_eth_vnd_rate()
-                stats = bc.get_campaign_onchain_stats(campaign.id)
-                # V2: dùng total_gas_cost_wei (contract mới, đã cộng dồn gas A+B+C qua recordGasCost)
-                total_gas_cost_wei = stats.get('total_gas_cost_wei', stats.get('total_gas_subsidized_wei', 0))
-                available_wei = stats['total_fund_wei'] - total_gas_cost_wei - stats['total_disbursed_wei'] - stats['total_admin_recovered_wei']
-                est_gas_vnd, _est_wei = estimate_gas_per_tx_vnd(eth_vnd_rate, bc=bc)
-                est_per_tx = _round_vnd(est_gas_vnd)
-                gas_onchain_cost_vnd = _round_vnd(_wei_to_vnd(total_gas_cost_wei, eth_vnd_rate))
-                onchain_available_vnd = _round_vnd(_wei_to_vnd(max(0, available_wei), eth_vnd_rate))
-            except Exception:
-                pass
-
-            # CÔNG THỨC ĐỘNG (áp dụng cả khi BlockchainService fail để tránh bypass):
-            #   lần đầu   → trừ 2 phí dự trù (giải ngân + thu hồi)
-            #   lần 2+    → chỉ trừ 1 phí dự trù (giải ngân)
-            reserve_gas = est_per_tx * 2 if is_first_disbursement else est_per_tx
-            total_gas_fees = gas_onchain_cost_vnd + reserve_gas
-            available = onchain_available_vnd - reserve_gas - campaign.locked_amount
-            available = _round_vnd(max(Decimal('0'), available))
             if amount > available:
-                lan_msg = "lần đầu (dự trù 2 phí: giải ngân + thu hồi gas)" if is_first_disbursement else "lần tiếp theo (chỉ dự trù phí giải ngân)"
-                messages.error(request, f"Số tiền vượt quá số dư khả dụng ({int(available):,}đ). Đã trừ phí gas {int(total_gas_fees):,}đ [{lan_msg}].")
+                messages.error(request,
+                               f"Số tiền vượt quá số dư khả dụng ({int(available):,}đ). "
+                               f"(Đã trừ {int(in_flight_sum):,}đ đang ở các đề xuất V3 chưa hoàn tất.)")
                 return redirect('admin_panel:quanly_giaingan')
 
             proposal = DisbursementProposal()
