@@ -1268,6 +1268,62 @@ def sua_quyengop(request, pk):
 # QUẢN LÝ GIẢI NGÂN
 # ========================================================
 
+
+# =============================================================
+# [V3] PUBLIC return/cancel pages cho PayOS Checkout (payout)
+# -------------------------------------------------------------
+# PayOS trả user về `returnUrl` / `cancelUrl` sau khi thanh toán.
+# Các URL này PHẢI PUBLIC (không @login_required) vì:
+#   1. PayOS success page có thể prefetch/validate URL — nếu URL trả
+#      302 redirect về login → PayOS Next.js page crash
+#      ("Application error: a server-side exception has occurred").
+#   2. User thanh toán xong có thể session admin đã expired.
+# -------------------------------------------------------------
+# KHỚP 1:1 với pattern `client:payos_return` / `client:payos_cancel`
+# của luồng donation (đang chạy ổn định).
+# =============================================================
+def v3_payout_return(request, pk):
+    """Trang public PayOS redirect về sau khi admin thanh toán xong."""
+    proposal = get_object_or_404(
+        DisbursementProposal.objects.select_related('campaign', 'campaign__organization'),
+        pk=pk,
+    )
+    status = (request.GET.get('status') or '').upper()
+    is_cancelled = (request.GET.get('cancel') or '').lower() == 'true'
+    order_code = request.GET.get('orderCode')
+    if is_cancelled or status == 'CANCELLED':
+        return render(request, 'client/payment_failed.html', {
+            'message': f'Đã huỷ thanh toán PayOS cho đề xuất giải ngân #{proposal.id}.',
+        })
+    org = proposal.campaign.organization
+    proposal_view = SimpleNamespace(
+        id=proposal.id,
+        donor_name=(proposal.recipient_name or (org.name if org else 'Quỹ tổ chức')),
+        campaign=proposal.campaign,
+        amount=proposal.amount_requested,
+        created_at=proposal.created_at,
+    )
+    return render(request, 'client/payment_success.html', {
+        'donation': proposal_view,
+        'payment_provider': 'PayOS',
+        'payment_status': status or 'PAID',
+        'show_blockchain_status': False,
+        'message': (
+            f'Đã ghi nhận thanh toán giải ngân #{proposal.id}. '
+            'Hệ thống sẽ xác nhận chính thức khi PayOS webhook hợp lệ.'
+        ),
+        'payos_order_code': order_code or '',
+    })
+
+
+def v3_payout_cancel(request, pk):
+    """Trang public PayOS redirect về khi user huỷ thanh toán."""
+    proposal = get_object_or_404(DisbursementProposal, pk=pk)
+    return render(request, 'client/payment_failed.html', {
+        'message': f'Bạn đã huỷ thanh toán PayOS cho đề xuất giải ngân #{proposal.id}.',
+    })
+
+
 @login_required(login_url='admin_panel:dangnhap')
 def quanly_giaingan(request):
     user = request.user
@@ -1492,16 +1548,16 @@ def quanly_giaingan(request):
                 # Format: `{proposal_id}{ms_timestamp % 100000}` — luôn < 10^15,
                 # tránh trùng với lần tạo link trước đó (PayOS từ chối duplicate).
                 order_code = int(f"{p.id}{int(time.time() * 1000) % 100000}")
-                # Redirect URL: ưu tiên settings.SITE_URL để local-dev không bị
-                # lạc sang production domain.
-                base_url = (getattr(settings, 'SITE_URL', '') or '').rstrip('/')
-                if not base_url:
-                    try:
-                        base_url = request.build_absolute_uri('/').rstrip('/')
-                    except Exception:
-                        base_url = ''
-                return_url = f"{base_url}/admin/giaingan/" if base_url else None
-                cancel_url = return_url
+                # Return/cancel URLs PHẢI là 2 URL PUBLIC KHÁC nhau (khớp 1:1 với
+                # luồng donation). Trỏ tới `/admin/giaingan/` (auth-protected) sẽ
+                # khiến PayOS success page crash với 'Application error: a
+                # server-side exception' khi PayOS Next.js validate/render URL.
+                return_url = request.build_absolute_uri(
+                    reverse('admin_panel:v3_payout_return', args=[p.id])
+                )
+                cancel_url = request.build_absolute_uri(
+                    reverse('admin_panel:v3_payout_cancel', args=[p.id])
+                )
 
                 description = f"DCP-DISB-{p.id}"[:25]
                 link = _payos_create_payment_link(

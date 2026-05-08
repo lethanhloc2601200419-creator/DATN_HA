@@ -211,10 +211,24 @@ _SIGNATURE_FIELDS = ('amount', 'cancelUrl', 'description', 'orderCode', 'returnU
 
 
 def _normalize_payos_value(value):
+    # Canonical normalization KHỚP HỆT `client/views.py::_normalize_payos_value` để
+    # đảm bảo HMAC signature payout flow === donation flow (PayOS server side verify
+    # theo cùng 1 thuật toán — chỉ khác checksum key giữa 2 luồng).
     if value in (None, 'undefined', 'null'):
         return ''
     if isinstance(value, bool):
         return 'true' if value else 'false'
+    if isinstance(value, list):
+        normalized_items = []
+        for item in value:
+            if isinstance(item, dict):
+                normalized_items.append({k: _normalize_payos_value(v) for k, v in sorted(item.items())})
+            else:
+                normalized_items.append(_normalize_payos_value(item))
+        return _json.dumps(normalized_items, ensure_ascii=False, separators=(',', ':'))
+    if isinstance(value, dict):
+        normalized_dict = {k: _normalize_payos_value(v) for k, v in sorted(value.items())}
+        return _json.dumps(normalized_dict, ensure_ascii=False, separators=(',', ':'))
     return str(value)
 
 
@@ -300,18 +314,28 @@ def create_payment_link(
     # PayOS description giới hạn 25 ký tự; cắt ngay để tránh contract error.
     description = (description or '')[:25] or f"DISBURSE{order_code_int}"[-25:]
 
-    fallback_url = 'https://web-production-e589d.up.railway.app/admin/giaingan/'
+    # Fallback URL KHÔNG được trỏ tới page auth-protected (`/admin/giaingan/`)
+    # vì PayOS success page validate/render URL → trả 302 redirect sẽ khiến
+    # Next.js page của PayOS crash "Application error". Chỉ dùng khi caller quên
+    # truyền — trỏ tới root domain là an toàn nhất.
+    fallback_url = 'https://web-production-e589d.up.railway.app/'
     cancel_url_final = cancel_url or fallback_url
     return_url_final = return_url or fallback_url
 
     # expiredAt: 15 phút từ hiện tại (khớp luồng donation). PayOS cần int timestamp.
     expired_at = int(time.time() + 15 * 60)
 
+    # Payload format KHỚP HỆT luồng donation (`client/views.py::_create_payos_payment_link`):
+    # đủ các field buyer* (empty string nếu không có) + items + expiredAt.
+    # Thiếu `buyerEmail`/`buyerPhone` có thể khiến PayOS success page (Next.js) crash
+    # khi render thông tin buyer → "Application error: a server-side exception".
     payload = {
         'orderCode': order_code_int,
         'amount': amount_int,
         'description': description,
         'buyerName': 'Quy to chuc',
+        'buyerEmail': '',
+        'buyerPhone': '',
         'items': [
             {
                 'name': description[:25] or 'Giai ngan',

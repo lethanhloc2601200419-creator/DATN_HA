@@ -22,6 +22,12 @@ urlpatterns = [
          name='payos_payout_webhook'),
     path('api/v3/disbursement/<int:pk>/simulate-webhook/',
          admin.v3_simulate_webhook, name='v3_simulate_webhook'),
+    # [V3] PayOS return/cancel PUBLIC pages (không @login_required) — tránh PayOS
+    # success page crash khi URL trả 302 redirect về login.
+    path('giaingan/payos/<int:pk>/return/', admin.v3_payout_return,
+         name='v3_payout_return'),
+    path('giaingan/payos/<int:pk>/cancel/', admin.v3_payout_cancel,
+         name='v3_payout_cancel'),
 
     path('trangchu/', admin.trangchu, name='trangchu'),
     path('dangnhap/', admin.dangnhap, name='dangnhap'),
