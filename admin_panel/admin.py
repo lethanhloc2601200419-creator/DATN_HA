@@ -91,6 +91,11 @@ class OrganizationAdmin(admin.ModelAdmin):
                 'wallet_verified_by_admin', 'wallet_verified_at', 'wallet_verified_by',
             ),
         }),
+        ('PayOS Credentials', {
+            'fields': (
+                'payos_client_id', 'payos_api_key', 'payos_checksum_key',
+            ),
+        }),
         ('Dấu thời gian', {
             'fields': ('created_at', 'updated_at'),
         }),

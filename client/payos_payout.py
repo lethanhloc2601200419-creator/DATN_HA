@@ -149,28 +149,23 @@ def verify_webhook_signature(payload: Dict[str, Any], signature: str) -> bool:
 
 def parse_webhook(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Trích các field quan trọng từ webhook payload.
+    Trích các field quan trọng từ webhook payload (for payment success).
 
     Returns dict với keys:
-        payout_id   : PayOS payout ID (match với proposal.payos_payout_id)
+        orderCode   : PayOS orderCode (proposal.id)
         bank_tx_id  : Bank Transaction ID — LÀ FIELD QUAN TRỌNG NHẤT,
-                      sẽ được lưu on-chain qua burnWithBankTx().
-        status      : 'success' | 'failed' | 'pending'
+                      sẽ được lưu on-chain qua finalizeBurnWithBankTx().
+        status      : 'success' | 'failed'
         amount      : int (VND)
     """
-    raw_status = str(payload.get('status', '')).upper()
-    status_map = {
-        'SUCCESS': 'success',
-        'COMPLETED': 'success',
-        'FAILED': 'failed',
-        'REJECTED': 'failed',
-    }
+    # For payment webhook, status is 'success' if code == '00'
+    code = payload.get('code')
+    status = 'success' if code == '00' else 'failed'
     return {
-        'payout_id': payload.get('payoutId') or payload.get('payout_id'),
-        'bank_tx_id': payload.get('bankTransactionId') or payload.get('bank_transaction_id'),
-        'status': status_map.get(raw_status, 'pending'),
+        'orderCode': payload.get('orderCode'),
+        'bank_tx_id': payload.get('counterAccountBankId') or payload.get('transactionNo'),
+        'status': status,
         'amount': int(payload.get('amount') or 0),
-        'reference_id': payload.get('referenceId') or payload.get('reference_id'),
     }
 
 
@@ -190,6 +185,21 @@ def _compute_hmac(payload: Dict[str, Any]) -> str:
         hashlib.sha256,
     )
     return mac.hexdigest()
+
+
+def create_payment_link(client_id, api_key, checksum_key, amount, order_code, description):
+    """
+    Tạo PayOS Payment Link cho admin scan QR và thanh toán thủ công.
+    """
+    if PAYOS_PAYOUT_MOCK:
+        return {
+            'checkoutUrl': f'https://my.payos.vn/checkout?orderCode={order_code}',
+            'qrCode': f'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://my.payos.vn/checkout?orderCode={order_code}',
+            'paymentLinkId': f'mock-link-{order_code}',
+        }
+    # TODO: Implement real PayOS API call to /v2/payment-requests
+    # Use client_id, api_key, checksum_key
+    # Return {'checkoutUrl': ..., 'qrCode': ..., 'paymentLinkId': ...}
 
 
 class PayoutRequestError(Exception):

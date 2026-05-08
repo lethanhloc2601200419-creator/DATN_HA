@@ -292,8 +292,14 @@
                             </button>
                             {% endif %}
 
-                            {# ---- READY_TO_PAYOUT: Admin Execute PayOS ---- #}
-                            {% if item.can_trigger_payout %}
+                            {# ---- READY_TO_PAYOUT: Manual PayOS QR ---- #}
+                            {% if qr_links and item.obj.id in qr_links %}
+                            <div class="text-center">
+                                <img src="{{ qr_links|key:item.obj.id|key:'qrCode' }}" alt="PayOS QR" style="width: 100px; height: 100px;" />
+                                <br>
+                                <small class="text-muted">Quét mã để giải ngân thủ công</small>
+                            </div>
+                            {% elif item.can_trigger_payout %}
                             <button type="button" class="btn btn-sm btn-success fw-bold"
                                     onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
                                     style="box-shadow: 0 2px 8px rgba(40,167,69,0.4);">

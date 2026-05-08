@@ -1474,6 +1474,26 @@ def quanly_giaingan(request):
             'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
         })
 
+    # Generate PayOS QR for ready_to_payout proposals
+    qr_links = {}
+    for item in proposals_data:
+        p = item['obj']
+        if p.v3_status == 'ready_to_payout':
+            org = p.campaign.organization
+            if org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
+                try:
+                    link = _payos_create_payment_link(
+                        org.payos_client_id,
+                        org.payos_api_key,
+                        org.payos_checksum_key,
+                        int(p.amount_requested),
+                        str(p.id),
+                        f'Payment for disbursement proposal {p.id}'
+                    )
+                    qr_links[p.id] = link
+                except Exception as e:
+                    logger.warning(f"Failed to create PayOS link for proposal {p.id}: {e}")
+
     # V3 stats dashboard (count by v3_status, not legacy status).
     stats = {
         'pending_multisig': proposals_qs.filter(
@@ -1504,6 +1524,7 @@ def quanly_giaingan(request):
         'export_excel_url': _export_links(request)[1],
         'approver_context': approver_context,
         'disbursement_web3_config': _build_disbursement_web3_config(request),
+        'qr_links': qr_links,
     }
     return render(request, 'admin_panel/quanly_giaingan.html', context)
 
@@ -1990,6 +2011,7 @@ import secrets as _secrets
 from django.db import connection as _db_connection
 from client.payos_payout import (
     request_payout as _payos_request_payout,
+    create_payment_link as _payos_create_payment_link,
     parse_webhook as _payos_parse_webhook,
     verify_webhook_signature as _payos_verify_webhook,
     PayoutRequestError,
@@ -2314,17 +2336,15 @@ def v3_payos_payout_webhook(request):
         return JsonResponse({'ok': False, 'message': 'Invalid signature.'}, status=401)
 
     parsed = _payos_parse_webhook(payload)
-    ref = parsed.get('reference_id') or ''
-    # reference_id format: proposal-<id>
-    try:
-        pid = int(ref.split('-', 1)[1])
-    except (IndexError, ValueError):
-        return JsonResponse({'ok': False, 'message': 'reference_id không hợp lệ.'}, status=400)
+    order_code = parsed.get('orderCode')
+    if not order_code:
+        return JsonResponse({'ok': False, 'message': 'orderCode missing.'}, status=400)
 
     try:
+        pid = int(order_code)
         proposal = DisbursementProposal.objects.get(pk=pid)
-    except DisbursementProposal.DoesNotExist:
-        return JsonResponse({'ok': False, 'message': f'Proposal {pid} not found.'}, status=404)
+    except (ValueError, DisbursementProposal.DoesNotExist):
+        return JsonResponse({'ok': False, 'message': f'Invalid orderCode or proposal not found.'}, status=400)
 
     # Idempotency: PayOS có thể retry webhook (network blip hay qua standard policy).
     # Nếu proposal đã ở state “fiat_transferred” hoặc “completed_audited” thì
@@ -2341,8 +2361,9 @@ def v3_payos_payout_webhook(request):
 
     proposal.bank_tx_id = parsed['bank_tx_id']
     proposal.fiat_transferred_at = timezone.now()
+    proposal.payos_paid_at = timezone.now()
     proposal.v3_status = 'fiat_transferred'
-    proposal.save(update_fields=['bank_tx_id', 'fiat_transferred_at', 'v3_status'])
+    proposal.save(update_fields=['bank_tx_id', 'fiat_transferred_at', 'payos_paid_at', 'v3_status'])
 
     # Phase 4: trigger burn on-chain trong background (tránh block webhook).
     t = threading.Thread(target=_run_finalize_burn_safe, args=(proposal.id,),

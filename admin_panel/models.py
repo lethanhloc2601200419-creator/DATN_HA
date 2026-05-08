@@ -153,6 +153,11 @@ class Organization(models.Model):
     contact_person = models.CharField(max_length=255, blank=True, null=True)
     contact_phone = models.CharField(max_length=20, blank=True, null=True)
 
+    # PayOS Credentials for manual payouts
+    payos_client_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS Client ID")
+    payos_api_key = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS API Key")
+    payos_checksum_key = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS Checksum Key")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
