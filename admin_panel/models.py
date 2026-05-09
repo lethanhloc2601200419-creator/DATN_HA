@@ -683,7 +683,11 @@ class DisbursementProposal(models.Model):
                                     verbose_name='TxHash finalizeBurnWithBankTx')
     burn_completed_at = models.DateTimeField(blank=True, null=True)
     payout_error = models.TextField(blank=True, null=True,
-                                    verbose_name='Lỗi PayOS/burn gần nhất')
+                                     verbose_name='Lỗi PayOS/burn gần nhất')
+    payos_checkout_url = models.TextField(blank=True, null=True,
+                                          verbose_name='PayOS Checkout URL (cached)')
+    payos_payment_link_id = models.CharField(max_length=255, blank=True, null=True,
+                                             verbose_name='PayOS Payment Link ID')
 
     executed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

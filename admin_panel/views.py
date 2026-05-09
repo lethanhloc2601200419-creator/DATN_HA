@@ -1551,41 +1551,50 @@ def quanly_giaingan(request):
         # dùng platform-wide keys của luồng donation.
         # =============================================================
         if p.v3_status == 'ready_to_payout' and p.multisig_confirmed_tx_hash:
-            org = p.campaign.organization
-            if org and org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
-                # orderCode PayOS: phải là INTEGER unique, ≤ 9007199254740991.
-                # Format: `{proposal_id}{ms_timestamp % 100000}` — luôn < 10^15,
-                # tránh trùng với lần tạo link trước đó (PayOS từ chối duplicate).
-                order_code = int(f"{p.id}{int(time.time() * 1000) % 100000}")
-                # Return/cancel URLs PHẢI là 2 URL PUBLIC KHÁC nhau (khớp 1:1 với
-                # luồng donation). Trỏ tới `/admin/giaingan/` (auth-protected) sẽ
-                # khiến PayOS success page crash với 'Application error: a
-                # server-side exception' khi PayOS Next.js validate/render URL.
-                return_url = request.build_absolute_uri('/admin/giaingan/')
-                cancel_url = request.build_absolute_uri('/admin/giaingan/')
+            # Avoid API spam: reuse cached checkout_url if exists
+            if p.payos_checkout_url:
+                item['qr_code_url'] = None  # Not cached, but can add if needed
+                item['checkout_url'] = p.payos_checkout_url
+            else:
+                org = p.campaign.organization
+                if org and org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
+                    # orderCode PayOS: phải là INTEGER unique, ≤ 9007199254740991.
+                    # Format: `{proposal_id}{ms_timestamp % 100000}` — luôn < 10^15,
+                    # tránh trùng với lần tạo link trước đó (PayOS từ chối duplicate).
+                    order_code = int(f"{p.id}{int(time.time() * 1000) % 100000}")
+                    # Return/cancel URLs PHẢI là 2 URL PUBLIC KHÁC nhau (khớp 1:1 với
+                    # luồng donation). Trỏ tới `/admin/giaingan/` (auth-protected) sẽ
+                    # khiến PayOS success page crash với 'Application error: a
+                    # server-side exception' khi PayOS Next.js validate/render URL.
+                    return_url = request.build_absolute_uri('/admin/giaingan/')
+                    cancel_url = request.build_absolute_uri('/admin/giaingan/')
 
-                description = f"DCP-DISB-{p.id}"[:25]
-                link = _payos_create_payment_link(
-                    org.payos_client_id,
-                    org.payos_api_key,
-                    org.payos_checksum_key,
-                    int(p.amount_requested),
-                    order_code,
-                    description,
-                    cancel_url=cancel_url,
-                    return_url=return_url,
-                )
-                if link:
-                    item['qr_code_url'] = link.get('qrCode')
-                    item['checkout_url'] = link.get('checkoutUrl')
-                else:
-                    # Link thất bại — chi tiết lỗi đã được print(..., flush=True)
-                    # trong `create_payment_link`. Log thêm context ở warning level.
-                    logger.warning(
-                        f"Failed to create PayOS payment link for proposal {p.id} "
-                        f"(org={org.id}, orderCode={order_code}). "
-                        "Xem stdout logs để biết lý do PayOS reject."
+                    description = f"DCP-DISB-{p.id}"[:25]
+                    link = _payos_create_payment_link(
+                        org.payos_client_id,
+                        org.payos_api_key,
+                        org.payos_checksum_key,
+                        int(p.amount_requested),
+                        order_code,
+                        description,
+                        cancel_url=cancel_url,
+                        return_url=return_url,
                     )
+                    if link:
+                        item['qr_code_url'] = link.get('qrCode')
+                        item['checkout_url'] = link.get('checkoutUrl')
+                        # Cache in DB to avoid re-creation
+                        p.payos_checkout_url = link.get('checkoutUrl')
+                        p.payos_payment_link_id = link.get('paymentLinkId')
+                        p.save(update_fields=['payos_checkout_url', 'payos_payment_link_id'])
+                    else:
+                        # Link thất bại — chi tiết lỗi đã được print(..., flush=True)
+                        # trong `create_payment_link`. Log thêm context ở warning level.
+                        logger.warning(
+                            f"Failed to create PayOS payment link for proposal {p.id} "
+                            f"(org={org.id}, orderCode={order_code}). "
+                            "Xem stdout logs để biết lý do PayOS reject."
+                        )
 
         proposals_data.append(item)
 
@@ -2426,11 +2435,11 @@ def v3_payos_payout_webhook(request):
         return JsonResponse({'ok': False, 'message': 'Body JSON không hợp lệ.'}, status=400)
 
     try:
-        parsed = _payos_parse_webhook(payload)
-        order_code = parsed.get('orderCode')
-        if not order_code:
-            raise ValueError('orderCode missing.')
-
+        # PayOS payout webhook has nested structure: data['data']['orderCode']
+        data = json.loads(request.body or '{}')
+        if 'data' not in data or 'orderCode' not in data['data']:
+            raise ValueError('orderCode missing in data.data')
+        order_code = data['data']['orderCode']
         pid = int(order_code)
         proposal = DisbursementProposal.objects.get(pk=pid)
 
@@ -2447,11 +2456,11 @@ def v3_payos_payout_webhook(request):
             return JsonResponse({'ok': True, 'note': 'webhook already processed',
                                  'v3_status': proposal.v3_status})
 
-        sig = payload.get('signature') or request.headers.get('X-PayOS-Signature', '')
-        if not _payos_verify_webhook(payload, sig, checksum_key):
+        sig = data.get('signature') or request.headers.get('X-PayOS-Signature', '')
+        if not _payos_verify_webhook(data['data'], sig, checksum_key):
             raise ValueError('Invalid signature.')
 
-        proposal.bank_tx_id = parsed['bank_tx_id']
+        proposal.bank_tx_id = data['data']['bankTransactionId']
         proposal.fiat_transferred_at = timezone.now()
         proposal.payos_paid_at = timezone.now()
         proposal.v3_status = 'fiat_transferred'
