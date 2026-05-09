@@ -1329,10 +1329,16 @@ def v3_payout_cancel(request, pk):
 @login_required(login_url='admin_panel:dangnhap')
 def quanly_giaingan(request):
     user = request.user
-    q = _normalize_query(request.GET.get('q'))
+    # Only allow specific params for filtering to avoid PayOS redirect params interference
+    allowed_params = {
+        'q': request.GET.get('q', ''),
+        'status': request.GET.get('status', '') if request.GET.get('status', '') in [choice[0] for choice in DisbursementProposal.V3_STATUS_CHOICES] else '',
+        'campaign': request.GET.get('campaign', ''),
+    }
+    q = _normalize_query(allowed_params['q'])
     approver_context = _get_disbursement_approver_context(user)
 
-    # Handle PayOS redirect messages
+    # Handle PayOS redirect messages (ignore for filtering)
     payos_status = request.GET.get('status', '').upper()
     if payos_status == 'PAID':
         messages.success(request, "Thanh toán PayOS thành công! Hệ thống sẽ xử lý tiếp khi nhận webhook.")
@@ -1399,8 +1405,8 @@ def quanly_giaingan(request):
             'available_amount': available_amount,
         })
 
-    campaign_filter = request.GET.get('campaign')
-    status_filter = request.GET.get('status', '')
+    campaign_filter = allowed_params['campaign']
+    status_filter = allowed_params['status']
     if campaign_filter:
         proposals_qs = proposals_qs.filter(campaign_id=campaign_filter)
     if q:
@@ -1586,7 +1592,8 @@ def quanly_giaingan(request):
                         # Cache in DB to avoid re-creation
                         p.payos_checkout_url = link.get('checkoutUrl')
                         p.payos_payment_link_id = link.get('paymentLinkId')
-                        p.save(update_fields=['payos_checkout_url', 'payos_payment_link_id'])
+                        p.payos_order_code = order_code
+                        p.save(update_fields=['payos_checkout_url', 'payos_payment_link_id', 'payos_order_code'])
                     else:
                         # Link thất bại — chi tiết lỗi đã được print(..., flush=True)
                         # trong `create_payment_link`. Log thêm context ở warning level.
@@ -2440,8 +2447,7 @@ def v3_payos_payout_webhook(request):
         if 'data' not in data or 'orderCode' not in data['data']:
             raise ValueError('orderCode missing in data.data')
         order_code = data['data']['orderCode']
-        pid = int(order_code)
-        proposal = DisbursementProposal.objects.get(pk=pid)
+        proposal = DisbursementProposal.objects.get(payos_order_code=order_code)
 
         # Get organization's PayOS checksum key for verification
         org = proposal.campaign.organization
