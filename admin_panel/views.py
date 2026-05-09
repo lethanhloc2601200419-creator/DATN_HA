@@ -2444,7 +2444,10 @@ def v3_payos_payout_webhook(request):
     try:
         # PayOS payout webhook has nested structure: data['data']['orderCode']
         data = json.loads(request.body or '{}')
-        if 'data' not in data or 'orderCode' not in data['data']:
+        if 'data' not in data or not data['data'].get('orderCode'):
+            # Check if it's a test ping
+            if data.get('data', {}).get('description') == 'Ma test Webhook':
+                return JsonResponse({"success": True, "message": "Test webhook received"}, status=200)
             raise ValueError('orderCode missing in data.data')
         order_code = data['data']['orderCode']
         proposal = DisbursementProposal.objects.get(payos_order_code=order_code)
@@ -2466,7 +2469,8 @@ def v3_payos_payout_webhook(request):
         if not _payos_verify_webhook(data['data'], sig, checksum_key):
             raise ValueError('Invalid signature.')
 
-        proposal.bank_tx_id = data['data']['bankTransactionId']
+        tx_id = data['data'].get('reference') or data['data'].get('bankTransactionId') or "UNKNOWN"
+        proposal.bank_tx_id = tx_id
         proposal.fiat_transferred_at = timezone.now()
         proposal.payos_paid_at = timezone.now()
         proposal.v3_status = 'fiat_transferred'
@@ -2476,7 +2480,7 @@ def v3_payos_payout_webhook(request):
         t = threading.Thread(target=_run_finalize_burn_safe, args=(proposal.id,),
                              name=f'v3-burn-{proposal.id}', daemon=True)
         transaction.on_commit(t.start)
-        return JsonResponse({'ok': True, 'bank_tx_id': parsed['bank_tx_id']})
+        return JsonResponse({'ok': True, 'bank_tx_id': tx_id})
     except Exception as e:
         # For PayOS test pings or errors, return success to allow URL configuration
         print(f"Webhook Ping or Error: {e}", flush=True)
