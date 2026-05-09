@@ -2472,9 +2472,8 @@ def v3_payos_payout_webhook(request):
         tx_id = data['data'].get('reference') or data['data'].get('bankTransactionId') or "UNKNOWN"
         proposal.bank_tx_id = tx_id
         proposal.fiat_transferred_at = timezone.now()
-        proposal.payos_paid_at = timezone.now()
         proposal.v3_status = 'fiat_transferred'
-        proposal.save(update_fields=['bank_tx_id', 'fiat_transferred_at', 'payos_paid_at', 'v3_status'])
+        proposal.save(update_fields=['bank_tx_id', 'fiat_transferred_at', 'v3_status'])
 
         # Phase 4: trigger burn on-chain trong background (tránh block webhook).
         t = threading.Thread(target=_run_finalize_burn_safe, args=(proposal.id,),
