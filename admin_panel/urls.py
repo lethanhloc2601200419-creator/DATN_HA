@@ -1,9 +1,22 @@
 
 from django.urls import path
 from admin_panel import views as admin
+from admin_panel import webhook_views
 
 app_name = 'admin_panel'
 urlpatterns = [
+    # ========== [V2] PayOS Payout webhook — platform-wide checksum ==========
+    # Endpoint MỚI theo spec: POST /webhook/payos/payout/ (ở root level qua
+    # doantn/urls.py + alias dưới /admin/ để tiện expose). Verify HMAC bằng
+    # PAYOS_CHECKSUM_KEY platform-wide. Endpoint V3 cũ
+    # (api/webhook/payos-payout/) verify per-organization vẫn giữ nguyên.
+    path('webhook/payos/payout/', webhook_views.payos_payout_webhook,
+         name='payos_payout_webhook_v2'),
+    # Backward-compat: PayOS dashboard có thể trỏ về URL V3 cũ — proxy về V2
+    # handler để không phải đổi config bên PayOS dashboard.
+    path('webhook/payos/payout/legacy/', webhook_views.payos_payout_webhook_legacy_proxy,
+         name='payos_payout_webhook_legacy_proxy'),
+
     # ========== [V3] 2-layer disbursement (EIP-712 + PayOS + burn) ==========
     # Đưa lên đầu để tránh bị catch bởi các route khác (như (?P<url>.*)$).
     # Phase 2: FE lấy EIP-712 payload để ký → POST signature về backend.

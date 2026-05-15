@@ -671,6 +671,62 @@ class BlockchainService:
         )
         return self._send_transaction(func, gas_limit=300000, wait_for_receipt=True)
 
+    # ==========================================================
+    # 5b. PUBLIC WRAPPER — finalize_disbursement(proposal, bank_tx_id)
+    # ----------------------------------------------------------
+    # API thân thiện hơn cho PayOS webhook layer: nhận proposal Django
+    # instance + bankTxId, tự derive multisigVault từ Organization và
+    # gọi smart3.finalizeBurnWithBankTx. Trả về tx_hash hex string.
+    #
+    # Khác với finalize_burn_with_bank_tx (low-level: cần multisig_vault
+    # rời), method này phù hợp cho callers chỉ có proposal object.
+    # ==========================================================
+    def finalize_disbursement(self, proposal, bank_tx_id):
+        """
+        High-level wrapper: gọi smart3.finalizeBurnWithBankTx(proposalId,
+        multisigVault, bankTxId), wait receipt (timeout ~60s qua
+        _send_transaction.wait_for_receipt=True), return tx_hash string.
+
+        Args:
+            proposal: DisbursementProposal Django instance (cần có
+                      proposal.id và proposal.campaign.organization.wallet_address).
+            bank_tx_id: str — Bank Transaction ID nhận từ PayOS webhook.
+
+        Returns:
+            str — tx_hash hex (vd '0xabc...').
+
+        Raises:
+            ValueError nếu thiếu thông tin (multisig_vault).
+            ContractLogicError nếu tx revert on-chain.
+            RuntimeError nếu smart3 chưa cấu hình.
+        """
+        if not bank_tx_id:
+            raise ValueError("bank_tx_id không được để trống.")
+        campaign = getattr(proposal, 'campaign', None)
+        org = getattr(campaign, 'organization', None) if campaign else None
+        multisig_vault = getattr(org, 'wallet_address', None) if org else None
+        if not multisig_vault:
+            raise ValueError(
+                f"Proposal #{proposal.id} không xác định được multisig_vault "
+                "(campaign.organization.wallet_address rỗng)."
+            )
+        result = self.finalize_burn_with_bank_tx(
+            proposal_id=proposal.id,
+            multisig_vault=multisig_vault,
+            bank_tx_id=bank_tx_id,
+        )
+        # _send_transaction(wait_for_receipt=True) trả dict {tx_hash, receipt, status}.
+        if isinstance(result, dict):
+            tx_hash = result.get('tx_hash')
+        else:
+            tx_hash = result
+        if not tx_hash:
+            raise RuntimeError(
+                f"finalize_disbursement không nhận được tx_hash từ smart3 (proposal #{proposal.id})."
+            )
+        print(f"✅ [BLOCKCHAIN] finalize_disbursement proposal={proposal.id} tx={tx_hash}", flush=True)
+        return str(tx_hash)
+
     def get_disbursed_and_burned_events(self, campaign_id=None, from_block=None, to_block='latest'):
         filters = {}
         if campaign_id is not None:

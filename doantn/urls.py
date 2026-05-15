@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path, include
 from admin_panel import views as admin_views
+from admin_panel import webhook_views as admin_webhook_views
 
 
 urlpatterns = [
@@ -26,6 +27,12 @@ urlpatterns = [
 
     # --- Google OAuth callback (root level to match Google Cloud Console) ---
     path('accounts/google/login/callback/', admin_views.google_callback, name='google_callback'),
+
+    # --- [V2] PayOS Payout webhook (root-level, đúng spec) ---
+    # Spec yêu cầu URL: POST /webhook/payos/payout/. Mount root-level (không
+    # qua /admin/) vì PayOS dashboard thường config webhook URL public.
+    path('webhook/payos/payout/', admin_webhook_views.payos_payout_webhook,
+         name='payos_payout_webhook_root'),
 
     # --- CLIENT (TRANG CHỦ) ---
     # Sửa 'client/' thành '' (rỗng) để nó làm trang chủ mặc định

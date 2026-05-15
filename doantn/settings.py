@@ -89,10 +89,27 @@ WEB3AUTH_NETWORK = os.getenv('WEB3AUTH_NETWORK', 'sapphire_devnet')
 BICONOMY_BUNDLER_URL = os.getenv('BICONOMY_BUNDLER_URL', '')
 BICONOMY_PAYMASTER_URL = os.getenv('BICONOMY_PAYMASTER_URL', '')
 
-# PayOS Configuration
+# PayOS Configuration — TÁCH 2 KÊNH HOÀN TOÀN
+# ----------------------------------------------------------------
+# Kênh THU (donation / payment-link): credentials cũ, KHÔNG đụng vào.
+#   PAYOS_CLIENT_ID / PAYOS_API_KEY / PAYOS_CHECKSUM_KEY
+#   → dùng ở client/views.py (PayOS Payment) cho donor pay tiền.
+#
+# Kênh CHI (payout / chuyển tiền ra ngân hàng tổ chức): credentials
+# RIÊNG, lấy từ Kênh Chi đã tạo trên PayOS dashboard.
+#   PAYOS_PAYOUT_CLIENT_ID / PAYOS_PAYOUT_API_KEY / PAYOS_PAYOUT_CHECKSUM_KEY
+#   → dùng ở client/payos_payout.py::PayosPayoutService và
+#     admin_panel/webhook_views.py để verify webhook payout.
+# ----------------------------------------------------------------
 PAYOS_CLIENT_ID = os.getenv('PAYOS_CLIENT_ID')
 PAYOS_API_KEY = os.getenv('PAYOS_API_KEY')
 PAYOS_CHECKSUM_KEY = os.getenv('PAYOS_CHECKSUM_KEY')
+
+PAYOS_PAYOUT_CLIENT_ID = os.getenv('PAYOS_PAYOUT_CLIENT_ID')
+PAYOS_PAYOUT_API_KEY = os.getenv('PAYOS_PAYOUT_API_KEY')
+PAYOS_PAYOUT_CHECKSUM_KEY = os.getenv('PAYOS_PAYOUT_CHECKSUM_KEY')
+
+PAYOS_PAYOUT_MOCK = False
 
 # Blockchain Configuration (Ethereum Sepolia)
 SEPOLIA_RPC_URL = os.getenv('SEPOLIA_RPC_URL')

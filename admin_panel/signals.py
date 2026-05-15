@@ -1,7 +1,8 @@
 """
-Signals for auto-syncing Campaign to Sepolia blockchain (DCPManager v4).
+Signals for auto-syncing Campaign to Sepolia blockchain (DCPManager v4) +
+auto-trigger PayOS payout khi DisbursementProposal đủ multisig confirmation.
 
-Flow:
+Flow Campaign:
   1. `pre_save` ghi lại status cũ (`_original_status`) lên instance để phát hiện
      transition sang 'active'.
   2. `post_save` check:
@@ -10,17 +11,23 @@ Flow:
      → nếu chưa is_onchain thì spawn `threading.Thread` chạy `sync_single_campaign`
        trong background (vì RPC sepolia thường mất 10-15s).
 
-Tại sao dùng threading thay vì Celery/RQ?
-  Dự án hiện chưa có message broker; threading daemon đủ nhẹ cho một tx/lần
-  duyệt. Nếu sau này scale lên thì thay handler bằng `.delay()` của Celery.
+Flow DisbursementProposal (V3):
+  1. `pre_save` ghi lại v3_status cũ (`_original_v3_status`).
+  2. `post_save` check transition sang 'ready_to_payout' (đã có 3 sig +
+     multisig_confirmed_tx_hash) → fire `trigger_payos_payout.delay(proposal_id)`.
+     Task tự idempotency-check qua proposal.payos_payout_id, nên admin click
+     button "Trigger Payout" thủ công vẫn an toàn (chỉ chạy 1 lần).
+     Disable bằng settings.V3_AUTO_TRIGGER_PAYOUT = False khi muốn admin
+     control 100% manual.
 """
 import threading
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
-from admin_panel.models import Campaign
+from admin_panel.models import Campaign, DisbursementProposal
 from admin_panel.blockchain_utils import sync_single_campaign
 
 
@@ -117,3 +124,69 @@ def _run_sync_in_background(campaign_id):
             connection.close()
         except Exception:
             pass
+
+
+# ==========================================================================
+# DisbursementProposal — auto-trigger PayOS payout khi multisig confirmed.
+# ==========================================================================
+_PROPOSAL_UNSET = object()
+
+
+@receiver(pre_save, sender=DisbursementProposal)
+def _cache_original_v3_status(sender, instance, **kwargs):
+    """Lưu v3_status cũ để post_save phát hiện transition."""
+    if not instance.pk:
+        instance._original_v3_status = _PROPOSAL_UNSET
+        return
+    try:
+        old = DisbursementProposal.objects.only('v3_status').get(pk=instance.pk)
+        instance._original_v3_status = old.v3_status
+    except DisbursementProposal.DoesNotExist:
+        instance._original_v3_status = _PROPOSAL_UNSET
+
+
+@receiver(post_save, sender=DisbursementProposal)
+def _auto_trigger_payos_payout(sender, instance, created, **kwargs):
+    """
+    Fire `trigger_payos_payout.delay(proposal_id)` khi:
+      • v3_status vừa chuyển sang 'ready_to_payout', VÀ
+      • multisig_confirmed_tx_hash đã có (Phase 3a done), VÀ
+      • payos_payout_id chưa có (chưa bị task khác chiếm),
+      • settings.V3_AUTO_TRIGGER_PAYOUT bật (default False để safe).
+
+    Task tự idempotent-check thêm 1 lớp nữa, nên dù call-site khác đã trigger
+    thủ công thì signal này không gây double-spend.
+    """
+    # Opt-out global: dev có thể tắt auto-trigger qua settings.
+    if not getattr(settings, 'V3_AUTO_TRIGGER_PAYOUT', False):
+        return
+    # Opt-out per-instance: caller đã tự trigger thì set _skip_auto_payout=True.
+    if getattr(instance, '_skip_auto_payout', False):
+        return
+
+    if instance.v3_status != 'ready_to_payout':
+        return
+    if not instance.multisig_confirmed_tx_hash:
+        return
+    if instance.payos_payout_id:
+        return  # đã có payout — task hoặc admin đã chi rồi.
+
+    original = getattr(instance, '_original_v3_status', _PROPOSAL_UNSET)
+    is_transition = (
+        created
+        or original is _PROPOSAL_UNSET
+        or original != 'ready_to_payout'
+    )
+    if not is_transition:
+        return
+
+    proposal_id = instance.pk
+
+    def _spawn():
+        try:
+            from admin_panel.tasks.disbursement_tasks import trigger_payos_payout
+            trigger_payos_payout.delay(proposal_id)
+        except Exception as exc:
+            print(f"❌ [SIGNAL] Không trigger được payout cho proposal #{proposal_id}: {exc}")
+
+    transaction.on_commit(_spawn)

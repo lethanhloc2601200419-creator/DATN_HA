@@ -418,3 +418,369 @@ def create_payment_link(
 class PayoutRequestError(Exception):
     """Raised khi request_payout thất bại (network / config / PayOS reject)."""
     pass
+
+
+# ==========================================================================
+# PayosPayoutService — class wrapper cho PayOS Payout V1 API.
+# --------------------------------------------------------------------------
+# Ba method chính (theo spec task tích hợp):
+#   1. check_balance()                 → int VND khả dụng trong escrow.
+#   2. create_payout(proposal)         → POST /v1/payouts (idempotent qua
+#                                        x-idempotency-key = proposal.id).
+#   3. get_payout_status(payout_id)    → GET  /v1/payouts/{id}.
+#
+# Tuân thủ:
+#   • KHÔNG hardcode credentials — đọc từ settings (env-driven).
+#   • Idempotency: header x-idempotency-key = str(proposal.id) chống chi trùng
+#     khi PayOS hoặc network retry.
+#   • Signature: HMAC-SHA256 canonical body với PAYOS_CHECKSUM_KEY.
+#   • Logging: in stdout (Railway logs) + raise PayoutRequestError có
+#     message rõ để view layer surface lên UI.
+#   • MOCK flag: mặc định True (PAYOS_PAYOUT_MOCK) để dev test không gây
+#     thất thoát tiền thật. Khi có credentials Payout production thì set
+#     env PAYOS_PAYOUT_MOCK=False.
+# ==========================================================================
+import logging as _logging
+
+_logger = _logging.getLogger(__name__)
+
+# Mapping bank_name → BIN (Vietnam Bank Identification Number, 6-digit, theo
+# chuẩn PayOS / NAPAS). Dùng làm fallback khi Organization chưa có field bank_bin
+# riêng (chưa migrate). Dev có thể bổ sung dần.
+_BANK_NAME_TO_BIN = {
+    'mb bank': '970422',
+    'mbbank': '970422',
+    'vietcombank': '970436',
+    'vcb': '970436',
+    'techcombank': '970407',
+    'tcb': '970407',
+    'bidv': '970418',
+    'agribank': '970405',
+    'vietinbank': '970415',
+    'tpbank': '970423',
+    'acb': '970416',
+    'vpbank': '970432',
+    'sacombank': '970403',
+    'hdbank': '970437',
+    'shb': '970443',
+    'ocb': '970448',
+    'msb': '970426',
+    'eximbank': '970431',
+    'lpbank': '970449',
+    'lienvietpostbank': '970449',
+    'seabank': '970440',
+    'pgbank': '970430',
+    'vib': '970441',
+    'scb': '970429',
+    'baovietbank': '970438',
+    'vietabank': '970427',
+    'vietbank': '970433',
+    'kienlongbank': '970452',
+    'pvcombank': '970412',
+}
+
+
+def _resolve_bank_bin(org) -> str:
+    """
+    Lấy BIN của tổ chức theo thứ tự ưu tiên:
+        1. `org.bank_bin` nếu Organization model đã có field này.
+        2. Mapping từ `org.bank_name` (case-insensitive, strip spaces).
+        3. ''  (caller phải xử lý trường hợp trống — PayOS sẽ reject).
+    """
+    explicit = getattr(org, 'bank_bin', None)
+    if explicit:
+        return str(explicit).strip()
+    name = (getattr(org, 'bank_name', '') or '').strip().lower()
+    if not name:
+        return ''
+    # Match nguyên tên hoặc substring (vd 'MB Bank Hà Nội' → 'mb bank').
+    if name in _BANK_NAME_TO_BIN:
+        return _BANK_NAME_TO_BIN[name]
+    for key, bin_code in _BANK_NAME_TO_BIN.items():
+        if key in name:
+            return bin_code
+    return ''
+
+
+def _build_idempotency_key(proposal_id) -> str:
+    """
+    Idempotency key = `proposal_{id}` để PayOS dedupe nếu task retry. Cùng
+    proposal_id → cùng key → PayOS coi là cùng 1 lệnh chi.
+    """
+    return f"proposal_{int(proposal_id)}"
+
+
+def _build_payout_signature(body: Dict[str, Any], checksum_key: str) -> str:
+    """
+    HMAC-SHA256 hex của canonical body (sorted keys, '&' separator) với
+    PAYOS_CHECKSUM_KEY. Khớp thuật toán PayOS verify ở server-side.
+    Bỏ qua field 'signature' nếu có để self-verify.
+    """
+    parts = []
+    for k in sorted(body.keys()):
+        if k == 'signature':
+            continue
+        v = body[k]
+        if isinstance(v, (list, dict)):
+            v = _json.dumps(v, ensure_ascii=False, separators=(',', ':'))
+        elif v is None:
+            v = ''
+        elif isinstance(v, bool):
+            v = 'true' if v else 'false'
+        else:
+            v = str(v)
+        parts.append(f"{k}={v}")
+    canonical = '&'.join(parts)
+    return hmac.new(
+        checksum_key.encode('utf-8'),
+        canonical.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+class PayosPayoutService:
+    """
+    Adapter gọi PayOS Payout API v1 (https://api-merchant.payos.vn/v1/payouts).
+
+    Khởi tạo KHÔNG nhận argument — đọc credentials từ Django settings.
+
+    QUAN TRỌNG: Service này dùng Kênh CHI (payout) của PayOS, có bộ
+    credentials RIÊNG hoàn toàn tách biệt với Kênh THU (donation):
+        settings.PAYOS_PAYOUT_CLIENT_ID
+        settings.PAYOS_PAYOUT_API_KEY
+        settings.PAYOS_PAYOUT_CHECKSUM_KEY
+
+    Tuyệt đối KHÔNG dùng `PAYOS_CLIENT_ID` / `PAYOS_API_KEY` /
+    `PAYOS_CHECKSUM_KEY` (đó là key của Kênh Thu — sẽ bị PayOS reject
+    với HTTP 401 hoặc signature mismatch nếu mix lẫn). KHÔNG có
+    fallback sang Kênh Thu — thiếu credentials Kênh Chi → fail-loud
+    để admin thấy ngay khi deploy thiếu env.
+    """
+
+    BASE_URL = _PAYOS_API_BASE  # https://api-merchant.payos.vn
+    REQUEST_TIMEOUT = 20  # seconds
+
+    def __init__(self):
+        from django.conf import settings as dj_settings
+
+        # CHỈ đọc PAYOS_PAYOUT_* (Kênh Chi). KHÔNG fallback sang PAYOS_*
+        # (Kênh Thu) — spec tách hoàn toàn 2 kênh, mix sẽ khiến PayOS reject
+        # signature hoặc (tệ hơn) chi nhầm từ bí danh khắc.
+        self.client_id = getattr(dj_settings, 'PAYOS_PAYOUT_CLIENT_ID', None) or ''
+        self.api_key = getattr(dj_settings, 'PAYOS_PAYOUT_API_KEY', None) or ''
+        self.checksum_key = getattr(dj_settings, 'PAYOS_PAYOUT_CHECKSUM_KEY', None) or ''
+        # Mock flag: nếu True → KHÔNG gọi PayOS thật, trả response mock.
+        # Mặc định lấy từ module-level constant (PAYOS_PAYOUT_MOCK) hoặc env.
+        self.mock_mode = bool(
+            getattr(dj_settings, 'PAYOS_PAYOUT_MOCK', PAYOS_PAYOUT_MOCK)
+        )
+        if not self.mock_mode and not (self.client_id and self.api_key and self.checksum_key):
+            raise PayoutRequestError(
+                "PayOS Payout credentials chưa cấu hình đầy đủ "
+                "(PAYOS_PAYOUT_CLIENT_ID / PAYOS_PAYOUT_API_KEY / PAYOS_PAYOUT_CHECKSUM_KEY). "
+                "Lưu ý: KHÔNG dùng key Kênh Thu (PAYOS_CLIENT_ID/API_KEY/CHECKSUM_KEY) — "
+                "PayOS sẽ reject signature."
+            )
+
+    # ---------------------------------------------------------------- helpers
+    def _headers(self, idempotency_key: str = '', signature: str = '') -> Dict[str, str]:
+        h = {
+            'x-client-id': self.client_id,
+            'x-api-key': self.api_key,
+            'Content-Type': 'application/json',
+        }
+        if idempotency_key:
+            h['x-idempotency-key'] = idempotency_key
+        if signature:
+            h['x-signature'] = signature
+        return h
+
+    # ---------------------------------------------------------------- 1. Balance
+    def check_balance(self) -> int:
+        """
+        GET /v1/payouts-account/balance.
+        Return: int VND khả dụng. Nếu MOCK → trả số dư khổng lồ để task không
+        bị chặn. Nếu PayOS lỗi → raise PayoutRequestError.
+        """
+        if self.mock_mode:
+            balance = 10_000_000_000  # 10 tỷ VND mock
+            _logger.info(f"[PAYOS/MOCK] check_balance → {balance:,} VND")
+            return balance
+
+        url = f"{self.BASE_URL}/v1/payouts-account/balance"
+        try:
+            resp = _http_requests.get(
+                url, headers=self._headers(), timeout=self.REQUEST_TIMEOUT,
+            )
+        except _http_requests.RequestException as exc:
+            _logger.error(f"[PAYOS] check_balance network error: {exc}")
+            raise PayoutRequestError(f"PayOS check_balance network error: {exc}") from exc
+
+        try:
+            payload = resp.json()
+        except ValueError:
+            raise PayoutRequestError(
+                f"PayOS check_balance trả về non-JSON (status={resp.status_code}): {resp.text[:200]}"
+            )
+        if resp.status_code >= 400 or payload.get('code') not in ('00', None):
+            raise PayoutRequestError(
+                f"PayOS check_balance reject status={resp.status_code} payload={payload}"
+            )
+        # PayOS contract: data.balance là int VND.
+        data = payload.get('data') or {}
+        balance = int(data.get('balance', 0))
+        _logger.info(f"[PAYOS] check_balance → {balance:,} VND")
+        return balance
+
+    # ---------------------------------------------------------------- 2. Create payout
+    def create_payout(self, proposal) -> Dict[str, Any]:
+        """
+        POST /v1/payouts cho 1 DisbursementProposal.
+
+        Side-effects:
+            - Lưu response.payoutId vào proposal.payos_payout_id.
+            - Lưu proposal.v3_status = 'payout_processing'.
+            - Lưu proposal.payos_payout_requested_at = now.
+            - Save proposal với update_fields giới hạn (idempotent re-call OK).
+
+        Return: dict response gốc (đã merge mock fields nếu mock mode).
+        Raise PayoutRequestError nếu PayOS reject hoặc network lỗi.
+        """
+        from django.utils import timezone as _tz
+
+        amount = int(proposal.amount_requested)
+        org = getattr(proposal.campaign, 'organization', None)
+        if not org:
+            raise PayoutRequestError(
+                f"Proposal #{proposal.id} không có organization → không xác định được tài khoản nhận."
+            )
+
+        to_account = (
+            getattr(proposal, 'recipient_bank_account', None)
+            or getattr(org, 'bank_account_number', None)
+            or ''
+        ).strip()
+        to_bin = (
+            getattr(proposal, 'recipient_bank_bin', None)
+            or _resolve_bank_bin(org)
+            or ''
+        ).strip()
+        if not to_account or not to_bin:
+            raise PayoutRequestError(
+                f"Proposal #{proposal.id} thiếu thông tin ngân hàng "
+                f"(account={to_account or 'EMPTY'}, bin={to_bin or 'EMPTY'}). "
+                "Cập nhật Organization.bank_name (hoặc thêm field bank_bin) trước khi tạo payout."
+            )
+
+        body: Dict[str, Any] = {
+            'referenceId': f"proposal_{proposal.id}",
+            'amount': amount,
+            'description': f"Giai ngan chien dich {proposal.campaign_id}"[:25],
+            'toBin': to_bin,
+            'toAccountNumber': to_account,
+            'category': ['charity'],
+        }
+        idempotency_key = _build_idempotency_key(proposal.id)
+
+        if self.mock_mode:
+            mock_payout_id = f"PAYOUT-{int(time.time())}-{secrets.token_hex(5).upper()}"
+            response_data: Dict[str, Any] = {
+                'code': '00',
+                'desc': 'success (mock)',
+                'data': {
+                    'payoutId': mock_payout_id,
+                    'referenceId': body['referenceId'],
+                    'status': 'PROCESSING',
+                    'amount': amount,
+                    'toBin': to_bin,
+                    'toAccountNumber': to_account,
+                },
+                'mock': True,
+            }
+            _logger.info(
+                f"[PAYOS/MOCK] create_payout proposal={proposal.id} "
+                f"amount={amount:,}đ → payout_id={mock_payout_id}"
+            )
+        else:
+            signature = _build_payout_signature(body, self.checksum_key)
+            url = f"{self.BASE_URL}/v1/payouts"
+            try:
+                resp = _http_requests.post(
+                    url,
+                    json=body,
+                    headers=self._headers(idempotency_key=idempotency_key, signature=signature),
+                    timeout=self.REQUEST_TIMEOUT,
+                )
+            except _http_requests.RequestException as exc:
+                _logger.error(f"[PAYOS] create_payout network error: {exc}")
+                raise PayoutRequestError(f"PayOS create_payout network error: {exc}") from exc
+            try:
+                response_data = resp.json()
+            except ValueError:
+                raise PayoutRequestError(
+                    f"PayOS create_payout non-JSON (status={resp.status_code}): {resp.text[:200]}"
+                )
+            if resp.status_code >= 400 or response_data.get('code') != '00':
+                raise PayoutRequestError(
+                    f"PayOS create_payout reject status={resp.status_code} payload={response_data}"
+                )
+            _logger.info(
+                f"[PAYOS] create_payout proposal={proposal.id} "
+                f"amount={amount:,}đ status={resp.status_code}"
+            )
+
+        payout_id = (response_data.get('data') or {}).get('payoutId') or response_data.get('payoutId')
+        if not payout_id:
+            raise PayoutRequestError(
+                f"PayOS create_payout không trả về payoutId. Response: {response_data}"
+            )
+
+        # Persist tới DB — chỉ update các field cần thiết, không trigger save() đầy đủ.
+        proposal.payos_payout_id = payout_id
+        proposal.v3_status = 'payout_processing'
+        proposal.payos_payout_requested_at = _tz.now()
+        proposal.save(update_fields=[
+            'payos_payout_id', 'v3_status', 'payos_payout_requested_at',
+        ])
+        return response_data
+
+    # ---------------------------------------------------------------- 3. Status
+    def get_payout_status(self, payout_id: str) -> str:
+        """
+        GET /v1/payouts/{payout_id}.
+        Return status string normalized: 'PROCESSING' | 'SUCCEEDED' | 'FAILED'.
+        Mock mode: luôn trả 'PROCESSING' (caller nên dùng simulate_webhook để
+        test SUCCEEDED).
+        """
+        if not payout_id:
+            raise PayoutRequestError("payout_id không được để trống.")
+        if self.mock_mode:
+            return 'PROCESSING'
+
+        url = f"{self.BASE_URL}/v1/payouts/{payout_id}"
+        try:
+            resp = _http_requests.get(
+                url, headers=self._headers(), timeout=self.REQUEST_TIMEOUT,
+            )
+        except _http_requests.RequestException as exc:
+            _logger.error(f"[PAYOS] get_payout_status network error: {exc}")
+            raise PayoutRequestError(f"PayOS get_payout_status network error: {exc}") from exc
+        try:
+            payload = resp.json()
+        except ValueError:
+            raise PayoutRequestError(
+                f"PayOS get_payout_status non-JSON (status={resp.status_code}): {resp.text[:200]}"
+            )
+        if resp.status_code >= 400 or payload.get('code') != '00':
+            raise PayoutRequestError(
+                f"PayOS get_payout_status reject status={resp.status_code} payload={payload}"
+            )
+        data = payload.get('data') or {}
+        raw_status = (data.get('status') or '').upper()
+        # PayOS dùng nhiều status khác nhau theo doc (PROCESSING, SUCCEEDED,
+        # SUCCESS, FAILED, CANCELED, ...). Normalize về 3 trạng thái chính.
+        if raw_status in ('SUCCEEDED', 'SUCCESS', 'COMPLETED', 'COMPLETE'):
+            return 'SUCCEEDED'
+        if raw_status in ('FAILED', 'FAILURE', 'REJECTED', 'CANCELED', 'CANCELLED'):
+            return 'FAILED'
+        return 'PROCESSING'
