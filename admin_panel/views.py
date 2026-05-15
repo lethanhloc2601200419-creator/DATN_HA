@@ -1552,56 +1552,13 @@ def quanly_giaingan(request):
         }
 
         # =============================================================
-        # PayOS Checkout link — CHỈ tạo khi đã relay multisig thành công
-        # (Phase 3a done). SỬ DỤNG CREDENTIALS RIÊNG CỦA ORGANIZATION, không
-        # dùng platform-wide keys của luồng donation.
+        # [V3 LUONG MOI - PayOS PAYOUT API]
+        # KHONG tao PayOS Checkout Link nua - do la luong CU (donor quet
+        # QR thanh toan). Luong giai ngan V3 dung PayOS PAYOUT API
+        # (chuyen fiat tu dong tu escrow Kenh Chi -> bank Org), duoc trigger
+        # qua nut "Thuc thi PayOS" -> endpoint v3_trigger_payos_payout ->
+        # PayosPayoutService.create_payout(). Khong co buoc scan QR thu cong.
         # =============================================================
-        if p.v3_status == 'ready_to_payout' and p.multisig_confirmed_tx_hash:
-            # Avoid API spam: reuse cached checkout_url if exists
-            if p.payos_checkout_url:
-                item['qr_code_url'] = None  # Not cached, but can add if needed
-                item['checkout_url'] = p.payos_checkout_url
-            else:
-                org = p.campaign.organization
-                if org and org.payos_client_id and org.payos_api_key and org.payos_checksum_key:
-                    # orderCode PayOS: phải là INTEGER unique, ≤ 9007199254740991.
-                    # Format: `{proposal_id}{ms_timestamp % 100000}` — luôn < 10^15,
-                    # tránh trùng với lần tạo link trước đó (PayOS từ chối duplicate).
-                    order_code = int(f"{p.id}{int(time.time() * 1000) % 100000}")
-                    # Return/cancel URLs PHẢI là 2 URL PUBLIC KHÁC nhau (khớp 1:1 với
-                    # luồng donation). Trỏ tới `/admin/giaingan/` (auth-protected) sẽ
-                    # khiến PayOS success page crash với 'Application error: a
-                    # server-side exception' khi PayOS Next.js validate/render URL.
-                    return_url = request.build_absolute_uri('/admin/giaingan/')
-                    cancel_url = request.build_absolute_uri('/admin/giaingan/')
-
-                    description = f"DCP-DISB-{p.id}"[:25]
-                    link = _payos_create_payment_link(
-                        org.payos_client_id,
-                        org.payos_api_key,
-                        org.payos_checksum_key,
-                        int(p.amount_requested),
-                        order_code,
-                        description,
-                        cancel_url=cancel_url,
-                        return_url=return_url,
-                    )
-                    if link:
-                        item['qr_code_url'] = link.get('qrCode')
-                        item['checkout_url'] = link.get('checkoutUrl')
-                        # Cache in DB to avoid re-creation
-                        p.payos_checkout_url = link.get('checkoutUrl')
-                        p.payos_payment_link_id = link.get('paymentLinkId')
-                        p.payos_order_code = order_code
-                        p.save(update_fields=['payos_checkout_url', 'payos_payment_link_id', 'payos_order_code'])
-                    else:
-                        # Link thất bại — chi tiết lỗi đã được print(..., flush=True)
-                        # trong `create_payment_link`. Log thêm context ở warning level.
-                        logger.warning(
-                            f"Failed to create PayOS payment link for proposal {p.id} "
-                            f"(org={org.id}, orderCode={order_code}). "
-                            "Xem stdout logs để biết lý do PayOS reject."
-                        )
 
         proposals_data.append(item)
 
@@ -2119,13 +2076,7 @@ def thu_hoi_gas(request):
 import threading
 import secrets as _secrets
 from django.db import connection as _db_connection
-from client.payos_payout import (
-    request_payout as _payos_request_payout,
-    create_payment_link as _payos_create_payment_link,
-    parse_webhook as _payos_parse_webhook,
-    verify_webhook_signature as _payos_verify_webhook,
-    PayoutRequestError,
-)
+from client.payos_payout import verify_webhook_signature as _payos_verify_webhook
 # Tái sử dụng hằng số 18-decimals từ blockchain service, tránh duplicate.
 from client.blockchain import _VNDT_DECIMALS as _VNDT_DECIMALS_EXP
 
@@ -2370,9 +2321,21 @@ def v3_execute_multisig_relayer(request, pk):
 
 @login_required
 def v3_trigger_payos_payout(request, pk):
-    """Admin bấm 'Execute Disbursement' → gửi lệnh PayOS Payout (mock hiện tại)."""
+    """
+    [V3 LUONG MOI] Admin bam "Thuc thi PayOS" -> goi PayOS Payout API
+    (Kenh Chi) -> tien fiat tu dong chuyen tu escrow PayOS sang bank Org.
+
+    Khac voi luong CU (mock-only, da xoa):
+      * Kiem tra so du Kenh Chi truoc (PayosPayoutService.check_balance).
+      * Goi POST /v1/payouts THAT su (khong mock) khi PAYOS_PAYOUT_MOCK=False.
+      * Idempotent: neu da co payos_payout_id thi skip.
+      * Headers x-client-id / x-api-key dung PAYOS_PAYOUT_* (Kenh Chi).
+
+    Endpoint nay van giu de admin co the retry thu cong khi auto signal
+    bi tat (V3_AUTO_TRIGGER_PAYOUT=False) hoac payout_failed.
+    """
     if not request.user.is_superuser:
-        return JsonResponse({'ok': False, 'message': 'Chỉ admin được trigger payout.'}, status=403)
+        return JsonResponse({'ok': False, 'message': 'Chi admin duoc trigger payout.'}, status=403)
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'message': 'Method not allowed.'}, status=405)
     proposal = get_object_or_404(
@@ -2380,22 +2343,36 @@ def v3_trigger_payos_payout(request, pk):
     )
     if proposal.v3_status != 'ready_to_payout':
         return JsonResponse({'ok': False,
-                             'message': f'v3_status={proposal.v3_status}, cần ready_to_payout.'},
+                             'message': f'v3_status={proposal.v3_status}, can ready_to_payout.'},
                             status=409)
+    # Idempotent guard: neu da co payos_payout_id thi khong goi lai PayOS
+    # (tranh double-spend khi admin spam click hoac auto-trigger song song).
+    if proposal.payos_payout_id:
+        return JsonResponse({'ok': True, 'payout_id': proposal.payos_payout_id,
+                             'skipped': True, 'reason': 'already_requested',
+                             'v3_status': proposal.v3_status})
+    # Delegate sang Celery task (co fallback threading neu khong co worker).
+    # Task da tu xu ly: check_balance -> create_payout -> save payos_payout_id.
+    # Set v3_status='payout_processing' NGAY de UX phan hoi tuc thoi.
+    # Task se override sang 'payout_failed' neu PayOS API reject; thanh
+    # cong thi gi nguyen 'payout_processing' cho den khi webhook cap nhat.
+    proposal.v3_status = 'payout_processing'
+    proposal.save(update_fields=['v3_status'])
     try:
-        result = _payos_request_payout(proposal)
-    except PayoutRequestError as exc:
-        proposal.payout_error = str(exc)[:1000]
+        from admin_panel.tasks.disbursement_tasks import trigger_payos_payout
+        trigger_payos_payout.delay(proposal.id)
+    except Exception as exc:
+        logger.error(f'[V3] trigger_payos_payout dispatch fail: {exc}')
+        proposal.payout_error = f'dispatch fail: {exc}'[:1000]
         proposal.v3_status = 'payout_failed'
         proposal.save(update_fields=['payout_error', 'v3_status'])
         return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
-    proposal.payos_payout_id = result['payout_id']
-    proposal.payos_payout_requested_at = timezone.now()
-    proposal.v3_status = 'payout_processing'
-    proposal.save(update_fields=['payos_payout_id', 'payos_payout_requested_at', 'v3_status'])
-    return JsonResponse({'ok': True, 'payout_id': result['payout_id'],
-                         'mock': result.get('mock', False),
-                         'v3_status': proposal.v3_status})
+    # Refresh tu DB de lay trang thai moi nhat (neu task chay sync mode).
+    proposal.refresh_from_db()
+    return JsonResponse({'ok': True,
+                         'payout_id': proposal.payos_payout_id or '',
+                         'v3_status': proposal.v3_status,
+                         'message': 'Da gui lenh PayOS Payout. He thong se cap nhat khi co webhook.'})
 
 
 def _run_finalize_burn_safe(proposal_id):

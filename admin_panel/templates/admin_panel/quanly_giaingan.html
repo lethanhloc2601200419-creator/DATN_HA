@@ -292,16 +292,16 @@
                             </button>
                             {% endif %}
 
-                            {# ---- READY_TO_PAYOUT: PayOS Checkout Link ---- #}
-                            {% if item.checkout_url %}
-                            <a href="{{ item.checkout_url }}" target="_blank" class="btn btn-sm btn-info fw-bold">
-                                <i class="fas fa-external-link-alt"></i> Thanh toán PayOS
-                            </a>
-                            {% elif item.can_trigger_payout %}
+                            {# ---- READY_TO_PAYOUT: PayOS Payout AUTO (luồng mới) ---- #}
+                            {# Không còn nút "Thanh toán PayOS" / scan QR — đó là luồng CŨ #}
+                            {# (donor pay-in). Luồng V3 dùng PayOS Payout API: 1 click → #}
+                            {# tiền tự chuyển từ Kênh Chi sang STK org (không cần QR). #}
+                            {% if item.can_trigger_payout %}
                             <button type="button" class="btn btn-sm btn-success fw-bold"
                                     onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
-                                    style="box-shadow: 0 2px 8px rgba(40,167,69,0.4);">
-                                <i class="fas fa-paper-plane"></i> Thực thi PayOS
+                                    style="box-shadow: 0 2px 8px rgba(40,167,69,0.4);"
+                                    title="Gửi lệnh PayOS Payout — tiền sẽ tự động chuyển vào STK của tổ chức">
+                                <i class="fas fa-paper-plane"></i> Thực thi PayOS (Auto)
                             </button>
                             {% endif %}
 
