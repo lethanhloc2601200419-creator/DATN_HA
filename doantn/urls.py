@@ -44,3 +44,10 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static('/campaigns/', document_root=settings.BASE_DIR / 'campaigns')
     urlpatterns += staticfiles_urlpatterns()
+# urls.py — thêm tạm để debug
+import requests
+from django.http import JsonResponse
+
+def my_ip(request):
+    r = requests.get("https://api.ipify.org?format=json")
+    return JsonResponse(r.json())

@@ -32,3 +32,5 @@ urlpatterns = [
     path('api/donations/<int:donation_id>/blockchain-status/', client.api_donation_blockchain_status, name='api_donation_blockchain_status'),
     path('api/donations/<int:donation_id>/retry-blockchain/', client.api_retry_donation_blockchain, name='api_retry_donation_blockchain'),
 ]
+
+
