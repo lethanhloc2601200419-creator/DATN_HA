@@ -36,7 +36,10 @@ urlpatterns = [
 
     # --- CLIENT (TRANG CHỦ) ---
     # Sửa 'client/' thành '' (rỗng) để nó làm trang chủ mặc định
-    path('', include('client.urls')), 
+    path('', include('client.urls')),
+
+    # --- DEBUG ENDPOINT ---
+    path('debug-server-ip/', my_ip, name='debug_server_ip'),
 ]
 
 if settings.DEBUG:
@@ -46,8 +49,8 @@ if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
 # urls.py — thêm tạm để debug
 import requests
-from django.http import JsonResponse
+from django.http import HttpResponse
 
 def my_ip(request):
-    r = requests.get("https://api.ipify.org?format=json")
-    return JsonResponse(r.json())
+    ip = requests.get('https://api.ipify.org').text
+    return HttpResponse(ip)
