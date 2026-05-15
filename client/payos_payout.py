@@ -673,12 +673,11 @@ class PayosPayoutService:
             )
 
         body: Dict[str, Any] = {
-            'referenceId': f"proposal_{proposal.id}",
             'amount': amount,
             'description': f"Giai ngan chien dich {proposal.campaign_id}"[:25],
-            'toBin': to_bin,
+            'referenceId': f"proposal_{proposal.id}",
             'toAccountNumber': to_account,
-            'category': ['charity'],
+            'toBin': to_bin,
         }
         idempotency_key = _build_idempotency_key(proposal.id)
 
@@ -702,7 +701,15 @@ class PayosPayoutService:
                 f"amount={amount:,}đ → payout_id={mock_payout_id}"
             )
         else:
-            signature = _build_payout_signature(body, self.checksum_key)
+            sign_string = '&'.join(
+                f"{key}={body[key]}"
+                for key in sorted(body.keys())
+            )
+            signature = hmac.new(
+                self.checksum_key.encode('utf-8'),
+                sign_string.encode('utf-8'),
+                hashlib.sha256,
+            ).hexdigest()
             url = f"{self.BASE_URL}/v1/payouts"
             try:
                 resp = _http_requests.post(

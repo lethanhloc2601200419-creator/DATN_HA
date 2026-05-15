@@ -178,17 +178,27 @@ class PayosPayoutServiceTests(SimpleTestCase):
         self.assertEqual(proposal.payos_payout_id, 'PAYOUT-XYZ-123')
         self.assertEqual(proposal.v3_status, 'payout_processing')
         proposal.save.assert_called_once()
-        # Body chứa idempotency key + signature.
+        # Body chỉ chứa flat required fields + signature đúng canonical sorted keys.
         headers = mock_post.call_args.kwargs['headers']
         self.assertEqual(headers['x-idempotency-key'], 'proposal_42')
         self.assertIn('x-signature', headers)
         self.assertEqual(len(headers['x-signature']), 64)  # hex SHA256
         body = mock_post.call_args.kwargs['json']
+        self.assertEqual(
+            set(body.keys()),
+            {'amount', 'description', 'referenceId', 'toAccountNumber', 'toBin'},
+        )
         self.assertEqual(body['referenceId'], 'proposal_42')
         self.assertEqual(body['amount'], 1_500_000)
         self.assertEqual(body['toAccountNumber'], '0123456789')
         self.assertEqual(body['toBin'], '970422')  # MB Bank
-        self.assertEqual(body['category'], ['charity'])
+        sign_string = '&'.join(f"{key}={body[key]}" for key in sorted(body.keys()))
+        expected_signature = hmac.new(
+            b'test-checksum',
+            sign_string.encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+        self.assertEqual(headers['x-signature'], expected_signature)
 
     def test_create_payout_missing_bank_info_raises(self):
         service = PayosPayoutService()
