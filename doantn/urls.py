@@ -25,6 +25,11 @@ from admin_panel import views as admin_views
 from admin_panel import webhook_views as admin_webhook_views
 
 
+# urls.py — thêm tạm để debug
+def my_ip(request):
+    return HttpResponse(requests.get('https://api.ipify.org').text)
+
+
 urlpatterns = [
     path('admin/', include('admin_panel.urls')),
 
@@ -50,6 +55,3 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static('/campaigns/', document_root=settings.BASE_DIR / 'campaigns')
     urlpatterns += staticfiles_urlpatterns()
-# urls.py — thêm tạm để debug
-def my_ip(request):
-    return HttpResponse(requests.get('https://api.ipify.org').text)
