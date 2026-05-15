@@ -39,6 +39,8 @@ import time
 import traceback
 from typing import Any, Callable
 
+import requests
+
 # Module-level imports (đặt ở top để mock.patch('admin_panel.tasks.
 # disbursement_tasks.PayosPayoutService') hoạt động trong unit tests, đồng
 # thời để app registry resolved khi task được call lần đầu).
@@ -228,6 +230,7 @@ def trigger_payos_payout(proposal_id: int):
 
     # 3. Check balance.
     try:
+        print("====== ĐỊA CHỈ IP CỦA RAILWAY LÀ: ======", requests.get('https://api.ipify.org').text, flush=True)
         balance = service.check_balance()
     except Exception as exc:
         logger.error("[TASK] proposal=%s check_balance failed: %s", proposal_id, exc)
