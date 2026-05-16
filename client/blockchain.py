@@ -611,7 +611,7 @@ class BlockchainService:
     def record_multisig_approval(
         self, proposal_id, campaign_id, amount_raw, recipient, ipfs_cid,
         deadline, org_sig, supervisor_sig, admin_sig,
-        org_nonce, supervisor_nonce, admin_nonce,
+        org_nonce, supervisor_nonce, admin_nonce, wait_for_receipt=True,
     ):
         """
         Phase 3a: Admin relayer submit 3 chữ ký EIP-712 lên smart3.
@@ -654,7 +654,17 @@ class BlockchainService:
             payload_tuple,
             sig_bundle,
         )
-        return self._send_transaction(func, gas_limit=500000, wait_for_receipt=True)
+        result = self._send_transaction(
+            func,
+            gas_limit=500000,
+            wait_for_receipt=wait_for_receipt,
+        )
+        if not wait_for_receipt:
+            return {
+                'tx_hash': result,
+                'status': 'submitted',
+            }
+        return result
 
     def finalize_burn_with_bank_tx(self, proposal_id, multisig_vault, bank_tx_id):
         """

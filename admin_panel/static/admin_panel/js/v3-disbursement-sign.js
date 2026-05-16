@@ -69,6 +69,16 @@
     return data;
   }
 
+  async function readJsonResponse(res, actionLabel) {
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (err) {
+      const preview = text.trim().slice(0, 240) || `HTTP ${res.status}`;
+      throw new Error(`${actionLabel} không trả JSON hợp lệ: ${preview}`);
+    }
+  }
+
   /**
    * Main entry: user bấm "Ký off-chain" trên proposal.
    * role ∈ {'organization', 'supervisor', 'admin'}.
@@ -116,12 +126,17 @@
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/relay-multisig/`, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        headers: { 'Accept': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res, 'Relay');
       if (!res.ok || !data.ok) throw new Error(data.message || `HTTP ${res.status}`);
-      alert(`✅ MultisigConfirmed on-chain. tx=${data.tx_hash}`);
-      window.location.reload();
+      if (data.pending_confirmation) {
+        alert(`✅ Đã gửi relay tx lên chain. tx=${data.tx_hash}\nHệ thống sẽ tự cập nhật khi Sepolia confirm.`);
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        alert(`✅ MultisigConfirmed on-chain. tx=${data.tx_hash}`);
+        window.location.reload();
+      }
     } catch (err) {
       alert('❌ Relay thất bại: ' + (err.message || err));
     }

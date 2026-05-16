@@ -291,6 +291,11 @@
                                 <i class="fas fa-upload"></i> Relay lên chain
                             </button>
                             {% endif %}
+                            {% if item.relay_pending %}
+                            <button type="button" class="btn btn-sm btn-secondary" disabled>
+                                <i class="fas fa-spinner fa-spin"></i> Đang chờ relay confirm
+                            </button>
+                            {% endif %}
 
                             {# ---- READY_TO_PAYOUT: PayOS Payout AUTO (luồng mới) ---- #}
                             {# Không còn nút "Thanh toán PayOS" / scan QR — đó là luồng CŨ #}
@@ -422,12 +427,14 @@
                                                             {{ item.obj.multisig_confirmed_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
                                                         </a>
                                                     </div>
+                                                    {% elif item.relay_pending %}
+                                                    <div class="small text-muted">Đã gửi tx, đang chờ Sepolia confirm.</div>
                                                     {% else %}
                                                     <div class="small text-muted">Chưa relay.</div>
                                                     {% endif %}
                                                 </div>
                                                 <span class="badge {% if item.obj.multisig_confirmed_tx_hash %}bg-success{% else %}bg-light text-dark{% endif %}">
-                                                    {% if item.obj.multisig_confirmed_tx_hash %}Done{% else %}Waiting{% endif %}
+                                                    {% if item.obj.multisig_confirmed_tx_hash %}Done{% elif item.relay_pending %}Pending{% else %}Waiting{% endif %}
                                                 </span>
                                             </div>
                                         </div>

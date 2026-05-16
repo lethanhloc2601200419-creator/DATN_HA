@@ -1523,11 +1523,13 @@ def quanly_giaingan(request):
             and p.v3_status in ('v3_not_started', 'pending_multisig')
             and bool(p.ipfs_cid)
         )
+        relay_pending = (p.payout_error or '').startswith('multisig relay pending:')
         # Admin relay button visible only when 3 sigs collected and not yet relayed.
         can_relay_multisig = (
             role == 'admin'
             and sig_count >= 3
             and not p.multisig_confirmed_tx_hash
+            and not relay_pending
             and p.v3_status in ('pending_multisig', 'ready_to_payout')
         )
         # Admin payout trigger when ready_to_payout.
@@ -1546,6 +1548,7 @@ def quanly_giaingan(request):
             'can_sign': can_sign,
             'can_sign_as': can_sign_as,
             'already_signed': already_signed,
+            'relay_pending': relay_pending,
             'can_relay_multisig': can_relay_multisig,
             'can_trigger_payout': can_trigger_payout,
             'can_reject': (role == 'admin' and p.v3_status in ('v3_not_started', 'pending_multisig')),
@@ -2305,18 +2308,73 @@ def v3_execute_multisig_relayer(request, pk):
             org_nonce=int(sigs['organization'].nonce),
             supervisor_nonce=int(sigs['supervisor'].nonce),
             admin_nonce=int(sigs['admin'].nonce),
+            wait_for_receipt=False,
         )
     except Exception as exc:
         proposal.payout_error = f'multisig relay fail: {exc}'[:1000]
         proposal.save(update_fields=['payout_error'])
         return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
 
-    proposal.multisig_confirmed_tx_hash = result.get('tx_hash')
-    proposal.multisig_confirmed_at = timezone.now()
-    proposal.v3_status = 'ready_to_payout'
-    proposal.save(update_fields=['multisig_confirmed_tx_hash', 'multisig_confirmed_at', 'v3_status'])
-    return JsonResponse({'ok': True, 'tx_hash': result.get('tx_hash'),
-                         'v3_status': proposal.v3_status})
+    tx_hash = result.get('tx_hash')
+    proposal.payout_error = f'multisig relay pending: {tx_hash}'[:1000]
+    proposal.save(update_fields=['payout_error'])
+
+    t = threading.Thread(
+        target=_run_confirm_multisig_relay_safe,
+        args=(proposal.id, tx_hash),
+        name=f'v3-relay-confirm-{proposal.id}',
+        daemon=True,
+    )
+    transaction.on_commit(t.start)
+
+    return JsonResponse({
+        'ok': True,
+        'tx_hash': tx_hash,
+        'v3_status': proposal.v3_status,
+        'pending_confirmation': True,
+        'message': 'Đã gửi transaction relay lên chain. Hệ thống sẽ cập nhật khi tx được mine.',
+    })
+
+
+def _run_confirm_multisig_relay_safe(proposal_id, tx_hash):
+    """Background worker: wait relay receipt, then mark proposal ready_to_payout."""
+    from admin_panel.models import DisbursementProposal as _DP
+
+    try:
+        bc = BlockchainService()
+        receipt = bc.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+        p = _DP.objects.get(pk=proposal_id)
+        if int(receipt.status) != 1:
+            p.payout_error = f'multisig relay fail: tx reverted ({tx_hash})'[:1000]
+            p.save(update_fields=['payout_error'])
+            print(f"❌ [V3/RELAY] proposal={proposal_id} tx reverted: {tx_hash}", flush=True)
+            return
+
+        p.multisig_confirmed_tx_hash = tx_hash
+        p.multisig_confirmed_at = timezone.now()
+        p.v3_status = 'ready_to_payout'
+        p.payout_error = ''
+        p.save(update_fields=[
+            'multisig_confirmed_tx_hash',
+            'multisig_confirmed_at',
+            'v3_status',
+            'payout_error',
+        ])
+        print(f"✅ [V3/RELAY] proposal={proposal_id} confirmed tx={tx_hash}", flush=True)
+    except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
+        try:
+            p = _DP.objects.get(pk=proposal_id)
+            p.payout_error = f'multisig relay confirm fail: {exc}'[:1000]
+            p.save(update_fields=['payout_error'])
+        except Exception:
+            pass
+    finally:
+        try:
+            _db_connection.close()
+        except Exception:
+            pass
 
 
 @login_required
@@ -2478,5 +2536,3 @@ def v3_simulate_webhook(request, pk):
     rf = RequestFactory()
     fake_req = rf.post('/fake', data=json.dumps(payload), content_type='application/json')
     return v3_payos_payout_webhook(fake_req)
-
-
