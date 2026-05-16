@@ -540,6 +540,75 @@ def _build_payout_signature(body: Dict[str, Any], checksum_key: str) -> str:
     ).hexdigest()
 
 
+def _first_payout_transaction(response_data: Dict[str, Any]) -> Dict[str, Any]:
+    data = response_data.get('data') if isinstance(response_data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    transactions = data.get('transactions') or data.get('payouts') or []
+    if isinstance(transactions, dict):
+        transactions = list(transactions.values())
+    if isinstance(transactions, list) and transactions and isinstance(transactions[0], dict):
+        return transactions[0]
+    return {}
+
+
+def _extract_create_payout_id(response_data: Dict[str, Any]) -> str:
+    data = response_data.get('data') if isinstance(response_data, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    tx = _first_payout_transaction(response_data)
+    payout_id = (
+        data.get('payoutId')
+        or data.get('payout_id')
+        or data.get('id')
+        or response_data.get('payoutId')
+        or response_data.get('id')
+        or tx.get('payoutId')
+        or tx.get('id')
+        or ''
+    )
+    return str(payout_id)
+
+
+def _extract_create_payout_status(response_data: Dict[str, Any]) -> str:
+    data = response_data.get('data') if isinstance(response_data, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    tx = _first_payout_transaction(response_data)
+    raw_status = (
+        tx.get('state')
+        or tx.get('status')
+        or data.get('approvalState')
+        or data.get('status')
+        or response_data.get('status')
+        or ''
+    )
+    status = str(raw_status or '').upper()
+    if status in ('SUCCEEDED', 'SUCCESS', 'COMPLETED', 'COMPLETE', 'PAID'):
+        return 'SUCCEEDED'
+    if status in ('FAILED', 'FAILURE', 'REJECTED', 'CANCELED', 'CANCELLED', 'ERROR'):
+        return 'FAILED'
+    return 'PROCESSING'
+
+
+def _extract_create_bank_tx_id(response_data: Dict[str, Any]) -> str:
+    data = response_data.get('data') if isinstance(response_data, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    tx = _first_payout_transaction(response_data)
+    bank_tx_id = (
+        tx.get('bankTransactionId')
+        or tx.get('transactionNo')
+        or tx.get('transactionId')
+        or tx.get('reference')
+        or data.get('bankTransactionId')
+        or data.get('transactionNo')
+        or data.get('transactionId')
+        or ''
+    )
+    return str(bank_tx_id)
+
+
 class PayosPayoutService:
     """
     Adapter gọi PayOS Payout API v1 (https://api-merchant.payos.vn/v1/payouts).
@@ -640,7 +709,7 @@ class PayosPayoutService:
         POST /v1/payouts cho 1 DisbursementProposal.
 
         Side-effects:
-            - Lưu response.payoutId vào proposal.payos_payout_id.
+            - Lưu PayOS payout id vào proposal.payos_payout_id.
             - Lưu proposal.v3_status = 'payout_processing'.
             - Lưu proposal.payos_payout_requested_at = now.
             - Save proposal với update_fields giới hạn (idempotent re-call OK).
@@ -738,19 +807,35 @@ class PayosPayoutService:
                 f"amount={amount:,}đ status={resp.status_code}"
             )
 
-        payout_id = (response_data.get('data') or {}).get('payoutId') or response_data.get('payoutId')
+        payout_id = _extract_create_payout_id(response_data)
         if not payout_id:
             raise PayoutRequestError(
-                f"PayOS create_payout không trả về payoutId. Response: {response_data}"
+                f"PayOS create_payout không trả về payout id. Response: {response_data}"
             )
 
         # Persist tới DB — chỉ update các field cần thiết, không trigger save() đầy đủ.
         proposal.payos_payout_id = payout_id
-        proposal.v3_status = 'payout_processing'
         proposal.payos_payout_requested_at = _tz.now()
-        proposal.save(update_fields=[
+        update_fields = [
             'payos_payout_id', 'v3_status', 'payos_payout_requested_at',
-        ])
+        ]
+
+        payout_status = _extract_create_payout_status(response_data)
+        if payout_status == 'SUCCEEDED':
+            bank_tx_id = _extract_create_bank_tx_id(response_data) or f"UNKNOWN-{payout_id}"
+            proposal.bank_tx_id = bank_tx_id
+            proposal.fiat_transferred_at = _tz.now()
+            proposal.v3_status = 'fiat_transferred'
+            proposal.payout_error = None
+            update_fields += ['bank_tx_id', 'fiat_transferred_at', 'payout_error']
+        elif payout_status == 'FAILED':
+            proposal.v3_status = 'payout_failed'
+            proposal.payout_error = str(response_data.get('desc') or 'PayOS payout failed')[:1000]
+            update_fields += ['payout_error']
+        else:
+            proposal.v3_status = 'payout_processing'
+
+        proposal.save(update_fields=update_fields)
         return response_data
 
     # ---------------------------------------------------------------- 3. Status

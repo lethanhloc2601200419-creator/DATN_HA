@@ -141,22 +141,39 @@ def _extract_payout_fields(payload: Dict[str, Any]) -> Dict[str, str]:
         data = payload['data']
     else:
         data = payload
+    transactions = data.get('transactions') or data.get('payouts') or []
+    if isinstance(transactions, dict):
+        transactions = list(transactions.values())
+    first_tx = transactions[0] if isinstance(transactions, list) and transactions and isinstance(transactions[0], dict) else {}
 
     payout_id = (
         data.get('payoutId')
         or data.get('payout_id')
+        or data.get('id')
         or payload.get('payoutId')
+        or payload.get('id')
+        or first_tx.get('payoutId')
+        or first_tx.get('id')
         or ''
     )
     status = (
-        data.get('status')
+        first_tx.get('state')
+        or first_tx.get('status')
+        or data.get('status')
+        or data.get('approvalState')
         or payload.get('status')
         or ''
     ).upper()
     bank_tx_id = (
-        data.get('bankTransactionId')
+        first_tx.get('bankTransactionId')
+        or first_tx.get('transactionNo')
+        or first_tx.get('transactionId')
+        or first_tx.get('reference')
+        or data.get('bankTransactionId')
         or data.get('bank_tx_id')
         or data.get('transactionId')
+        or data.get('transactionNo')
+        or data.get('reference')
         or data.get('referenceId')
         or payload.get('bankTransactionId')
         or payload.get('referenceId')

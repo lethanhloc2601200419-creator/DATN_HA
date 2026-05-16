@@ -24,6 +24,7 @@ from client.payos_payout import (
     PayoutRequestError,
     _PAYOS_ENCODE_SAFE,
     _build_payout_signature,
+    _extract_create_payout_id,
     _resolve_bank_bin,
 )
 
@@ -204,6 +205,44 @@ class PayosPayoutServiceTests(SimpleTestCase):
             hashlib.sha256,
         ).hexdigest()
         self.assertEqual(headers['x-signature'], expected_signature)
+
+    @mock.patch('client.payos_payout._http_requests.post')
+    def test_create_payout_accepts_payos_batch_response_and_success_state(self, mock_post):
+        mock_resp = mock.MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            'code': '00',
+            'desc': 'success',
+            'data': {
+                'id': 'batch_b5b8f0987ab1430a9a512365e4f9d127',
+                'referenceId': 'proposal_42',
+                'transactions': [{
+                    'id': 'batch_txn_e482a0e1c2f548719a14f335c99bb0ae',
+                    'referenceId': 'proposal_42',
+                    'amount': 1_500_000,
+                    'description': 'Giai ngan chien dich 7',
+                    'toBin': '970422',
+                    'toAccountNumber': '0123456789',
+                    'reference': '105424354',
+                    'state': 'SUCCEEDED',
+                }],
+                'approvalState': 'COMPLETED',
+            },
+        }
+        mock_post.return_value = mock_resp
+
+        service = PayosPayoutService()
+        proposal = _make_mock_proposal()
+
+        response = service.create_payout(proposal)
+
+        self.assertEqual(_extract_create_payout_id(response), 'batch_b5b8f0987ab1430a9a512365e4f9d127')
+        self.assertEqual(proposal.payos_payout_id, 'batch_b5b8f0987ab1430a9a512365e4f9d127')
+        self.assertEqual(proposal.bank_tx_id, '105424354')
+        self.assertEqual(proposal.v3_status, 'fiat_transferred')
+        update_fields = set(proposal.save.call_args.kwargs['update_fields'])
+        self.assertIn('bank_tx_id', update_fields)
+        self.assertIn('fiat_transferred_at', update_fields)
 
     def test_create_payout_missing_bank_info_raises(self):
         service = PayosPayoutService()

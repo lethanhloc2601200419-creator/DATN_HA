@@ -46,7 +46,7 @@ import requests
 # thời để app registry resolved khi task được call lần đầu).
 # DisbursementProposal cần app registry → import lazy bên trong task để
 # tránh circular ở app-loading time.
-from client.payos_payout import PayosPayoutService
+from client.payos_payout import PayosPayoutService, PayoutRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -260,14 +260,40 @@ def trigger_payos_payout(proposal_id: int):
         }
 
     # 4. Create payout.
-    response = service.create_payout(proposal)
-    payout_id = (response.get('data') or {}).get('payoutId') or response.get('payoutId')
+    try:
+        response = service.create_payout(proposal)
+    except PayoutRequestError as exc:
+        msg = str(exc)
+        if '606' in msg or 'Idempotency key' in msg or 'idempotency key' in msg.lower():
+            proposal.v3_status = 'payout_failed'
+            proposal.payout_error = (
+                f"{msg} — PayOS có thể đã nhận request trước đó; cần reconcile bằng response/log PayOS."
+            )[:1000]
+            proposal.save(update_fields=['v3_status', 'payout_error'])
+            logger.error("[TASK] proposal=%s PayOS idempotency conflict; stop retry: %s", proposal_id, msg)
+            return {
+                'payout_id': proposal.payos_payout_id,
+                'status': proposal.v3_status,
+                'skipped': True,
+                'reason': 'idempotency_conflict_needs_reconcile',
+            }
+        raise
     logger.info(
-        "[TASK] proposal=%s create_payout OK → payout_id=%s",
-        proposal_id, payout_id,
+        "[TASK] proposal=%s create_payout OK → payout_id=%s status=%s",
+        proposal_id, proposal.payos_payout_id, proposal.v3_status,
     )
+    if proposal.v3_status == 'fiat_transferred' and proposal.bank_tx_id and not proposal.burn_tx_hash:
+        try:
+            from admin_panel.webhook_views import _spawn_finalize_thread
+            _spawn_finalize_thread(proposal.id, proposal.bank_tx_id)
+            logger.info(
+                "[TASK] proposal=%s PayOS already SUCCEEDED → queued burn finalize bank_tx=%s",
+                proposal_id, proposal.bank_tx_id,
+            )
+        except Exception as exc:
+            logger.error("[TASK] proposal=%s queue burn finalize failed: %s", proposal_id, exc)
     return {
-        'payout_id': payout_id,
+        'payout_id': proposal.payos_payout_id,
         'status': proposal.v3_status,
         'skipped': False,
     }
