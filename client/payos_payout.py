@@ -36,11 +36,13 @@ import os
 import secrets
 import time
 from typing import Any, Dict
+from urllib.parse import quote as _quote
 
 import requests as _http_requests
 
 # Endpoint REST PayOS v2 — khớp với luồng donation (client/views.py) đang chạy ổn định.
 _PAYOS_API_BASE = 'https://api-merchant.payos.vn'
+_PAYOS_ENCODE_SAFE = "-_.!~*'()"
 
 
 # --------------------------------------------------------------------------
@@ -702,7 +704,7 @@ class PayosPayoutService:
             )
         else:
             sign_string = '&'.join(
-                f"{key}={body[key]}"
+                f"{key}={_quote(str(body[key]), safe=_PAYOS_ENCODE_SAFE)}"
                 for key in sorted(body.keys())
             )
             signature = hmac.new(

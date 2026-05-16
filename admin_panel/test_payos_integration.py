@@ -15,12 +15,14 @@ import hmac
 import json
 from decimal import Decimal
 from unittest import mock
+from urllib.parse import quote
 
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from client.payos_payout import (
     PayosPayoutService,
     PayoutRequestError,
+    _PAYOS_ENCODE_SAFE,
     _build_payout_signature,
     _resolve_bank_bin,
 )
@@ -192,7 +194,10 @@ class PayosPayoutServiceTests(SimpleTestCase):
         self.assertEqual(body['amount'], 1_500_000)
         self.assertEqual(body['toAccountNumber'], '0123456789')
         self.assertEqual(body['toBin'], '970422')  # MB Bank
-        sign_string = '&'.join(f"{key}={body[key]}" for key in sorted(body.keys()))
+        sign_string = '&'.join(
+            f"{key}={quote(str(body[key]), safe=_PAYOS_ENCODE_SAFE)}"
+            for key in sorted(body.keys())
+        )
         expected_signature = hmac.new(
             b'test-checksum',
             sign_string.encode('utf-8'),
