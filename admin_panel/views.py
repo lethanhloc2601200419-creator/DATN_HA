@@ -1565,6 +1565,12 @@ def quanly_giaingan(request):
 
         proposals_data.append(item)
 
+    has_live_v3_pending = any(
+        item['relay_pending']
+        or item['obj'].v3_status in ('payout_processing', 'fiat_transferred')
+        for item in proposals_data
+    )
+
     # V3 stats dashboard (count by v3_status, not legacy status).
     stats = {
         'pending_multisig': proposals_qs.filter(
@@ -1595,6 +1601,7 @@ def quanly_giaingan(request):
         'export_excel_url': _export_links(request)[1],
         'approver_context': approver_context,
         'disbursement_web3_config': _build_disbursement_web3_config(request),
+        'has_live_v3_pending': has_live_v3_pending,
     }
     return render(request, 'admin_panel/quanly_giaingan.html', context)
 

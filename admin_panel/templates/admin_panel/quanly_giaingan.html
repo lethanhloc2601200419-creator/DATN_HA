@@ -313,7 +313,12 @@
                             {# ---- FIAT_TRANSFERRED: chờ webhook (disabled) ---- #}
                             {% if item.obj.v3_status == 'fiat_transferred' %}
                             <button type="button" class="btn btn-sm btn-info" disabled>
-                                <i class="fas fa-spinner fa-spin"></i> Đang chờ Bank Webhook…
+                                <i class="fas fa-spinner fa-spin"></i> Đã nhận webhook, đang burn…
+                            </button>
+                            {% endif %}
+                            {% if item.obj.v3_status == 'payout_processing' %}
+                            <button type="button" class="btn btn-sm btn-info" disabled>
+                                <i class="fas fa-spinner fa-spin"></i> Đang chờ PayOS webhook…
                             </button>
                             {% endif %}
 
@@ -691,6 +696,10 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
 {# ============================================================ #}
 {{ disbursement_web3_config|json_script:"disbursement-proposal-config" }}
 <script>
+window.V3_DISBURSEMENT_AUTO_REFRESH = {
+    enabled: {% if has_live_v3_pending %}true{% else %}false{% endif %},
+    intervalMs: 5000
+};
 (() => {
     const node = document.getElementById('disbursement-proposal-config');
     if (!node) return;

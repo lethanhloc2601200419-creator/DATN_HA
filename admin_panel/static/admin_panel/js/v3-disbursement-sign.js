@@ -17,6 +17,18 @@
   'use strict';
 
   const CSRF_TOKEN = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+  let refreshTimer = null;
+
+  function schedulePageRefresh(delayMs) {
+    if (refreshTimer) window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => {
+      if (document.hidden) {
+        schedulePageRefresh(2000);
+        return;
+      }
+      window.location.reload();
+    }, delayMs);
+  }
 
   async function getMetaMaskAccount() {
     if (!window.ethereum) {
@@ -132,7 +144,7 @@
       if (!res.ok || !data.ok) throw new Error(data.message || `HTTP ${res.status}`);
       if (data.pending_confirmation) {
         alert(`✅ Đã gửi relay tx lên chain. tx=${data.tx_hash}\nHệ thống sẽ tự cập nhật khi Sepolia confirm.`);
-        setTimeout(() => window.location.reload(), 1200);
+        schedulePageRefresh(2500);
       } else {
         alert(`✅ MultisigConfirmed on-chain. tx=${data.tx_hash}`);
         window.location.reload();
@@ -149,12 +161,12 @@
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/trigger-payout/`, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        headers: { 'Accept': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res, 'PayOS payout');
       if (!res.ok || !data.ok) throw new Error(data.message || `HTTP ${res.status}`);
       alert(`✅ Đã gửi lệnh PayOS. payout_id=${data.payout_id}${data.mock ? ' (MOCK)' : ''}`);
-      window.location.reload();
+      schedulePageRefresh(2500);
     } catch (err) {
       alert('❌ Trigger payout thất bại: ' + (err.message || err));
     }
@@ -179,4 +191,9 @@
   }
 
   window.V3Disbursement = { signAs, relayMultisig, triggerPayout, simulateWebhook };
+
+  const autoRefresh = window.V3_DISBURSEMENT_AUTO_REFRESH || {};
+  if (autoRefresh.enabled) {
+    schedulePageRefresh(Number(autoRefresh.intervalMs) || 5000);
+  }
 })();
