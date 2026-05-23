@@ -67,6 +67,70 @@ def _normalize_query(value):
     return (value or '').strip()
 
 
+def _clean_admin_unit_name(value):
+    return re.sub(r'\s+', ' ', value or '').strip()
+
+
+def _fetch_casso_addresskit(path):
+    url = f"https://production.cas.so/address-kit/latest/{path.lstrip('/')}"
+    response = requests.get(url, timeout=12)
+    response.raise_for_status()
+    return response.json()
+
+
+def _apply_campaign_location(campaign, post_data):
+    campaign.beneficiary_province = _clean_admin_unit_name(post_data.get('beneficiary_province')) or None
+    campaign.beneficiary_ward = _clean_admin_unit_name(post_data.get('beneficiary_ward')) or None
+    campaign.beneficiary_address = _clean_admin_unit_name(post_data.get('beneficiary_address')) or None
+    campaign.beneficiary_lat = post_data.get('beneficiary_lat') or None
+    campaign.beneficiary_lng = post_data.get('beneficiary_lng') or None
+
+
+def _reverse_geocode_with_nominatim(lat_value, lng_value):
+    response = requests.get(
+        'https://nominatim.openstreetmap.org/reverse',
+        params={
+            'format': 'jsonv2',
+            'lat': lat_value,
+            'lon': lng_value,
+            'zoom': 18,
+            'addressdetails': 1,
+            'accept-language': 'vi',
+        },
+        headers={'User-Agent': 'doantn-charity-admin/1.0'},
+        timeout=12,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    address = payload.get('address') or {}
+    province = _clean_admin_unit_name(
+        address.get('state') or address.get('city') or address.get('province')
+    )
+    ward = _clean_admin_unit_name(
+        address.get('suburb') or address.get('quarter') or address.get('village') or address.get('town')
+    )
+    detail_parts = []
+    for value in (
+        address.get('house_number'),
+        address.get('road'),
+        address.get('amenity'),
+        address.get('building'),
+        payload.get('name'),
+    ):
+        text = _clean_admin_unit_name(value)
+        if text and text not in detail_parts and text not in {province, ward}:
+            detail_parts.append(text)
+
+    label = _clean_admin_unit_name(payload.get('display_name'))
+    return {
+        'province': province,
+        'ward': ward,
+        'address': ', '.join(detail_parts) or label,
+        'formatted_address': label,
+        'source': 'nominatim',
+    }
+
+
 def _format_export_value(value):
     if value is None:
         return ''
@@ -996,6 +1060,111 @@ def quanlychiendich(request):
     return render(request, 'admin_panel/quanlychiendich.html', context)
 
 
+@login_required(login_url='admin_panel:dangnhap')
+def api_vietnam_provinces(request):
+    try:
+        data = _fetch_casso_addresskit('provinces')
+        provinces = [
+            {
+                'code': item.get('code'),
+                'name': _clean_admin_unit_name(item.get('name')),
+            }
+            for item in data.get('provinces', [])
+        ]
+        return JsonResponse({'ok': True, 'provinces': provinces})
+    except requests.RequestException as exc:
+        return JsonResponse({'ok': False, 'message': f'Không tải được danh sách tỉnh/thành: {exc}'}, status=502)
+
+
+@login_required(login_url='admin_panel:dangnhap')
+def api_vietnam_communes(request, province_code):
+    try:
+        data = _fetch_casso_addresskit(f'provinces/{province_code}/communes')
+        communes = [
+            {
+                'code': item.get('code'),
+                'name': _clean_admin_unit_name(item.get('name')),
+            }
+            for item in data.get('communes', [])
+        ]
+        return JsonResponse({'ok': True, 'communes': communes})
+    except requests.RequestException as exc:
+        return JsonResponse({'ok': False, 'message': f'Không tải được danh sách xã/phường: {exc}'}, status=502)
+
+
+@login_required(login_url='admin_panel:dangnhap')
+def api_openmap_reverse_geocode(request):
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    if not lat or not lng:
+        return JsonResponse({'ok': False, 'message': 'Thiếu tọa độ.'}, status=400)
+    if not settings.OPENMAP_API_KEY:
+        return JsonResponse({'ok': False, 'message': 'Server chưa cấu hình OPENMAP_API_KEY.'}, status=500)
+
+    try:
+        lat_value = float(lat)
+        lng_value = float(lng)
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'message': 'Tọa độ không hợp lệ.'}, status=400)
+
+    openmap_error = ''
+    try:
+        response = requests.get(
+            'https://mapapis.openmap.vn/v1/geocode/reverse',
+            params={
+                'point.lat': lat_value,
+                'point.lon': lng_value,
+                'size': 1,
+                'boundary.circle.radius': 1,
+                'admin_v2': 'true',
+                'apikey': settings.OPENMAP_API_KEY,
+            },
+            timeout=12,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as exc:
+        openmap_error = str(exc)
+        try:
+            fallback = _reverse_geocode_with_nominatim(lat_value, lng_value)
+            return JsonResponse({
+                'ok': True,
+                **fallback,
+                'lat': lat_value,
+                'lng': lng_value,
+                'warning': f'OpenMap không dùng được ({openmap_error}); đã dùng Nominatim làm dự phòng.',
+            })
+        except requests.RequestException as fallback_exc:
+            return JsonResponse({
+                'ok': False,
+                'message': f'Không gọi được OpenMap: {openmap_error}. Fallback Nominatim cũng lỗi: {fallback_exc}',
+            }, status=502)
+
+    feature = (payload.get('features') or [{}])[0]
+    props = feature.get('properties') or {}
+    label = _clean_admin_unit_name(props.get('label') or props.get('address') or '')
+    province = _clean_admin_unit_name(props.get('region'))
+    ward = _clean_admin_unit_name(props.get('locality'))
+
+    detail_parts = []
+    for value in (props.get('name'), props.get('short_address'), props.get('street')):
+        text = _clean_admin_unit_name(value)
+        if text and text not in detail_parts and text not in {province, ward}:
+            detail_parts.append(text)
+    detail = ', '.join(detail_parts) or label
+
+    return JsonResponse({
+        'ok': True,
+        'province': province,
+        'ward': ward,
+        'address': detail,
+        'formatted_address': label,
+        'lat': lat_value,
+        'lng': lng_value,
+        'source': 'openmap',
+    })
+
+
 # ========================================================
 # 🔥🔥🔥 HÀM QUAN TRỌNG: THÊM CHIẾN DỊCH + BLOCKCHAIN 🔥🔥🔥
 # ========================================================
@@ -1010,6 +1179,7 @@ def them_chiendich(request):
             camp.end_date = request.POST.get('end_date')
             camp.short_description = request.POST.get('short_description')
             camp.full_description = request.POST.get('full_description')
+            _apply_campaign_location(camp, request.POST)
             
             cat_id = request.POST.get('category_id')
             if cat_id: camp.category_id = cat_id
@@ -1087,6 +1257,7 @@ def sua_chiendich(request, pk):
             camp.end_date = request.POST.get('end_date')
             camp.short_description = request.POST.get('short_description')
             camp.full_description = request.POST.get('full_description')
+            _apply_campaign_location(camp, request.POST)
 
             camp.category_id = request.POST.get('category_id') or None
             camp.occasion_id = request.POST.get('occasion_id') or None

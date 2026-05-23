@@ -246,6 +246,9 @@ SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 # =====================================================
 CASSO_SECRET_KEY = os.getenv('CASSO_SECRET_KEY', '')
 
+# OpenMap.vn reverse geocoding for admin campaign map picker.
+OPENMAP_API_KEY = os.getenv('OPENMAP_API_KEY', '')
+
 # =====================================================
 # BLOCKCHAIN CONFIGURATION (HARDCODED FOR TESTING)
 # =====================================================

@@ -300,6 +300,7 @@ class Campaign(models.Model):
     # --- 5. GIS & ĐỊA ĐIỂM (LOGIC THÔNG MINH) ---
     # Vẫn giữ các trường này để User có thể nhập địa chỉ riêng nếu muốn
     beneficiary_province = models.CharField(max_length=100, blank=True, null=True)
+    beneficiary_ward = models.CharField(max_length=100, blank=True, null=True)
     beneficiary_address = models.TextField(blank=True, null=True)
     beneficiary_lat = models.DecimalField(max_digits=15, decimal_places=8, blank=True, null=True) # Tăng digits lên cho an toàn
     beneficiary_lng = models.DecimalField(max_digits=15, decimal_places=8, blank=True, null=True)

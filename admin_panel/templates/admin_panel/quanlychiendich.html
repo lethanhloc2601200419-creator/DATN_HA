@@ -3,6 +3,16 @@
 {% load humanize %}
 
 {% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    .campaign-location-map {
+        width: 100%;
+        height: 260px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+</style>
 <div class="container-fluid px-4">
     <h2 class="page-title">Quản lý Chiến dịch Gây quỹ</h2>
 
@@ -194,6 +204,11 @@
         data-prog="{{ c.target_program.id|default_if_none:'' }}"
         data-cat="{{ c.category.id|default_if_none:'' }}"
         data-occ="{{ c.occasion.id|default_if_none:'' }}"
+        data-province="{{ c.beneficiary_province|default:'' }}"
+        data-ward="{{ c.beneficiary_ward|default:'' }}"
+        data-address="{{ c.beneficiary_address|default:'' }}"
+        data-lat="{{ c.beneficiary_lat|default:'' }}"
+        data-lng="{{ c.beneficiary_lng|default:'' }}"
 
         onclick="fillDataToModal(this)">
     <i class="fas fa-edit"></i>
@@ -320,6 +335,40 @@
                             </select>
                         </div>
 
+                        <div class="col-12">
+                            <div class="campaign-location-picker" data-prefix="add">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label>Tỉnh/Thành phố</label>
+                                        <select name="beneficiary_province" id="add_beneficiary_province" class="form-select js-province-select">
+                                            <option value="">-- Chọn tỉnh/thành --</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>Phường/Xã</label>
+                                        <select name="beneficiary_ward" id="add_beneficiary_ward" class="form-select js-ward-select" disabled>
+                                            <option value="">-- Chọn phường/xã --</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>Địa chỉ chi tiết</label>
+                                        <input type="text" name="beneficiary_address" id="add_beneficiary_address" class="form-control js-address-input" placeholder="Số nhà, đường, điểm trường...">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="hidden" name="beneficiary_lat" id="add_beneficiary_lat" class="js-lat-input">
+                                        <input type="hidden" name="beneficiary_lng" id="add_beneficiary_lng" class="js-lng-input">
+                                        <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
+                                            <i class="fas fa-rotate-left"></i> Xóa điểm chọn
+                                        </button>
+                                        <span class="small text-muted ms-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</span>
+                                    </div>
+                                    <div class="col-12">
+                                        <div id="add_location_map" class="campaign-location-map js-location-map"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-md-6 mb-3">
                             <label>Ảnh đại diện</label>
                             <input type="file" name="avatar" class="form-control">
@@ -413,6 +462,40 @@
                             </select>
                         </div>
 
+                        <div class="col-12">
+                            <div class="campaign-location-picker" data-prefix="edit">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label>Tỉnh/Thành phố</label>
+                                        <select name="beneficiary_province" id="edit_beneficiary_province" class="form-select js-province-select">
+                                            <option value="">-- Chọn tỉnh/thành --</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>Phường/Xã</label>
+                                        <select name="beneficiary_ward" id="edit_beneficiary_ward" class="form-select js-ward-select" disabled>
+                                            <option value="">-- Chọn phường/xã --</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>Địa chỉ chi tiết</label>
+                                        <input type="text" name="beneficiary_address" id="edit_beneficiary_address" class="form-control js-address-input" placeholder="Số nhà, đường, điểm trường...">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="hidden" name="beneficiary_lat" id="edit_beneficiary_lat" class="js-lat-input">
+                                        <input type="hidden" name="beneficiary_lng" id="edit_beneficiary_lng" class="js-lng-input">
+                                        <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
+                                            <i class="fas fa-rotate-left"></i> Xóa điểm chọn
+                                        </button>
+                                        <span class="small text-muted ms-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</span>
+                                    </div>
+                                    <div class="col-12">
+                                        <div id="edit_location_map" class="campaign-location-map js-location-map"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                        <div class="col-md-6 mb-3">
     <label class="fw-bold small">Ảnh đại diện</label>
     
@@ -454,7 +537,227 @@
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    const ADMIN_PROVINCES_URL = "{% url 'admin_panel:api_vietnam_provinces' %}";
+    const ADMIN_COMMUNES_URL_TEMPLATE = "{% url 'admin_panel:api_vietnam_communes' 'PROVINCE_CODE' %}";
+    const ADMIN_REVERSE_GEOCODE_URL = "{% url 'admin_panel:api_openmap_reverse_geocode' %}";
+    let vietnamProvincesCache = null;
+    const locationPickers = {};
+
+    function getCommunesUrl(provinceCode) {
+        return ADMIN_COMMUNES_URL_TEMPLATE.replace('PROVINCE_CODE', encodeURIComponent(provinceCode));
+    }
+
+    function setStatus(picker, message, isError) {
+        const status = picker.querySelector('.js-location-status');
+        if (!status) return;
+        status.textContent = message;
+        status.classList.toggle('text-danger', Boolean(isError));
+        status.classList.toggle('text-muted', !isError);
+    }
+
+    async function fetchJson(url) {
+        const response = await fetch(url, {headers: {'Accept': 'application/json'}});
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error(data.message || 'Không tải được dữ liệu.');
+        }
+        return data;
+    }
+
+    async function loadProvinces() {
+        if (vietnamProvincesCache) return vietnamProvincesCache;
+        const data = await fetchJson(ADMIN_PROVINCES_URL);
+        vietnamProvincesCache = data.provinces || [];
+        return vietnamProvincesCache;
+    }
+
+    function fillSelect(select, items, placeholder) {
+        select.innerHTML = `<option value="">${placeholder}</option>`;
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.name;
+            option.dataset.code = item.code;
+            option.textContent = item.name;
+            select.appendChild(option);
+        });
+    }
+
+    function selectByValue(select, value) {
+        const normalized = (value || '').trim();
+        if (!normalized) {
+            select.value = '';
+            return;
+        }
+        const comparable = normalizeUnitName(normalized);
+        const found = Array.from(select.options).find(option => {
+            if (!option.value) return false;
+            const optionComparable = normalizeUnitName(option.value);
+            return optionComparable === comparable || optionComparable.includes(comparable) || comparable.includes(optionComparable);
+        });
+        if (found) select.value = found.value;
+    }
+
+    function normalizeUnitName(value) {
+        return (value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\b(tinh|thanh pho|tp|phuong|xa|thi tran)\b/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    async function loadWardsForPicker(picker, selectedWard) {
+        const provinceSelect = picker.querySelector('.js-province-select');
+        const wardSelect = picker.querySelector('.js-ward-select');
+        const selectedOption = provinceSelect.options[provinceSelect.selectedIndex];
+        const provinceCode = selectedOption?.dataset?.code;
+
+        fillSelect(wardSelect, [], '-- Chọn phường/xã --');
+        wardSelect.disabled = true;
+        if (!provinceCode) return;
+
+        setStatus(picker, 'Đang tải xã/phường...', false);
+        const data = await fetchJson(getCommunesUrl(provinceCode));
+        fillSelect(wardSelect, data.communes || [], '-- Chọn phường/xã --');
+        wardSelect.disabled = false;
+        selectByValue(wardSelect, selectedWard);
+        setStatus(picker, 'Có thể chọn thủ công hoặc click trên bản đồ.', false);
+    }
+
+    function setMarker(state, lat, lng) {
+        if (!state.map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        if (!state.marker) {
+            state.marker = L.marker([lat, lng], {draggable: false}).addTo(state.map);
+        } else {
+            state.marker.setLatLng([lat, lng]);
+        }
+        state.map.setView([lat, lng], Math.max(state.map.getZoom(), 14));
+    }
+
+    async function applyReverseGeocode(picker, state, lat, lng) {
+        const provinceSelect = picker.querySelector('.js-province-select');
+        const wardSelect = picker.querySelector('.js-ward-select');
+        const addressInput = picker.querySelector('.js-address-input');
+        const latInput = picker.querySelector('.js-lat-input');
+        const lngInput = picker.querySelector('.js-lng-input');
+
+        latInput.value = lat.toFixed(8);
+        lngInput.value = lng.toFixed(8);
+        setMarker(state, lat, lng);
+        setStatus(picker, 'Đang lấy địa chỉ từ OpenMap...', false);
+
+        try {
+            const url = `${ADMIN_REVERSE_GEOCODE_URL}?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
+            const data = await fetchJson(url);
+            addressInput.value = data.address || data.formatted_address || '';
+            const provinces = await loadProvinces();
+            fillSelect(provinceSelect, provinces, '-- Chọn tỉnh/thành --');
+            selectByValue(provinceSelect, data.province || '');
+            await loadWardsForPicker(picker, data.ward || '');
+            setStatus(picker, data.warning || data.formatted_address || 'Đã lấy địa chỉ từ vị trí trên bản đồ.', Boolean(data.warning));
+        } catch (error) {
+            setStatus(picker, error.message, true);
+        }
+    }
+
+    async function setLocationPickerValues(prefix, data) {
+        const state = locationPickers[prefix];
+        if (!state) return;
+        const picker = state.picker;
+        const provinceSelect = picker.querySelector('.js-province-select');
+        const addressInput = picker.querySelector('.js-address-input');
+        const latInput = picker.querySelector('.js-lat-input');
+        const lngInput = picker.querySelector('.js-lng-input');
+
+        addressInput.value = data.address || '';
+        latInput.value = data.lat || '';
+        lngInput.value = data.lng || '';
+        const provinces = await loadProvinces();
+        fillSelect(provinceSelect, provinces, '-- Chọn tỉnh/thành --');
+        selectByValue(provinceSelect, data.province || '');
+        await loadWardsForPicker(picker, data.ward || '');
+
+        const lat = parseFloat(data.lat);
+        const lng = parseFloat(data.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            setMarker(state, lat, lng);
+        } else if (state.marker) {
+            state.map.removeLayer(state.marker);
+            state.marker = null;
+        }
+    }
+
+    async function initLocationPicker(picker) {
+        const prefix = picker.dataset.prefix;
+        const mapElement = picker.querySelector('.js-location-map');
+        const provinceSelect = picker.querySelector('.js-province-select');
+        const wardSelect = picker.querySelector('.js-ward-select');
+        const addressInput = picker.querySelector('.js-address-input');
+        const latInput = picker.querySelector('.js-lat-input');
+        const lngInput = picker.querySelector('.js-lng-input');
+
+        let map = null;
+        if (window.L && mapElement) {
+            map = L.map(mapElement).setView([16.047079, 108.206230], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+            map.on('click', event => applyReverseGeocode(picker, locationPickers[prefix], event.latlng.lat, event.latlng.lng));
+        }
+
+        locationPickers[prefix] = {picker, map, marker: null};
+
+        try {
+            const provinces = await loadProvinces();
+            fillSelect(provinceSelect, provinces, '-- Chọn tỉnh/thành --');
+        } catch (error) {
+            setStatus(picker, error.message, true);
+        }
+
+        provinceSelect.addEventListener('change', () => {
+            latInput.value = '';
+            lngInput.value = '';
+            loadWardsForPicker(picker, '').catch(error => setStatus(picker, error.message, true));
+        });
+
+        wardSelect.addEventListener('change', () => {
+            latInput.value = '';
+            lngInput.value = '';
+        });
+
+        addressInput.addEventListener('input', () => {
+            latInput.value = '';
+            lngInput.value = '';
+        });
+
+        picker.querySelector('.js-reset-location')?.addEventListener('click', () => {
+            latInput.value = '';
+            lngInput.value = '';
+            if (map && locationPickers[prefix].marker) {
+                map.removeLayer(locationPickers[prefix].marker);
+                locationPickers[prefix].marker = null;
+            }
+            setStatus(picker, 'Đã xóa điểm chọn trên bản đồ.', false);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.campaign-location-picker').forEach(picker => {
+            initLocationPicker(picker);
+        });
+
+        ['addModal', 'editModal'].forEach(modalId => {
+            document.getElementById(modalId)?.addEventListener('shown.bs.modal', function() {
+                const prefix = modalId === 'addModal' ? 'add' : 'edit';
+                const state = locationPickers[prefix];
+                if (state?.map) state.map.invalidateSize();
+            });
+        });
+    });
+
     function fillDataToModal(btn) {
     // 1. Lấy dữ liệu cơ bản (Giữ nguyên code cũ)
     var id = btn.getAttribute('data-id');
@@ -468,6 +771,11 @@
     var progId = btn.getAttribute('data-prog');
     var catId = btn.getAttribute('data-cat');
     var occId = btn.getAttribute('data-occ');
+    var province = btn.getAttribute('data-province');
+    var ward = btn.getAttribute('data-ward');
+    var address = btn.getAttribute('data-address');
+    var lat = btn.getAttribute('data-lat');
+    var lng = btn.getAttribute('data-lng');
 
     // 2. LẤY LINK ẢNH (MỚI)
     var avatarUrl = btn.getAttribute('data-avatar');
@@ -515,6 +823,14 @@
     if(document.getElementById('e_program_id')) document.getElementById('e_program_id').value = progId;
     if(document.getElementById('e_category_id')) document.getElementById('e_category_id').value = catId;
     if(document.getElementById('e_occasion_id')) document.getElementById('e_occasion_id').value = occId;
+
+    setLocationPickerValues('edit', {
+        province: province,
+        ward: ward,
+        address: address,
+        lat: lat,
+        lng: lng
+    });
 }
 
 document.getElementById('select-all-campaigns')?.addEventListener('change', function() {
