@@ -702,8 +702,8 @@
         let map = null;
         if (window.L && mapElement) {
             map = L.map(mapElement).setView([16.047079, 108.206230], 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
             }).addTo(map);
             map.on('click', event => applyReverseGeocode(picker, locationPickers[prefix], event.latlng.lat, event.latlng.lng));
         }

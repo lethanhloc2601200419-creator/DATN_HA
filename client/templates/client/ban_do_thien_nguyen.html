@@ -60,8 +60,8 @@
         // 2. Khởi tạo bản đồ (Mặc định nhìn cả Việt Nam)
         var map = L.map('charity_map').setView([16.047079, 108.206230], 6);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
         }).addTo(map);
 
         // 3. Tạo một nhóm (FeatureGroup) để chứa tất cả các điểm
