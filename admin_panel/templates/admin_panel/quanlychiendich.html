@@ -588,7 +588,7 @@
         const normalized = (value || '').trim();
         if (!normalized) {
             select.value = '';
-            return;
+            return '';
         }
         const comparable = normalizeUnitName(normalized);
         const found = Array.from(select.options).find(option => {
@@ -623,6 +623,31 @@
         return matches[0]?.value || '';
     }
 
+    function extractWardLikeText(text) {
+        const parts = (text || '')
+            .split(',')
+            .map(part => part.trim())
+            .filter(Boolean);
+        const wardPart = parts.find(part => /^(xã|xa|phường|phuong|thị trấn|thi tran)\s+/i.test(part));
+        return wardPart || '';
+    }
+
+    function ensureSelectOption(select, value) {
+        const normalized = (value || '').trim();
+        if (!normalized) return '';
+        const existingValue = selectByValue(select, normalized);
+        if (existingValue) return existingValue;
+
+        const option = document.createElement('option');
+        option.value = normalized;
+        option.textContent = normalized;
+        option.dataset.inferred = 'true';
+        select.appendChild(option);
+        select.disabled = false;
+        select.value = normalized;
+        return normalized;
+    }
+
     function cleanupDetailedAddress(rawAddress, ward, province) {
         const parts = (rawAddress || '')
             .split(',')
@@ -634,7 +659,9 @@
             const comparable = normalizeUnitName(part);
             if (!comparable || comparable === 'viet nam' || comparable === 'vietnam') return false;
             if (wardComparable && (comparable === wardComparable || comparable.includes(wardComparable))) return false;
+            if (wardComparable && wardComparable.includes(comparable)) return false;
             if (provinceComparable && (comparable === provinceComparable || comparable.includes(provinceComparable))) return false;
+            if (provinceComparable && provinceComparable.includes(comparable)) return false;
             return true;
         });
 
@@ -695,8 +722,9 @@
             const selectedProvince = selectByValue(provinceSelect, data.province || '');
             await loadWardsForPicker(picker, data.ward || '');
             if (!wardSelect.value) {
-                const inferredWard = inferWardFromText(wardSelect, `${data.address || ''}, ${data.formatted_address || ''}`);
-                if (inferredWard) wardSelect.value = inferredWard;
+                const sourceText = `${data.address || ''}, ${data.formatted_address || ''}`;
+                const inferredWard = inferWardFromText(wardSelect, sourceText) || extractWardLikeText(sourceText);
+                if (inferredWard) ensureSelectOption(wardSelect, inferredWard);
             }
             addressInput.value = cleanupDetailedAddress(
                 data.address || data.formatted_address || '',
