@@ -597,6 +597,7 @@
             return optionComparable === comparable || optionComparable.includes(comparable) || comparable.includes(optionComparable);
         });
         if (found) select.value = found.value;
+        return found ? found.value : '';
     }
 
     function normalizeUnitName(value) {
@@ -607,6 +608,43 @@
             .replace(/\b(tinh|thanh pho|tp|phuong|xa|thi tran)\b/g, '')
             .replace(/\s+/g, ' ')
             .trim();
+    }
+
+    function inferWardFromText(wardSelect, text) {
+        const comparableText = normalizeUnitName(text);
+        if (!comparableText) return '';
+
+        const matches = Array.from(wardSelect.options)
+            .filter(option => option.value)
+            .map(option => ({value: option.value, comparable: normalizeUnitName(option.value)}))
+            .filter(item => item.comparable && comparableText.includes(item.comparable))
+            .sort((a, b) => b.comparable.length - a.comparable.length);
+
+        return matches[0]?.value || '';
+    }
+
+    function cleanupDetailedAddress(rawAddress, ward, province) {
+        const parts = (rawAddress || '')
+            .split(',')
+            .map(part => part.trim())
+            .filter(Boolean);
+        const wardComparable = normalizeUnitName(ward);
+        const provinceComparable = normalizeUnitName(province);
+        const filtered = parts.filter(part => {
+            const comparable = normalizeUnitName(part);
+            if (!comparable || comparable === 'viet nam' || comparable === 'vietnam') return false;
+            if (wardComparable && (comparable === wardComparable || comparable.includes(wardComparable))) return false;
+            if (provinceComparable && (comparable === provinceComparable || comparable.includes(provinceComparable))) return false;
+            return true;
+        });
+
+        if (filtered.length) return filtered.join(', ');
+
+        const rawComparable = normalizeUnitName(rawAddress);
+        if (wardComparable && rawComparable && (rawComparable === wardComparable || rawComparable.includes(wardComparable))) {
+            return '';
+        }
+        return rawAddress || '';
     }
 
     async function loadWardsForPicker(picker, selectedWard) {
@@ -652,11 +690,19 @@
         try {
             const url = `${ADMIN_REVERSE_GEOCODE_URL}?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
             const data = await fetchJson(url);
-            addressInput.value = data.address || data.formatted_address || '';
             const provinces = await loadProvinces();
             fillSelect(provinceSelect, provinces, '-- Chọn tỉnh/thành --');
-            selectByValue(provinceSelect, data.province || '');
+            const selectedProvince = selectByValue(provinceSelect, data.province || '');
             await loadWardsForPicker(picker, data.ward || '');
+            if (!wardSelect.value) {
+                const inferredWard = inferWardFromText(wardSelect, `${data.address || ''}, ${data.formatted_address || ''}`);
+                if (inferredWard) wardSelect.value = inferredWard;
+            }
+            addressInput.value = cleanupDetailedAddress(
+                data.address || data.formatted_address || '',
+                wardSelect.value,
+                selectedProvince || provinceSelect.value
+            );
             setStatus(picker, data.warning || data.formatted_address || 'Đã lấy địa chỉ từ vị trí trên bản đồ.', Boolean(data.warning));
         } catch (error) {
             setStatus(picker, error.message, true);

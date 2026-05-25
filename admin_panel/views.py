@@ -106,9 +106,20 @@ def _reverse_geocode_with_nominatim(lat_value, lng_value):
     province = _clean_admin_unit_name(
         address.get('state') or address.get('city') or address.get('province')
     )
-    ward = _clean_admin_unit_name(
-        address.get('suburb') or address.get('quarter') or address.get('village') or address.get('town')
-    )
+    ward_candidates = [
+        address.get('suburb'),
+        address.get('quarter'),
+        address.get('municipality'),
+        address.get('village'),
+        address.get('town'),
+        address.get('hamlet'),
+    ]
+    ward = ''
+    for candidate in ward_candidates:
+        text = _clean_admin_unit_name(candidate)
+        if text:
+            ward = text
+            break
     detail_parts = []
     for value in (
         address.get('house_number'),
