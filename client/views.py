@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseRedirect, JsonResponse
 from admin_panel.models import (
-    UserProfile, Campaign, Donation, TargetProgram, BankStatement, ActivityLog,
+    UserProfile, Campaign, CampaignCategory, Donation, TargetProgram,
+    BankStatement, ActivityLog,
     DisbursementProposal, ProposalVote, Organization,
 )
 from admin_panel.disbursement_utils import check_and_execute_proposal, estimate_gas_per_tx_vnd
@@ -1022,32 +1023,116 @@ def vote_proposal(request, campaign_id, proposal_id):
     return redirect('client:chitiet_chiendich', pk=campaign_id)
 
 def ban_do_page(request):
-    # 2. Lấy dữ liệu từ TargetProgram
-    programs = TargetProgram.objects.filter(
-        is_active=True, 
-        beneficiary_lat__isnull=False, 
-        beneficiary_lng__isnull=False
+    """
+    Trang Bản đồ thiện nguyện — hiển thị toàn bộ chiến dịch (Campaign)
+    có toạ độ GIS dưới dạng marker trên Leaflet map.
+
+    Quy tắc lấy toạ độ:
+      - Ưu tiên `campaign.beneficiary_lat/lng` (do creator nhập).
+      - Fallback sang `target_program.beneficiary_lat/lng` nếu campaign
+        chưa có toạ độ. Logic này cũng đã được implement ở
+        Campaign.save() — nhưng vẫn fallback ở đây để chắc chắn.
+
+    Trạng thái hiển thị: active / completed / ended (không show pending,
+    rejected, hidden, paused, deleted).
+    """
+    qs = (
+        Campaign.objects
+        .filter(status__in=['active', 'completed', 'ended'])
+        .filter(
+            Q(beneficiary_lat__isnull=False, beneficiary_lng__isnull=False)
+            | Q(
+                target_program__beneficiary_lat__isnull=False,
+                target_program__beneficiary_lng__isnull=False,
+            )
+        )
+        .select_related('organization', 'target_program', 'category')
+        .order_by('-created_at')
     )
 
     map_data = []
-    for p in programs:
-        # Xử lý ảnh (nếu không có ảnh thì dùng ảnh mặc định)
-        img_url = p.image.url if p.image else '/static/images/default_program.jpg' 
-        
+    province_set = set()
+    category_ids_used = set()
+    total_raised = 0
+    total_supporters = 0
+    today = timezone.now().date()
+
+    for c in qs:
+        lat = c.beneficiary_lat
+        lng = c.beneficiary_lng
+        if (not lat or not lng) and c.target_program:
+            lat = lat or c.target_program.beneficiary_lat
+            lng = lng or c.target_program.beneficiary_lng
+        if not lat or not lng:
+            continue
+
+        target_amount = int(c.target_amount or 0)
+        current_amount = int(c.current_amount or 0)
+        progress_pct = (current_amount / target_amount * 100) if target_amount > 0 else 0
+        progress_pct = round(min(progress_pct, 100), 1)
+
+        days_left = None
+        if c.end_date:
+            days_left = (c.end_date - today).days
+
+        province = (c.beneficiary_province or '').strip()
+        if province:
+            province_set.add(province)
+        if c.category_id:
+            category_ids_used.add(c.category_id)
+
+        total_raised += current_amount
+        total_supporters += int(c.support_count or 0)
+
         map_data.append({
-            'name': p.name,
-            # Chuyển Decimal/Float sang float của Python để JSON hiểu
-            'lat': float(p.beneficiary_lat),
-            'lng': float(p.beneficiary_lng),
-            'address': p.beneficiary_address,
-            # Link tới trang chi tiết (bạn kiểm tra lại đúng url chưa nhé)
-            'url': f"/chuong-trinh/{p.id}/", 
-            'image': img_url,
-            'money': float(p.total_target_amount) if p.total_target_amount else 0
+            'id': c.id,
+            'title': c.title,
+            'short_description': (c.short_description or '')[:200],
+            'lat': float(lat),
+            'lng': float(lng),
+            'address': c.beneficiary_address or '',
+            'province': province,
+            'ward': (c.beneficiary_ward or '').strip(),
+            'image': (
+                c.cover_image_url
+                or c.avatar_image_url
+                or '/static/images/default_program.jpg'
+            ),
+            'url_detail': reverse('client:chitiet_chiendich', args=[c.id]),
+            'url_donate': reverse('client:ungho', args=[c.id]),
+            'status': c.status,
+            'status_label': c.get_status_display(),
+            'category_id': c.category_id,
+            'category_name': c.category.name if c.category else '',
+            'organization_name': c.organization.name if c.organization else '',
+            'organization_logo': (c.organization.logo_url if c.organization else '') or '',
+            'target_amount': target_amount,
+            'current_amount': current_amount,
+            'progress_pct': progress_pct,
+            'support_count': int(c.support_count or 0),
+            'days_left': days_left,
+            'end_date': c.end_date.isoformat() if c.end_date else '',
         })
 
+    # Chỉ hiển thị danh mục có chiến dịch đang show — cho dropdown gọn.
+    categories = list(
+        CampaignCategory.objects
+        .filter(id__in=category_ids_used, is_active=True)
+        .order_by('display_order', 'name')
+        .values('id', 'name')
+    )
+
     context = {
-        'map_data_json': json.dumps(map_data)
+        # Truyền list Python thẳng — template dùng `|json_script` sẽ tự serialize
+        # JSON một lần (escape an toàn). Nếu json.dumps trước thì sẽ bị bọc 2 lớp.
+        'map_data_json': map_data,
+        'categories': categories,
+        'stats': {
+            'total_campaigns': len(map_data),
+            'total_provinces': len(province_set),
+            'total_raised': total_raised,
+            'total_supporters': total_supporters,
+        },
     }
     return render(request, 'client/ban_do_thien_nguyen.html', context)
 

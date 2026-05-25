@@ -1,100 +1,1094 @@
-{% extends 'client/base_client.html' %} {% load static %}
+{% extends 'client/base_client.html' %}
+{% load static %}
 {% load humanize %}
 
-{% block content %}
+{% block title %}Bản đồ thiện nguyện · Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
 <style>
-    /* CSS cho bản đồ hiển thị đẹp */
-    #charity_map {
-        width: 100%;
-        height: 80vh; /* Cao bằng 80% màn hình thiết bị */
-        border-radius: 15px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        z-index: 1;
+    /* ========== LAYOUT ========== */
+    .map-page {
+        background: var(--primary-50);
+        padding: 24px 0 48px;
     }
-    
-    /* CSS cho cái bong bóng popup khi bấm vào */
-    .map-popup-card {
-        text-align: center;
-        width: 200px;
+    .map-page .container-xxl {
+        max-width: 1400px;
     }
-    .map-popup-img {
-        width: 100%;
-        height: 120px;
-        object-fit: cover;
-        border-radius: 8px;
-        margin-bottom: 8px;
+
+    /* ---------- Hero stats ---------- */
+    .map-hero {
+        background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-800) 60%, var(--primary-700) 100%);
+        border-radius: var(--radius-lg);
+        padding: 28px 32px;
+        color: var(--white);
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 20px;
     }
-    .map-popup-title {
-        font-weight: bold;
+    .map-hero::before {
+        content: "";
+        position: absolute;
+        right: -80px; top: -80px;
+        width: 280px; height: 280px;
+        background: radial-gradient(circle, rgba(249,115,22,0.18) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .map-hero h1 {
+        color: var(--white);
+        font-size: 26px;
+        font-weight: 700;
+        margin: 0 0 6px 0;
+        position: relative;
+    }
+    .map-hero .hero-sub {
+        color: var(--primary-300);
         font-size: 14px;
-        margin-bottom: 5px;
-        display: block;
-        color: var(--danger-600); /* Màu đỏ thương hiệu */
-        text-decoration: none;
+        margin: 0 0 18px 0;
+        position: relative;
     }
-    .leaflet-popup-content-wrapper {
-        border-radius: 10px;
+    .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        position: relative;
+    }
+    .hero-stat {
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: transform .2s, background .2s;
+    }
+    .hero-stat:hover {
+        transform: translateY(-2px);
+        background: rgba(255,255,255,0.13);
+    }
+    .hero-stat-icon {
+        width: 42px; height: 42px;
+        border-radius: var(--radius-md);
+        background: rgba(249,115,22,0.22);
+        color: var(--accent-500);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    .hero-stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--white);
+        line-height: 1.1;
+    }
+    .hero-stat-label {
+        font-size: 12px;
+        color: var(--primary-300);
+        margin-top: 2px;
+    }
+
+    /* ---------- Toolbar ---------- */
+    .map-toolbar {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+    .toolbar-search {
+        position: relative;
+        flex: 1 1 280px;
+        min-width: 220px;
+    }
+    .toolbar-search input {
+        width: 100%;
+        padding: 9px 14px 9px 38px;
+        border: 1.5px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        outline: none;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .toolbar-search input:focus {
+        border-color: var(--primary-600);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    .toolbar-search i {
+        position: absolute;
+        left: 14px; top: 50%;
+        transform: translateY(-50%);
+        color: var(--neutral-500);
+        font-size: 14px;
+    }
+    .toolbar-select {
+        padding: 9px 32px 9px 14px;
+        border: 1.5px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        background-color: var(--white);
+        cursor: pointer;
+        min-width: 140px;
+    }
+    .toolbar-select:focus {
+        outline: none;
+        border-color: var(--primary-600);
+    }
+    .region-chips {
+        display: inline-flex;
+        gap: 6px;
+        background: var(--primary-50);
+        padding: 4px;
+        border-radius: var(--radius-full);
+    }
+    .region-chip {
+        border: none;
+        background: transparent;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--neutral-700);
+        padding: 6px 14px;
+        border-radius: var(--radius-full);
+        cursor: pointer;
+        transition: all .15s;
+    }
+    .region-chip:hover { color: var(--primary-800); }
+    .region-chip.active {
+        background: var(--primary-800);
+        color: var(--white);
+        box-shadow: var(--shadow-btn);
+    }
+    .toolbar-icon-btn {
+        width: 40px; height: 40px;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--neutral-300);
+        background: var(--white);
+        color: var(--primary-700);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+        transition: all .15s;
+    }
+    .toolbar-icon-btn:hover {
+        background: var(--primary-50);
+        border-color: var(--primary-300);
+        color: var(--primary-800);
+    }
+    .toolbar-mobile-filter { display: none; }
+
+    /* ---------- Main layout (sidebar + map) ---------- */
+    .map-layout {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 16px;
+        height: calc(100vh - 240px);
+        min-height: 580px;
+    }
+
+    .map-sidebar {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
     }
+    .sidebar-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--primary-200);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        color: var(--neutral-700);
+    }
+    .sidebar-header strong {
+        color: var(--primary-800);
+        font-weight: 600;
+    }
+    .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+    }
+    .sidebar-list::-webkit-scrollbar { width: 6px; }
+    .sidebar-list::-webkit-scrollbar-thumb { background: var(--primary-200); border-radius: 3px; }
+    .sidebar-list::-webkit-scrollbar-thumb:hover { background: var(--primary-300); }
+
+    /* Sidebar card */
+    .sb-card {
+        background: var(--white);
+        border: 1.5px solid var(--primary-100);
+        border-radius: var(--radius-md);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all .2s;
+        overflow: hidden;
+    }
+    .sb-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary-300);
+        box-shadow: 0 4px 16px rgba(30,58,138,0.10);
+    }
+    .sb-card.active {
+        border-color: var(--primary-600);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    .sb-img-wrap {
+        position: relative;
+        width: 100%;
+        height: 110px;
+        overflow: hidden;
+    }
+    .sb-img-wrap img {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        transition: transform .3s;
+    }
+    .sb-card:hover .sb-img-wrap img { transform: scale(1.05); }
+    .sb-status {
+        position: absolute;
+        top: 8px; left: 8px;
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: var(--radius-full);
+        backdrop-filter: blur(6px);
+    }
+    .sb-status-active     { background: rgba(249,115,22,0.92);  color: var(--white); }
+    .sb-status-completed  { background: rgba(22,163,74,0.92);   color: var(--white); }
+    .sb-status-ended      { background: rgba(107,114,128,0.92); color: var(--white); }
+    .sb-body { padding: 10px 12px 12px; }
+    .sb-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--neutral-900);
+        line-height: 1.35;
+        margin: 0 0 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .sb-org {
+        font-size: 11.5px;
+        color: var(--neutral-500);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .sb-org i { color: var(--primary-500); font-size: 10px; }
+    .sb-progress-track {
+        height: 5px;
+        background: var(--primary-100);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .sb-progress-fill {
+        height: 100%;
+        background: var(--primary-800);
+        border-radius: var(--radius-full);
+        transition: width .4s ease;
+    }
+    .sb-progress-fill.urgent { background: var(--accent-500); }
+    .sb-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11.5px;
+        color: var(--neutral-500);
+    }
+    .sb-meta strong { color: var(--primary-700); font-weight: 600; }
+
+    .sidebar-empty {
+        padding: 36px 18px;
+        text-align: center;
+        color: var(--neutral-500);
+    }
+    .sidebar-empty i {
+        font-size: 32px;
+        color: var(--primary-300);
+        margin-bottom: 10px;
+    }
+    .sidebar-empty p { font-size: 13px; margin: 0 0 12px; }
+
+    /* ---------- Map wrapper ---------- */
+    .map-wrapper {
+        position: relative;
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+    #charity_map { width: 100%; height: 100%; z-index: 1; }
+
+    /* Legend */
+    .map-legend {
+        position: absolute;
+        bottom: 16px; left: 16px;
+        background: var(--white);
+        border-radius: var(--radius-md);
+        padding: 10px 14px;
+        box-shadow: 0 4px 16px rgba(15,32,68,0.12);
+        z-index: 400;
+        font-size: 12px;
+        color: var(--neutral-700);
+    }
+    .map-legend strong {
+        display: block;
+        font-size: 11px;
+        color: var(--primary-800);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+    }
+    .legend-row {
+        display: flex; align-items: center;
+        gap: 8px; margin-bottom: 4px;
+    }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        box-shadow: 0 0 0 2px var(--white), 0 0 0 3px rgba(0,0,0,0.08);
+    }
+
+    /* ---------- Custom marker pin ---------- */
+    .campaign-marker { background: transparent !important; border: none !important; }
+    .marker-pin {
+        width: 36px; height: 44px;
+        position: relative;
+        cursor: pointer;
+        transition: transform .15s ease;
+        --pin-color: #1e3a8a;
+    }
+    .marker-pin::before {
+        content: "";
+        position: absolute;
+        width: 32px; height: 32px;
+        background: var(--pin-color);
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        top: 0; left: 2px;
+        box-shadow: 0 2px 8px rgba(15,32,68,0.30), 0 0 0 3px rgba(255,255,255,0.95);
+    }
+    .marker-pin i {
+        position: absolute;
+        top: 8px; left: 0; right: 0;
+        text-align: center;
+        color: var(--white);
+        font-size: 13px;
+        z-index: 2;
+        transform: translateX(1px);
+    }
+    .marker-pin:hover { transform: scale(1.15) translateY(-3px); }
+
+    /* Cluster bubble */
+    .campaign-cluster { background: transparent !important; border: none !important; }
+    .cluster-bubble {
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-700), var(--primary-900));
+        color: var(--white);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(30,58,138,0.45), 0 0 0 4px rgba(255,255,255,0.85);
+        cursor: pointer;
+    }
+
+    /* ---------- Popup ---------- */
+    .leaflet-popup-content-wrapper {
+        border-radius: var(--radius-lg) !important;
+        padding: 0 !important;
+        box-shadow: 0 10px 40px rgba(15,32,68,0.20) !important;
+        overflow: hidden;
+    }
+    .leaflet-popup-content { margin: 0 !important; width: 290px !important; }
+    .leaflet-popup-tip { background: var(--white); }
+
+    .popup-card { font-family: var(--font-sans); }
+    .popup-img { width: 100%; height: 130px; object-fit: cover; display: block; }
+    .popup-body { padding: 12px 14px 14px; }
+    .popup-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .popup-badge {
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: var(--radius-full);
+    }
+    .popup-badge-active     { background: var(--accent-100);  color: #c2410c; }
+    .popup-badge-completed  { background: var(--success-100); color: var(--success-600); }
+    .popup-badge-ended      { background: var(--neutral-100); color: var(--neutral-700); }
+    .popup-badge-cat        { background: var(--primary-100); color: var(--primary-800); }
+    .popup-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--neutral-900) !important;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .popup-org, .popup-addr {
+        font-size: 12px;
+        color: var(--neutral-700);
+        margin: 0 0 4px;
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    .popup-org i, .popup-addr i {
+        color: var(--primary-500);
+        font-size: 11px;
+        margin-top: 3px;
+    }
+    .popup-progress { margin: 10px 0 8px; }
+    .popup-progress-text {
+        display: flex; justify-content: space-between; align-items: baseline;
+        font-size: 11.5px; color: var(--neutral-500);
+        margin-bottom: 4px;
+    }
+    .popup-progress-text strong { color: var(--primary-800); font-size: 13px; }
+    .popup-progress-track {
+        height: 6px;
+        background: var(--primary-100);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+    }
+    .popup-progress-fill {
+        height: 100%;
+        background: var(--primary-800);
+        border-radius: var(--radius-full);
+    }
+    .popup-progress-fill.urgent { background: var(--accent-500); }
+    .popup-progress-meta {
+        display: flex; justify-content: space-between;
+        font-size: 11px; color: var(--neutral-500);
+        margin-top: 5px;
+    }
+    .popup-meta {
+        font-size: 11.5px;
+        color: var(--neutral-700);
+        margin: 6px 0 12px;
+    }
+    .popup-meta i { color: var(--accent-500); margin-right: 4px; }
+    .popup-actions { display: flex; gap: 8px; }
+    .popup-actions .btn {
+        flex: 1;
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 8px 10px;
+        border-radius: var(--radius-md);
+    }
+
+    /* ---------- Mobile ---------- */
+    @media (max-width: 991px) {
+        .map-page { padding: 14px 0 32px; }
+        .map-hero { padding: 20px 18px; margin-bottom: 12px; }
+        .map-hero h1 { font-size: 20px; }
+        .hero-stat-value { font-size: 18px; }
+
+        .toolbar-mobile-filter { display: inline-flex; }
+        .toolbar-collapse {
+            display: none;
+            flex-basis: 100%;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .toolbar-collapse.open { display: flex; }
+        .toolbar-collapse .toolbar-select,
+        .toolbar-collapse .region-chips { width: 100%; justify-content: center; }
+
+        .map-layout {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            height: calc(100vh - 220px);
+        }
+        .map-sidebar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            top: auto;
+            height: 55vh;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            transform: translateY(calc(100% - 56px));
+            transition: transform .3s ease;
+            z-index: 600;
+            box-shadow: 0 -8px 32px rgba(15,32,68,0.18);
+        }
+        .map-sidebar.expanded { transform: translateY(0); }
+        .sidebar-handle {
+            display: flex !important;
+            justify-content: center;
+            padding: 8px 0 4px;
+            cursor: pointer;
+        }
+        .sidebar-handle::before {
+            content: "";
+            width: 40px; height: 4px;
+            background: var(--neutral-300);
+            border-radius: 2px;
+        }
+        .map-wrapper { height: 100%; }
+        .map-legend {
+            bottom: 70px;
+            font-size: 11px;
+            padding: 8px 10px;
+        }
+    }
+    @media (min-width: 992px) {
+        .sidebar-handle { display: none; }
+    }
 </style>
+{% endblock %}
 
-<div class="container-fluid py-5 bg-light">
-    <div class="container">
-        <div class="text-center mb-4">
-            <h2 class="fw-bold text-primary">📍 Bản Đồ Hành Trình Thiện Nguyện</h2>
-            <p class="text-muted">Nơi dấu chân yêu thương của chúng ta đã đi qua.</p>
-        </div>
+{% block content %}
+<div class="map-page">
+    <div class="container-xxl px-3 px-md-4">
 
-        <div id="charity_map"></div>
+        <!-- ===== HERO STATS ===== -->
+        <section class="map-hero">
+            <h1>📍 Bản đồ hành trình thiện nguyện</h1>
+            <p class="hero-sub">Mỗi điểm trên bản đồ là một câu chuyện — bấm vào để xem chi tiết và chung tay ủng hộ.</p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-icon"><i class="fas fa-bullseye"></i></div>
+                    <div>
+                        <div class="hero-stat-value">{{ stats.total_campaigns|intcomma }}</div>
+                        <div class="hero-stat-label">Chiến dịch trên bản đồ</div>
+                    </div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon"><i class="fas fa-mountain-city"></i></div>
+                    <div>
+                        <div class="hero-stat-value">{{ stats.total_provinces|intcomma }}</div>
+                        <div class="hero-stat-label">Tỉnh/thành đã có dấu chân</div>
+                    </div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon"><i class="fas fa-hand-holding-heart"></i></div>
+                    <div>
+                        <div class="hero-stat-value">{{ stats.total_raised|intcomma }}đ</div>
+                        <div class="hero-stat-label">Tổng tiền đã quyên góp</div>
+                    </div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon"><i class="fas fa-users"></i></div>
+                    <div>
+                        <div class="hero-stat-value">{{ stats.total_supporters|intcomma }}</div>
+                        <div class="hero-stat-label">Lượt ủng hộ</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== TOOLBAR ===== -->
+        <section class="map-toolbar">
+            <div class="toolbar-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Tìm theo tên chiến dịch, tổ chức, địa điểm..." autocomplete="off">
+            </div>
+
+            <button type="button" class="toolbar-icon-btn toolbar-mobile-filter" id="mobileFilterToggle" title="Hiện/ẩn bộ lọc">
+                <i class="fas fa-sliders"></i>
+            </button>
+
+            <div class="toolbar-collapse d-flex flex-wrap gap-2 align-items-center">
+                <select class="toolbar-select" id="statusFilter">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="active">Đang gây quỹ</option>
+                    <option value="completed">Đã hoàn thành</option>
+                    <option value="ended">Đã kết thúc</option>
+                </select>
+
+                <select class="toolbar-select" id="categoryFilter">
+                    <option value="all">Tất cả danh mục</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="region-chips" role="tablist">
+                    <button type="button" class="region-chip active" data-region="all">Toàn quốc</button>
+                    <button type="button" class="region-chip" data-region="bac">Bắc</button>
+                    <button type="button" class="region-chip" data-region="trung">Trung</button>
+                    <button type="button" class="region-chip" data-region="nam">Nam</button>
+                </div>
+            </div>
+
+            <button type="button" class="toolbar-icon-btn" id="locateMeBtn" title="Vị trí của tôi">
+                <i class="fas fa-location-crosshairs"></i>
+            </button>
+            <button type="button" class="toolbar-icon-btn" id="resetBtn" title="Đặt lại bộ lọc">
+                <i class="fas fa-rotate-left"></i>
+            </button>
+        </section>
+
+        <!-- ===== MAIN LAYOUT ===== -->
+        <section class="map-layout">
+            <aside class="map-sidebar" id="mapSidebar">
+                <div class="sidebar-handle" id="sidebarHandle"></div>
+                <div class="sidebar-header">
+                    <span>Hiển thị <strong id="visibleCount">0</strong> / <strong id="totalCount">0</strong> chiến dịch</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary d-none" id="clearFiltersBtn" style="font-size:11px;padding:3px 10px;">
+                        <i class="fas fa-times me-1"></i>Xóa lọc
+                    </button>
+                </div>
+                <div class="sidebar-list" id="campaignList"></div>
+            </aside>
+
+            <div class="map-wrapper">
+                <div id="charity_map"></div>
+                <div class="map-legend">
+                    <strong>Chú thích</strong>
+                    <div class="legend-row"><span class="legend-dot" style="background:#f97316"></span> Đang gây quỹ</div>
+                    <div class="legend-row"><span class="legend-dot" style="background:#16a34a"></span> Đã hoàn thành</div>
+                    <div class="legend-row"><span class="legend-dot" style="background:#6b7280"></span> Đã kết thúc</div>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
+{# Dữ liệu Campaign từ Django — json_script tự động escape an toàn (XSS-proof) #}
+{{ map_data_json|json_script:"map-data" }}
+{% endblock %}
+
+{% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // 1. Lấy dữ liệu từ Python gửi sang (được nén trong biến JSON)
-        var locations = JSON.parse('{{ map_data_json|escapejs }}');
+(function() {
+    'use strict';
 
-        // 2. Khởi tạo bản đồ (Mặc định nhìn cả Việt Nam)
-        var map = L.map('charity_map').setView([16.047079, 108.206230], 6);
+    // ============================================================
+    // 1. DATA + STATE
+    // ============================================================
+    // View truyền list Python; template `|json_script` đã serialize JSON 1 lần
+    // và escape XSS-safe. Chỉ cần JSON.parse 1 lần.
+    var ALL = [];
+    try {
+        var parsed = JSON.parse(document.getElementById('map-data').textContent);
+        ALL = Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        console.error('Lỗi parse map-data:', e);
+    }
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-        }).addTo(map);
+    var state = { q: '', status: 'all', category: 'all', region: 'all' };
 
-        // 3. Tạo một nhóm (FeatureGroup) để chứa tất cả các điểm
-        // Mục đích: Để sau khi vẽ xong, bản đồ tự zoom vừa khít tất cả các điểm
-        var markersGroup = new L.FeatureGroup();
+    var REGION_PROVINCES = {
+        bac: ['hà nội','hải phòng','quảng ninh','lạng sơn','cao bằng','bắc kạn',
+              'thái nguyên','bắc giang','phú thọ','vĩnh phúc','bắc ninh','hải dương',
+              'hưng yên','hà nam','nam định','thái bình','ninh bình','hà giang',
+              'tuyên quang','lào cai','yên bái','điện biên','lai châu','sơn la','hòa bình'],
+        trung: ['thanh hóa','nghệ an','hà tĩnh','quảng bình','quảng trị','thừa thiên huế','huế',
+                'đà nẵng','quảng nam','quảng ngãi','bình định','phú yên','khánh hòa',
+                'ninh thuận','bình thuận','kon tum','gia lai','đắk lắk','đắk nông','lâm đồng'],
+        nam: ['tp.hcm','tp hcm','hồ chí minh','sài gòn','bình phước','bình dương','đồng nai','tây ninh',
+              'bà rịa - vũng tàu','bà rịa','vũng tàu','long an','tiền giang','bến tre','trà vinh','vĩnh long',
+              'đồng tháp','an giang','kiên giang','cần thơ','hậu giang','sóc trăng',
+              'bạc liêu','cà mau'],
+    };
 
-        // 4. Lặp qua danh sách và vẽ từng điểm
-        locations.forEach(function(loc) {
-            // Nội dung HTML trong cái bong bóng popup
-            var popupContent = `
-                <div class="map-popup-card">
-                    <img src="${loc.image}" class="map-popup-img">
-                    <a href="${loc.url}" class="map-popup-title">${loc.name}</a>
-                    <p class="small text-muted mb-2"><i class="fas fa-map-marker-alt"></i> ${loc.address}</p>
-                    <a href="${loc.url}" class="btn btn-sm btn-danger w-100">Xem chi tiết & Ủng hộ</a>
-                </div>
-            `;
+    var REGION_BBOX = {
+        bac:   [[20.5, 102.5], [23.5, 108.5]],
+        trung: [[12.0, 105.0], [20.5, 109.5]],
+        nam:   [[8.0, 104.0],  [12.5, 109.0]],
+    };
 
-            // Tạo Marker và gán sự kiện click
-            var marker = L.marker([loc.lat, loc.lng])
-                .bindPopup(popupContent);
-            
-            markersGroup.addLayer(marker); // Thêm vào nhóm
+    // ============================================================
+    // 2. UTILS
+    // ============================================================
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function formatVnd(n) {
+        if (!n || n === 0) return '0đ';
+        return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+    }
+    function debounce(fn, wait) {
+        var t;
+        return function() {
+            var ctx = this, args = arguments;
+            clearTimeout(t);
+            t = setTimeout(function() { fn.apply(ctx, args); }, wait);
+        };
+    }
+    function normalize(s) {
+        return (s || '').toString().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    function provinceToRegion(province) {
+        var p = (province || '').toLowerCase().trim();
+        if (!p) return null;
+        for (var key in REGION_PROVINCES) {
+            for (var i = 0; i < REGION_PROVINCES[key].length; i++) {
+                if (p.indexOf(REGION_PROVINCES[key][i]) !== -1) return key;
+            }
+        }
+        return null;
+    }
+
+    // ============================================================
+    // 3. MAP + ICONS
+    // ============================================================
+    var map = L.map('charity_map', {
+        zoomControl: true,
+        scrollWheelZoom: true,
+    }).setView([16.047079, 108.206230], 6);
+    map.zoomControl.setPosition('topright');
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+    }).addTo(map);
+
+    function buildIcon(status) {
+        var color = status === 'active' ? '#f97316'
+                  : status === 'completed' ? '#16a34a'
+                  : '#6b7280';
+        return L.divIcon({
+            className: 'campaign-marker',
+            html: '<div class="marker-pin" style="--pin-color:' + color + '">' +
+                    '<i class="fas fa-heart"></i>' +
+                  '</div>',
+            iconSize: [36, 44],
+            iconAnchor: [18, 44],
+            popupAnchor: [0, -42],
+        });
+    }
+
+    var clusterGroup = L.markerClusterGroup({
+        showCoverageOnHover: false,
+        spiderfyOnMaxZoom: true,
+        maxClusterRadius: 55,
+        iconCreateFunction: function(cluster) {
+            return L.divIcon({
+                className: 'campaign-cluster',
+                html: '<div class="cluster-bubble"><span>' + cluster.getChildCount() + '</span></div>',
+                iconSize: [44, 44],
+            });
+        },
+    });
+    map.addLayer(clusterGroup);
+
+    var markersById = {};   // id -> Leaflet marker (cho list hiện tại)
+    var dataById = {};      // id -> raw object
+    ALL.forEach(function(c) { dataById[c.id] = c; });
+
+    // ============================================================
+    // 4. POPUP + SIDEBAR TEMPLATES
+    // ============================================================
+    function buildPopup(c) {
+        var statusBadge =
+            c.status === 'active'    ? '<span class="popup-badge popup-badge-active">Đang gây quỹ</span>' :
+            c.status === 'completed' ? '<span class="popup-badge popup-badge-completed">Hoàn thành</span>' :
+                                        '<span class="popup-badge popup-badge-ended">Đã kết thúc</span>';
+        var catBadge = c.category_name
+            ? '<span class="popup-badge popup-badge-cat">' + escapeHtml(c.category_name) + '</span>'
+            : '';
+        var orgLine = c.organization_name
+            ? '<div class="popup-org"><i class="fas fa-building"></i> ' + escapeHtml(c.organization_name) + '</div>'
+            : '';
+        var addrText = c.address || c.province || '—';
+        var progressUrgent = c.days_left !== null && c.days_left !== undefined && c.days_left <= 7 && c.status === 'active';
+        var daysText;
+        if (c.days_left === null || c.days_left === undefined) {
+            daysText = '<i class="fas fa-clock"></i>Chiến dịch dài hạn';
+        } else if (c.days_left > 0) {
+            daysText = '<i class="fas fa-clock"></i>Còn <strong>' + c.days_left + '</strong> ngày';
+        } else {
+            daysText = '<i class="fas fa-clock"></i>Đã hết hạn';
+        }
+
+        return '' +
+        '<div class="popup-card">' +
+            '<img class="popup-img" src="' + escapeHtml(c.image) + '" alt="" ' +
+                'onerror="this.onerror=null;this.src=\'/static/images/default_program.jpg\'">' +
+            '<div class="popup-body">' +
+                '<div class="popup-tags">' + statusBadge + catBadge + '</div>' +
+                '<h6 class="popup-title">' + escapeHtml(c.title) + '</h6>' +
+                orgLine +
+                '<div class="popup-addr"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(addrText) + '</div>' +
+                '<div class="popup-progress">' +
+                    '<div class="popup-progress-text">' +
+                        '<strong>' + formatVnd(c.current_amount) + '</strong>' +
+                        '<span>/ ' + formatVnd(c.target_amount) + '</span>' +
+                    '</div>' +
+                    '<div class="popup-progress-track">' +
+                        '<div class="popup-progress-fill ' + (progressUrgent ? 'urgent' : '') + '" style="width:' + c.progress_pct + '%"></div>' +
+                    '</div>' +
+                    '<div class="popup-progress-meta">' +
+                        '<span>' + c.progress_pct + '% mục tiêu</span>' +
+                        '<span><i class="fas fa-users"></i> ' + (c.support_count || 0) + ' người</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="popup-meta">' + daysText + '</div>' +
+                '<div class="popup-actions">' +
+                    '<a href="' + c.url_detail + '" class="btn btn-outline-primary">Chi tiết</a>' +
+                    (c.status === 'active'
+                        ? '<a href="' + c.url_donate + '" class="btn btn-danger">Ủng hộ</a>'
+                        : '') +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function buildSidebarCard(c) {
+        var statusLabel = escapeHtml(c.status_label || '');
+        var orgLine = c.organization_name
+            ? '<div class="sb-org"><i class="fas fa-building"></i> ' + escapeHtml(c.organization_name) + '</div>'
+            : '';
+        var progressUrgent = c.days_left !== null && c.days_left !== undefined && c.days_left <= 7 && c.status === 'active';
+        var province = c.province || '—';
+        return '' +
+        '<div class="sb-card" data-id="' + c.id + '" data-lat="' + c.lat + '" data-lng="' + c.lng + '">' +
+            '<div class="sb-img-wrap">' +
+                '<img src="' + escapeHtml(c.image) + '" alt="" ' +
+                    'onerror="this.onerror=null;this.src=\'/static/images/default_program.jpg\'">' +
+                '<span class="sb-status sb-status-' + escapeHtml(c.status) + '">' + statusLabel + '</span>' +
+            '</div>' +
+            '<div class="sb-body">' +
+                '<div class="sb-title">' + escapeHtml(c.title) + '</div>' +
+                orgLine +
+                '<div class="sb-progress-track">' +
+                    '<div class="sb-progress-fill ' + (progressUrgent ? 'urgent' : '') + '" style="width:' + c.progress_pct + '%"></div>' +
+                '</div>' +
+                '<div class="sb-meta">' +
+                    '<span><strong>' + c.progress_pct + '%</strong></span>' +
+                    '<span><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(province) + '</span>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    // ============================================================
+    // 5. FILTER LOGIC
+    // ============================================================
+    function applyFilters() {
+        var q = normalize(state.q);
+        return ALL.filter(function(c) {
+            if (state.status !== 'all' && c.status !== state.status) return false;
+            if (state.category !== 'all' && String(c.category_id || '') !== String(state.category)) return false;
+            if (state.region !== 'all') {
+                if (provinceToRegion(c.province) !== state.region) return false;
+            }
+            if (q) {
+                var hay = normalize(c.title) + ' ' +
+                          normalize(c.organization_name) + ' ' +
+                          normalize(c.address) + ' ' +
+                          normalize(c.province) + ' ' +
+                          normalize(c.short_description);
+                if (hay.indexOf(q) === -1) return false;
+            }
+            return true;
+        });
+    }
+
+    // ============================================================
+    // 6. RENDER
+    // ============================================================
+    function renderMarkers(list) {
+        clusterGroup.clearLayers();
+        markersById = {};
+        list.forEach(function(c) {
+            var marker = L.marker([c.lat, c.lng], { icon: buildIcon(c.status) });
+            marker.bindPopup(buildPopup(c), { maxWidth: 290, autoPanPadding: [40, 40] });
+            marker.campaignId = c.id;
+            clusterGroup.addLayer(marker);
+            markersById[c.id] = marker;
+        });
+    }
+
+    function renderSidebar(list) {
+        var elList = document.getElementById('campaignList');
+        document.getElementById('visibleCount').textContent = list.length;
+        document.getElementById('totalCount').textContent = ALL.length;
+
+        var hasActiveFilter = state.q || state.status !== 'all' ||
+                              state.category !== 'all' || state.region !== 'all';
+        document.getElementById('clearFiltersBtn').classList.toggle('d-none', !hasActiveFilter);
+
+        if (list.length === 0) {
+            elList.innerHTML =
+                '<div class="sidebar-empty">' +
+                    '<i class="fas fa-search"></i>' +
+                    '<p>Không tìm thấy chiến dịch nào phù hợp với bộ lọc.</p>' +
+                    (hasActiveFilter
+                        ? '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.__resetMapFilters()">Xóa bộ lọc</button>'
+                        : '') +
+                '</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < list.length; i++) html += buildSidebarCard(list[i]);
+        elList.innerHTML = html;
+    }
+
+    function fitToList(list) {
+        if (list.length === 0) return;
+        if (list.length === 1) {
+            map.setView([list[0].lat, list[0].lng], 12);
+            return;
+        }
+        var group = L.featureGroup(list.map(function(c) {
+            return L.marker([c.lat, c.lng]);
+        }));
+        map.fitBounds(group.getBounds().pad(0.15));
+    }
+
+    function refresh(opts) {
+        opts = opts || {};
+        var list = applyFilters();
+        renderMarkers(list);
+        renderSidebar(list);
+        if (opts.fit !== false) fitToList(list);
+    }
+
+    // ============================================================
+    // 7. EVENT BINDINGS
+    // ============================================================
+    var searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', debounce(function() {
+        state.q = searchInput.value.trim();
+        refresh({ fit: false });
+    }, 280));
+
+    document.getElementById('statusFilter').addEventListener('change', function() {
+        state.status = this.value;
+        refresh();
+    });
+    document.getElementById('categoryFilter').addEventListener('change', function() {
+        state.category = this.value;
+        refresh();
+    });
+
+    document.querySelectorAll('.region-chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+            document.querySelectorAll('.region-chip').forEach(function(c) { c.classList.remove('active'); });
+            this.classList.add('active');
+            state.region = this.dataset.region;
+            // Khi chọn vùng, fly tới bbox vùng để user thấy ngay
+            if (state.region !== 'all' && REGION_BBOX[state.region]) {
+                map.flyToBounds(REGION_BBOX[state.region], { padding: [30, 30], duration: 0.6 });
+                refresh({ fit: false });
+            } else {
+                refresh();
+            }
+        });
+    });
+
+    document.getElementById('locateMeBtn').addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            alert('Trình duyệt không hỗ trợ định vị.');
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                map.flyTo([pos.coords.latitude, pos.coords.longitude], 12, { duration: 0.8 });
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-location-crosshairs"></i>';
+            },
+            function() {
+                alert('Không lấy được vị trí của bạn.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-location-crosshairs"></i>';
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    });
+
+    function resetFilters() {
+        state.q = '';
+        state.status = 'all';
+        state.category = 'all';
+        state.region = 'all';
+        searchInput.value = '';
+        document.getElementById('statusFilter').value = 'all';
+        document.getElementById('categoryFilter').value = 'all';
+        document.querySelectorAll('.region-chip').forEach(function(c) {
+            c.classList.toggle('active', c.dataset.region === 'all');
+        });
+        refresh();
+    }
+    document.getElementById('resetBtn').addEventListener('click', resetFilters);
+    document.getElementById('clearFiltersBtn').addEventListener('click', resetFilters);
+    window.__resetMapFilters = resetFilters;
+
+    // Sidebar card click → fly + open popup
+    document.getElementById('campaignList').addEventListener('click', function(e) {
+        var card = e.target.closest('.sb-card');
+        if (!card) return;
+        var id = parseInt(card.dataset.id, 10);
+        var marker = markersById[id];
+        var data = dataById[id];
+        if (!marker || !data) return;
+
+        // highlight card
+        document.querySelectorAll('.sb-card.active').forEach(function(el) { el.classList.remove('active'); });
+        card.classList.add('active');
+
+        // Mở cluster nếu marker đang trong cluster, rồi mới openPopup
+        clusterGroup.zoomToShowLayer(marker, function() {
+            map.flyTo([data.lat, data.lng], Math.max(map.getZoom(), 13), { duration: 0.6 });
+            marker.openPopup();
         });
 
-        // 5. Thêm nhóm vào bản đồ
-        map.addLayer(markersGroup);
-
-        // 6. Tự động Zoom bản đồ sao cho nhìn thấy hết tất cả các điểm
-        if (locations.length > 0) {
-            map.fitBounds(markersGroup.getBounds().pad(0.1)); // pad(0.1) để lùi ra một chút cho thoáng
+        // Mobile: đóng bottom sheet để user thấy map
+        if (window.innerWidth < 992) {
+            document.getElementById('mapSidebar').classList.remove('expanded');
         }
     });
-</script>
 
+    // Mobile bottom-sheet handle
+    var sidebarEl = document.getElementById('mapSidebar');
+    document.getElementById('sidebarHandle').addEventListener('click', function() {
+        sidebarEl.classList.toggle('expanded');
+    });
+
+    // Mobile filter toggle
+    document.getElementById('mobileFilterToggle').addEventListener('click', function() {
+        document.querySelector('.toolbar-collapse').classList.toggle('open');
+    });
+
+    // ============================================================
+    // 8. INITIAL RENDER
+    // ============================================================
+    if (ALL.length === 0) {
+        document.getElementById('campaignList').innerHTML =
+            '<div class="sidebar-empty">' +
+                '<i class="fas fa-circle-info"></i>' +
+                '<p>Chưa có chiến dịch nào có toạ độ bản đồ. Hãy quay lại sau!</p>' +
+            '</div>';
+        document.getElementById('totalCount').textContent = '0';
+        document.getElementById('visibleCount').textContent = '0';
+    } else {
+        refresh();
+    }
+
+    // Resize handler — bản đồ cần invalidateSize sau khi DOM thay đổi
+    window.addEventListener('resize', debounce(function() {
+        map.invalidateSize();
+    }, 200));
+})();
+</script>
 {% endblock %}
