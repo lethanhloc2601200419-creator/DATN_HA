@@ -369,34 +369,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {% endblock %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    function updateCountdowns() {
-        document.querySelectorAll('.countdown').forEach(function(el) {
-            var endStr = el.getAttribute('data-end');
-            if (!endStr) return;
-            var end = new Date(endStr);
-            var now = new Date();
-            var diff = end - now;
-            if (diff <= 0) {
-                el.textContent = 'Đã hết hạn';
-                el.classList.add('text-danger');
-                return;
-            }
-            var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-            var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            var parts = [];
-            if (days > 0) parts.push(days + ' ngày');
-            if (hours > 0) parts.push(hours + ' giờ');
-            parts.push(minutes + ' phút');
-            el.textContent = parts.join(' ');
-        });
-    }
-    updateCountdowns();
-    setInterval(updateCountdowns, 60000);
-});
-</script>
-
-{% endblock %}

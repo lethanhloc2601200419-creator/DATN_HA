@@ -1084,6 +1084,17 @@ def ban_do_page(request):
         total_raised += current_amount
         total_supporters += int(c.support_count or 0)
 
+        # Xử lý URL ảnh: ưu tiên cover -> avatar -> default.
+        # Nếu là đường dẫn tương đối (không bắt đầu bằng http/https hoặc /), thêm settings.MEDIA_URL.
+        raw_img = c.cover_image_url or c.avatar_image_url or ''
+        if raw_img:
+            if raw_img.startswith(('http://', 'https://', '/')):
+                campaign_img = raw_img
+            else:
+                campaign_img = settings.MEDIA_URL + raw_img
+        else:
+            campaign_img = '/static/client/img/bg_trangchu.jpg'
+
         map_data.append({
             'id': c.id,
             'title': c.title,
@@ -1093,11 +1104,7 @@ def ban_do_page(request):
             'address': c.beneficiary_address or '',
             'province': province,
             'ward': (c.beneficiary_ward or '').strip(),
-            'image': (
-                c.cover_image_url
-                or c.avatar_image_url
-                or '/static/client/img/bg_trangchu.jpg'
-            ),
+            'image': campaign_img,
             'url_detail': reverse('client:chitiet_chiendich', args=[c.id]),
             'url_donate': reverse('client:ungho', args=[c.id]),
             'status': c.status,
