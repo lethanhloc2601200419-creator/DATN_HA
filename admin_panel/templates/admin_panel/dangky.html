@@ -1,208 +1,112 @@
-{% extends 'admin_panel/trangchu.html' %}
 {% load static %}
-
-{% block title %}Đăng ký Đối tác - Quỹ Nhân Ái{% endblock %}
-
-{% block extra_css %}
-<style>
-    body {
-      display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 0;
-      background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-50) 100%);
-    }
-    .auth-container {
-      background: var(--white);
-      padding: 48px;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
-      border: 1px solid var(--primary-100);
-      width: 520px;
-      max-width: 90%;
-      margin: auto;
-    }
-    .auth-header { text-align: center; margin-bottom: 32px; }
-    .auth-logo { color: var(--primary-800); margin-bottom: 16px; }
-    .auth-header h2 { color: var(--primary-950); font-weight: 800; font-size: 26px; margin-bottom: 8px; letter-spacing: -0.5px; }
-    .auth-header p { color: var(--neutral-500); font-size: 14px; font-weight: 500; }
-
-    .form-group { margin-bottom: 20px; position: relative; }
-    .form-label { display: block; font-size: 12px; font-weight: 800; color: var(--neutral-700); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký Đối tác - Quỹ Nhân Ái</title>
     
-    .form-control {
-      width: 100%; padding: 10px 16px;
-      border: 1.5px solid var(--primary-100); border-radius: var(--radius-md);
-      font-size: 14.5px; transition: all 0.2s;
-      background: var(--neutral-100);
-    }
-    .form-control:focus {
-      outline: none; border-color: var(--primary-600);
-      background: var(--white); box-shadow: 0 0 0 4px var(--primary-100);
-    }
-
-    .error-msg { color: var(--danger-600); font-size: 11px; font-weight: 700; margin-top: 4px; display: none; }
-    .form-group.error .form-control { border-color: var(--danger-600); background-color: var(--danger-100); }
-    .form-group.error .error-msg { display: block; }
-
-    .toggle-password {
-      position: absolute; right: 16px; top: 34px;
-      cursor: pointer; color: var(--neutral-500); transition: 0.2s;
-    }
-
-    .btn-submit {
-      width: 100%; padding: 14px; margin-top: 10px;
-      background: var(--primary-800);
-      border: none; border-radius: var(--radius-md);
-      color: white; font-weight: 700; font-size: 16px;
-      cursor: pointer; transition: all 0.3s;
-      box-shadow: var(--shadow-btn);
-    }
-    .btn-submit:hover { background: var(--primary-900); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
-
-    .auth-footer { text-align: center; margin-top: 32px; font-size: 14px; color: var(--neutral-500); font-weight: 500; }
-    .auth-footer a { color: var(--primary-700); text-decoration: none; font-weight: 700; }
-    .auth-footer a:hover { color: var(--primary-900); text-decoration: underline; }
-
-    .msg-box { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="auth-container">
-    <div class="auth-header">
-      <div class="auth-logo"><i class="fas fa-user-plus fa-3x"></i></div>
-      <h2>Đăng ký Đối tác</h2>
-      <p>Tham gia mạng lưới thiện nguyện minh bạch</p>
-    </div>
-
-    {% if messages %}
-      {% for message in messages %}
-        <div class="msg-box animate__animated animate__fadeIn" style="
-          {% if 'success' in message.tags %} background:var(--success-100); color:var(--success-600); border:1px solid var(--success-600);
-          {% elif 'warning' in message.tags %} background:var(--warning-100); color:var(--warning-600); border:1px solid var(--warning-600);
-          {% else %} background:var(--danger-100); color:var(--danger-600); border:1px solid var(--danger-600);
-          {% endif %}">
-          {% if 'success' in message.tags %}<i class="fas fa-circle-check fs-5"></i>
-          {% elif 'warning' in message.tags %}<i class="fas fa-triangle-exclamation fs-5"></i>
-          {% else %}<i class="fas fa-circle-xmark fs-5"></i>{% endif %}
-          <span>{{ message }}</span>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-950: #0a1628; --primary-900: #0f2044; --primary-800: #1e3a8a;
+            --primary-700: #2a4fa3; --primary-600: #3b6ac7; --primary-500: #4f84e0;
+            --primary-100: #e8f1fe; --primary-50: #f3f7ff;
+            --accent-600: #ea580c; --accent-500: #f97316;
+            --success-600: #16a34a; --success-100: #f0fdf4;
+            --danger-600: #dc2626; --danger-100: #fef2f2;
+            --warning-600: #ca8a04; --warning-100: #fefce8;
+            --neutral-900: #111827; --neutral-700: #374151; --neutral-500: #6b7280;
+            --neutral-400: #9ca3af; --neutral-100: #f9fafb;
+            --white: #ffffff;
+            --radius-md: 10px; --radius-lg: 16px;
+            --shadow-lg: 0 10px 25px rgba(15, 32, 68, 0.12);
+            --shadow-btn: 0 4px 14px rgba(30, 58, 138, 0.25);
+        }
+        body {
+            background: linear-gradient(135deg, var(--primary-50) 0%, var(--primary-100) 100%);
+            font-family: 'Be Vietnam Pro', sans-serif;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px;
+        }
+        .auth-card {
+            background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+            border: 1px solid var(--primary-100); width: 100%; max-width: 500px; padding: 40px;
+            position: relative; overflow: hidden;
+        }
+        .auth-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--primary-800), var(--accent-500)); }
+        .auth-header { text-align: center; margin-bottom: 32px; }
+        .auth-logo { color: var(--primary-800); margin-bottom: 16px; }
+        .auth-header h2 { color: var(--primary-950); font-weight: 800; font-size: 24px; margin-bottom: 8px; }
+        .auth-header p { color: var(--neutral-500); font-size: 14px; }
+        .form-label { font-size: 12px; font-weight: 800; color: var(--neutral-700); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; display: block; }
+        .form-control { padding: 10px 16px; border-radius: var(--radius-md); border: 1.5px solid var(--primary-100); background: var(--neutral-100); transition: 0.2s; font-size: 14.5px; }
+        .form-control:focus { outline: none; border-color: var(--primary-600); background: var(--white); box-shadow: 0 0 0 4px var(--primary-100); }
+        .btn-submit { background: var(--primary-800); color: white; border: none; border-radius: var(--radius-md); padding: 14px; width: 100%; font-weight: 700; margin-top: 15px; box-shadow: var(--shadow-btn); transition: 0.3s; }
+        .btn-submit:hover { background: var(--primary-900); transform: translateY(-1px); }
+        .msg-box { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .auth-footer { text-align: center; margin-top: 32px; font-size: 14px; color: var(--neutral-500); }
+        .auth-footer a { color: var(--primary-700); font-weight: 700; text-decoration: none; }
+        .error-msg { color: var(--danger-600); font-size: 11px; font-weight: 700; margin-top: 4px; display: none; }
+        .form-group.error .form-control { border-color: var(--danger-600); background-color: var(--danger-100); }
+        .form-group.error .error-msg { display: block; }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo"><i class="fas fa-user-plus fa-3x"></i></div>
+            <h2>Đăng ký Đối tác</h2>
+            <p>Tham gia mạng lưới thiện nguyện minh bạch</p>
         </div>
-      {% endfor %}
-    {% endif %}
 
-    <form id="registerForm" method="post" action="{% url 'admin_panel:dangky' %}"> 
-      {% csrf_token %}
+        {% if messages %}
+            {% for message in messages %}
+            <div class="msg-box" style="{% if 'success' in message.tags %} background:var(--success-100); color:var(--success-600); border:1px solid var(--success-600); {% else %} background:var(--danger-100); color:var(--danger-600); border:1px solid var(--danger-600); {% endif %}">
+                <i class="fas {% if 'success' in message.tags %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        {% endif %}
 
-      <div class="form-group" id="group-fullname">
-        <label class="form-label">Họ và tên</label>
-        <input type="text" id="fullname" name="fullname" class="form-control" placeholder="Nguyễn Văn A" required>
-        <span class="error-msg"><i class="fas fa-circle-exclamation me-1"></i> Vui lòng nhập họ tên hợp lệ.</span>
-      </div>
+        <form method="post" action="{% url 'admin_panel:dangky' %}">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">Họ và tên</label>
+                <input type="text" name="fullname" class="form-control w-100" placeholder="Nguyễn Văn A" required>
+            </div>
 
-      <div class="form-group" id="group-username">
-        <label class="form-label">Tên đăng nhập (Username)</label>
-        <input type="text" id="username" name="username" class="form-control" placeholder="locwara" required>
-        <span class="error-msg"><i class="fas fa-circle-exclamation me-1"></i> Username tối thiểu 4 ký tự.</span>
-      </div>
+            <div class="mb-3">
+                <label class="form-label">Tên đăng nhập (Username)</label>
+                <input type="text" name="username" class="form-control w-100" placeholder="username" required>
+            </div>
 
-      <div class="form-group" id="group-email">
-        <label class="form-label">Địa chỉ Email</label>
-        <input type="email" id="email" name="email" class="form-control" placeholder="email@vi-du.com" required>
-        <span class="error-msg"><i class="fas fa-circle-exclamation me-1"></i> Email không hợp lệ.</span>
-      </div>
+            <div class="mb-3">
+                <label class="form-label">Địa chỉ Email</label>
+                <input type="email" name="email" class="form-control w-100" placeholder="email@domain.com" required>
+            </div>
 
-      <div class="row g-3">
-        <div class="col-md-6">
-            <div class="form-group" id="group-pass">
-                <label class="form-label">Mật khẩu</label>
-                <div class="position-relative">
-                  <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
-                  <span class="toggle-password" onclick="togglePass('password')"><i class="fas fa-eye"></i></span>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Mật khẩu</label>
+                    <input type="password" name="password" class="form-control w-100" placeholder="••••••••" required>
                 </div>
-                <span class="error-msg">Tối thiểu 6 ký tự.</span>
+                <div class="col-md-6">
+                    <label class="form-label">Xác nhận</label>
+                    <input type="password" name="confirm_password" class="form-control w-100" placeholder="••••••••" required>
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="form-group" id="group-confirm">
-                <label class="form-label">Xác nhận mật khẩu</label>
-                <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="••••••••" required>
-                <span class="error-msg">Mật khẩu không khớp.</span>
-            </div>
-        </div>
-      </div>
 
-      <button type="submit" class="btn-submit">TẠO TÀI KHOẢN ĐỐI TÁC</button>
-    </form>
+            <button type="submit" class="btn-submit">TẠO TÀI KHOẢN ĐỐI TÁC</button>
+        </form>
 
-    <div class="auth-footer">
-      Đã có tài khoản quản trị? <a href="{% url 'admin_panel:dangnhap' %}">Đăng nhập ngay</a>
+        <div class="auth-footer">
+            Đã có tài khoản? <a href="{% url 'admin_panel:dangnhap' %}">Đăng nhập ngay</a>
+        </div>
     </div>
-</div>
-
-<script>
-    const username = document.getElementById('username');
-    username?.addEventListener('input', () => {
-      if(username.value.trim().length < 4) setError('group-username', "Username tối thiểu 4 ký tự");
-      else setSuccess('group-username');
-    });
-
-    function togglePass(id) {
-      const input = document.getElementById(id);
-      if (input) input.type = input.type === "password" ? "text" : "password";
-    }
-    function setError(id, msg) {
-        const group = document.getElementById(id);
-        if (group) {
-            group.classList.add('error');
-            const msgEl = group.querySelector('.error-msg');
-            if (msgEl) msgEl.innerHTML = `<i class="fas fa-circle-exclamation me-1"></i> ${msg}`;
-        }
-    }
-    function setSuccess(id) {
-        const group = document.getElementById(id);
-        if (group) group.classList.remove('error');
-    }
-
-    const fullname = document.getElementById('fullname');
-    const email = document.getElementById('email');
-    const pass = document.getElementById('password');
-    const confirmPass = document.getElementById('confirm_password');
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    fullname?.addEventListener('input', () => {
-        if(fullname.value.trim().length < 2) setError('group-fullname', "Họ tên quá ngắn");
-        else setSuccess('group-fullname');
-    });
-
-    email?.addEventListener('input', () => {
-        if(!emailRegex.test(email.value)) setError('group-email', "Email sai định dạng");
-        else setSuccess('group-email');
-    });
-
-    pass?.addEventListener('input', () => {
-        if(pass.value.length < 6) setError('group-pass', "Mật khẩu quá ngắn (>=6)");
-        else {
-            setSuccess('group-pass');
-            if(confirmPass && confirmPass.value !== '') triggerEvent(confirmPass, 'input');
-        }
-    });
-
-    confirmPass?.addEventListener('input', () => {
-        if(confirmPass.value !== pass.value) setError('group-confirm', "Mật khẩu không khớp");
-        else setSuccess('group-confirm');
-    });
-
-    function triggerEvent(el, type) {
-        if ('createEvent' in document) {
-            var e = document.createEvent('HTMLEvents');
-            e.initEvent(type, false, true);
-            el.dispatchEvent(e);
-        }
-    }
-    
-    document.getElementById('registerForm')?.addEventListener('submit', (e) => {
-        if(document.querySelectorAll('.form-group.error').length > 0) {
-            e.preventDefault();
-            alert("Vui lòng sửa các lỗi để đăng ký.");
-        }
-    });
-</script>
-{% endblock %}
+</body>
+</html>

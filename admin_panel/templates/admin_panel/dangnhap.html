@@ -1,164 +1,101 @@
+{% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đăng nhập hệ thống</title>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  {% block extra_css %}
-<style>
-    body {
-      display: flex; align-items: center; justify-content: center; height: 100vh;
-      background: linear-gradient(135deg, var(--primary-100) 0%, var(--primary-50) 100%);
-    }
-    .auth-container {
-      background: var(--white);
-      padding: 48px;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
-      border: 1px solid var(--primary-100);
-      width: 440px;
-      max-width: 90%;
-    }
-    .auth-header { text-align: center; margin-bottom: 32px; }
-    .auth-logo { color: var(--primary-800); margin-bottom: 16px; }
-    .auth-header h2 { color: var(--primary-950); font-weight: 800; font-size: 26px; margin-bottom: 8px; letter-spacing: -0.5px; }
-    .auth-header p { color: var(--neutral-500); font-size: 14px; font-weight: 500; }
-
-    .form-group { margin-bottom: 24px; position: relative; }
-    .form-label { display: block; font-size: 13px; font-weight: 800; color: var(--neutral-700); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập Admin - Quỹ Nhân Ái</title>
     
-    .form-control {
-      width: 100%; padding: 12px 16px;
-      border: 1.5px solid var(--primary-100); border-radius: var(--radius-md);
-      font-size: 15px; transition: all 0.2s;
-      background: var(--neutral-100);
-    }
-    .form-control:focus {
-      outline: none; border-color: var(--primary-600);
-      background: var(--white); box-shadow: 0 0 0 4px var(--primary-100);
-    }
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-950: #0a1628; --primary-900: #0f2044; --primary-800: #1e3a8a;
+            --primary-700: #2a4fa3; --primary-600: #3b6ac7; --primary-500: #4f84e0;
+            --primary-100: #e8f1fe; --primary-50: #f3f7ff;
+            --accent-600: #ea580c; --accent-500: #f97316;
+            --success-600: #16a34a; --success-100: #f0fdf4;
+            --danger-600: #dc2626; --danger-100: #fef2f2;
+            --warning-600: #ca8a04; --warning-100: #fefce8;
+            --neutral-900: #111827; --neutral-700: #374151; --neutral-500: #6b7280;
+            --neutral-400: #9ca3af; --neutral-100: #f9fafb;
+            --white: #ffffff;
+            --radius-md: 10px; --radius-lg: 16px;
+            --shadow-lg: 0 10px 25px rgba(15, 32, 68, 0.12);
+            --shadow-btn: 0 4px 14px rgba(30, 58, 138, 0.25);
+        }
+        body {
+            background: linear-gradient(135deg, var(--primary-50) 0%, var(--primary-100) 100%);
+            font-family: 'Be Vietnam Pro', sans-serif;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .auth-card {
+            background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+            border: 1px solid var(--primary-100); width: 100%; max-width: 440px; padding: 40px;
+            position: relative; overflow: hidden;
+        }
+        .auth-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--primary-800), var(--accent-500)); }
+        .auth-header { text-align: center; margin-bottom: 32px; }
+        .auth-logo { color: var(--primary-800); margin-bottom: 16px; }
+        .auth-header h2 { color: var(--primary-950); font-weight: 800; font-size: 24px; margin-bottom: 8px; }
+        .auth-header p { color: var(--neutral-500); font-size: 14px; }
+        .form-label { font-size: 12px; font-weight: 800; color: var(--neutral-700); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
+        .form-control { padding: 12px 16px; border-radius: var(--radius-md); border: 1.5px solid var(--primary-100); background: var(--neutral-100); transition: 0.2s; }
+        .form-control:focus { outline: none; border-color: var(--primary-600); background: var(--white); box-shadow: 0 0 0 4px var(--primary-100); }
+        .btn-submit { background: var(--primary-800); color: white; border: none; border-radius: var(--radius-md); padding: 14px; width: 100%; font-weight: 700; margin-top: 10px; box-shadow: var(--shadow-btn); transition: 0.3s; }
+        .btn-submit:hover { background: var(--primary-900); transform: translateY(-1px); }
+        .msg-box { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .divider { display: flex; align-items: center; text-align: center; margin: 24px 0; color: var(--neutral-400); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--primary-100); }
+        .divider:not(:empty)::before { margin-right: 1em; }
+        .divider:not(:empty)::after { margin-left: 1em; }
+        .btn-google { width: 100%; padding: 11px; background: var(--white); border: 1.5px solid var(--primary-100); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--neutral-700); font-weight: 600; font-size: 14px; text-decoration: none !important; }
+        .auth-footer { text-align: center; margin-top: 32px; font-size: 14px; color: var(--neutral-500); }
+        .auth-footer a { color: var(--primary-700); font-weight: 700; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo"><i class="fas fa-shield-heart fa-3x"></i></div>
+            <h2>Đăng nhập Admin</h2>
+            <p>Hệ thống Quản trị Quỹ Nhân Ái</p>
+        </div>
 
-    .toggle-password {
-      position: absolute; right: 16px; top: 38px;
-      cursor: pointer; color: var(--neutral-500); transition: 0.2s;
-    }
-    .toggle-password:hover { color: var(--primary-600); }
+        {% if messages %}
+            {% for message in messages %}
+            <div class="msg-box" style="{% if 'success' in message.tags %} background:var(--success-100); color:var(--success-600); border:1px solid var(--success-600); {% else %} background:var(--danger-100); color:var(--danger-600); border:1px solid var(--danger-600); {% endif %}">
+                <i class="fas {% if 'success' in message.tags %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        {% endif %}
 
-    .btn-submit {
-      width: 100%; padding: 14px;
-      background: var(--primary-800);
-      border: none; border-radius: var(--radius-md);
-      color: white; font-weight: 700; font-size: 16px;
-      cursor: pointer; transition: all 0.3s;
-      box-shadow: var(--shadow-btn);
-    }
-    .btn-submit:hover { background: var(--primary-900); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+        <form method="post" action="{% url 'admin_panel:dangnhap' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Username hoặc Email</label>
+                <input type="text" name="username" class="form-control w-100" placeholder="Tên đăng nhập" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Mật khẩu</label>
+                <input type="password" name="password" class="form-control w-100" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn-submit">XÁC NHẬN ĐĂNG NHẬP</button>
+        </form>
 
-    .btn-google {
-      width: 100%; padding: 12px;
-      background: var(--white); border: 1.5px solid var(--primary-100);
-      border-radius: var(--radius-md); margin-top: 20px;
-      display: inline-flex; align-items: center; justify-content: center; gap: 12px;
-      color: var(--neutral-700); font-weight: 600; font-size: 14px;
-      text-decoration: none !important; transition: 0.2s;
-    }
-    .btn-google:hover { background: var(--primary-50); border-color: var(--primary-200); }
+        <div class="divider">Hoặc tiếp tục với</div>
+        <a href="#" onclick="alert('Tính năng đang bảo trì'); return false;" class="btn-google">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" width="18">
+            <span>Google Workspace</span>
+        </a>
 
-    .divider { display: flex; align-items: center; text-align: center; margin: 24px 0; color: var(--neutral-400); font-size: 12px; font-weight: 700; text-transform: uppercase; }
-    .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--primary-100); }
-    .divider:not(:empty)::before { margin-right: 1em; }
-    .divider:not(:empty)::after { margin-left: 1em; }
-
-    .auth-footer { text-align: center; margin-top: 32px; font-size: 14px; color: var(--neutral-500); font-weight: 500; }
-    .auth-footer a { color: var(--primary-700); text-decoration: none; font-weight: 700; }
-    .auth-footer a:hover { color: var(--primary-900); text-decoration: underline; }
-
-    .msg-box { padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="auth-container">
-    <div class="auth-header">
-      <div class="auth-logo"><i class="fas fa-shield-heart fa-3x"></i></div>
-      <h2>Đăng nhập Admin</h2>
-      <p>Hệ thống Quản trị Quỹ Nhân Ái</p>
+        <div class="auth-footer">
+            Bạn chưa có tài khoản? <a href="{% url 'admin_panel:dangky' %}">Đăng ký ngay</a>
+        </div>
     </div>
-
-    {% if messages %}
-      {% for message in messages %}
-        <div class="msg-box animate__animated animate__shakeX" style="
-          {% if 'success' in message.tags %} background:var(--success-100); color:var(--success-600); border:1px solid var(--success-600);
-          {% elif 'warning' in message.tags %} background:var(--warning-100); color:var(--warning-600); border:1px solid var(--warning-600);
-          {% else %} background:var(--danger-100); color:var(--danger-600); border:1px solid var(--danger-600);
-          {% endif %}">
-          {% if 'success' in message.tags %}<i class="fas fa-circle-check fs-5"></i>
-          {% elif 'warning' in message.tags %}<i class="fas fa-triangle-exclamation fs-5"></i>
-          {% else %}<i class="fas fa-circle-xmark fs-5"></i>{% endif %}
-          <span>{{ message }}</span>
-        </div>
-      {% endfor %}
-    {% endif %}
-
-    <form id="loginForm" method="post" action="{% url 'admin_panel:dangnhap' %}">
-      {% csrf_token %}
-      
-      <div class="form-group">
-        <label class="form-label" for="username">Username hoặc Email</label>
-        <input type="text" id="username" name="username" class="form-control" placeholder="Tên đăng nhập của bạn" required>
-      </div>
-
-      <div class="form-group">
-        <div class="d-flex justify-content-between align-items-end">
-            <label class="form-label" for="password">Mật khẩu</label>
-            <a href="#" class="text-xs text-muted text-decoration-none mb-2 fw-600 hover-primary" style="font-size: 11px;">Quên mật khẩu?</a>
-        </div>
-        <div class="position-relative">
-          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
-          <span class="toggle-password" onclick="togglePass('password')"><i class="fas fa-eye"></i></span>
-        </div>
-      </div>
-
-      <button type="submit" class="btn-submit" id="submitBtn">XÁC NHẬN ĐĂNG NHẬP</button>
-    </form>
-
-    <div class="divider">Hoặc tiếp tục với</div>
-
-    <a href="#" onclick="loginWithGoogle(); return false;" class="btn-google">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_\"G\"_logo.svg\" width="18" height="18">
-      <span>Đăng nhập bằng Google</span>
-    </a>
-
-    <div class="auth-footer">
-      Bạn là đối tác mới? <a href="{% url 'admin_panel:dangky' %}">Đăng ký tài khoản</a>
-    </div>
-</div>
-
-<script>
-  function loginWithGoogle() {
-    const clientId = '{{ google_client_id }}';
-    const redirectUri = 'http://localhost:8000/accounts/google/login/callback/';
-    const scope = 'openid email profile';
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent(scope)}&` +
-      `response_type=code&` +
-      `access_type=offline`;
-    window.location.href = url;
-  }
-  function togglePass(id) {
-    const input = document.getElementById(id);
-    input.type = input.type === "password" ? "text" : "password";
-  }
-  document.getElementById('loginForm').addEventListener('submit', function(e) {
-    const user = document.getElementById('username').value.trim();
-    const pass = document.getElementById('password').value.trim();
-    if (!user || !pass) {
-      e.preventDefault();
-      alert("Vui lòng nhập đầy đủ thông tin!");
-    }
-  });
-</script>
-{% endblock %}
+</body>
+</html>
