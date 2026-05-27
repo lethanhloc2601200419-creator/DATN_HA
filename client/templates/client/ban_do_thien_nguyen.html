@@ -21,63 +21,81 @@
 
     /* ---------- Hero stats ---------- */
     .map-hero {
-        background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-800) 60%, var(--primary-700) 100%);
+        background: linear-gradient(135deg, var(--primary-950) 0%, var(--primary-900) 50%, var(--primary-800) 100%);
         border-radius: var(--radius-lg);
-        padding: 32px;
+        padding: 40px 32px;
         color: var(--white);
         position: relative;
         overflow: hidden;
         margin-bottom: 24px;
-        box-shadow: var(--shadow-md);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .map-hero::before {
+        content: ''; position: absolute; top: -50%; right: -10%; width: 400px; height: 400px;
+        background: radial-gradient(circle, rgba(59,106,199,0.15) 0%, transparent 70%);
+        z-index: 0;
     }
     .map-hero h1 {
         color: var(--white);
-        font-size: 28px;
-        font-weight: 700;
-        margin: 0 0 8px 0;
+        font-size: 32px;
+        font-weight: 800;
+        margin: 0 0 10px 0;
+        position: relative; z-index: 1;
+        letter-spacing: -0.5px;
     }
     .map-hero .hero-sub {
-        color: var(--primary-300);
-        font-size: 15px;
-        margin: 0 0 24px 0;
+        color: var(--primary-200);
+        font-size: 16px;
+        margin: 0 0 32px 0;
+        position: relative; z-index: 1;
+        opacity: 0.9;
     }
     .hero-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        position: relative; z-index: 1;
     }
     .hero-stat {
-        background: rgba(255,255,255,0.08);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.1);
         border-radius: var(--radius-md);
-        padding: 16px;
+        padding: 20px;
         display: flex;
         align-items: center;
-        gap: 12px;
-        transition: 0.3s;
+        gap: 16px;
+        transition: all 0.3s ease;
     }
     .hero-stat:hover {
-        transform: translateY(-3px);
-        background: rgba(255,255,255,0.12);
+        transform: translateY(-5px);
+        background: rgba(255,255,255,0.1);
+        border-color: var(--primary-400);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     }
     .hero-stat-icon {
-        width: 44px; height: 44px;
-        border-radius: var(--radius-md);
-        background: rgba(249,115,22,0.25);
-        color: var(--accent-400);
+        width: 52px; height: 52px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--primary-600), var(--primary-400));
+        color: var(--white);
         display: flex; align-items: center; justify-content: center;
-        font-size: 18px;
+        font-size: 20px;
+        box-shadow: 0 4px 12px rgba(59,106,199,0.3);
     }
     .hero-stat-value {
-        font-size: 24px;
-        font-weight: 700;
+        font-size: 26px;
+        font-weight: 800;
         color: var(--white);
         line-height: 1.1;
+        margin-bottom: 2px;
     }
     .hero-stat-label {
-        font-size: 12px;
-        color: var(--primary-300);
+        font-size: 13px;
+        color: var(--primary-200);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
     /* ---------- Toolbar ---------- */
