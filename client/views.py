@@ -1096,7 +1096,7 @@ def ban_do_page(request):
             'image': (
                 c.cover_image_url
                 or c.avatar_image_url
-                or '/static/images/default_program.jpg'
+                or '/static/client/img/bg_trangchu.jpg'
             ),
             'url_detail': reverse('client:chitiet_chiendich', args=[c.id]),
             'url_donate': reverse('client:ungho', args=[c.id]),
@@ -1123,9 +1123,9 @@ def ban_do_page(request):
     )
 
     context = {
-        # Truyền list Python thẳng — template dùng `|json_script` sẽ tự serialize
-        # JSON một lần (escape an toàn). Nếu json.dumps trước thì sẽ bị bọc 2 lớp.
-        'map_data_json': map_data,
+        # Sử dụng json.dumps với ensure_ascii=False để hiển thị tiếng Việt trực tiếp,
+        # giúp tránh các lỗi mã hóa \u0110... trên browser.
+        'map_data_json': json.dumps(map_data, ensure_ascii=False),
         'categories': categories,
         'stats': {
             'total_campaigns': len(map_data),

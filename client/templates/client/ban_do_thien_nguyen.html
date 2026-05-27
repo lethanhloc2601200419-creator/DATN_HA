@@ -187,18 +187,39 @@
     }
     .sidebar-header strong { color: var(--primary-800); font-weight: 700; }
     
+    .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
     .sb-card {
         background: var(--white);
-        border: 1px solid var(--primary-50);
+        border: 1px solid var(--primary-100);
         border-radius: var(--radius-md);
-        margin-bottom: 12px;
+        margin-bottom: 16px;
         cursor: pointer;
-        transition: 0.2s;
+        transition: 0.3s;
         overflow: hidden;
         box-shadow: var(--shadow-sm);
+        position: relative;
     }
-    .sb-card:hover { transform: translateY(-2px); border-color: var(--accent-500); box-shadow: var(--shadow-md); }
+    .sb-card:hover { transform: translateY(-3px); border-color: var(--accent-500); box-shadow: var(--shadow-md); }
     .sb-card.active { border-color: var(--primary-600); border-width: 2px; box-shadow: 0 0 0 3px var(--primary-100); }
+    
+    .sb-img-wrap {
+        position: relative;
+        height: 140px;
+        background: var(--neutral-100);
+        overflow: hidden;
+    }
+    .sb-img-wrap img {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        transition: 0.5s;
+    }
+    .sb-card:hover .sb-img-wrap img { transform: scale(1.08); }
+
     .sb-status {
         position: absolute;
         top: 10px; left: 10px;
@@ -208,10 +229,50 @@
         border-radius: var(--radius-full);
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        z-index: 2;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     .sb-status-active     { background: var(--accent-500);  color: var(--white); }
     .sb-status-completed  { background: var(--success-600);   color: var(--white); }
     .sb-status-ended      { background: var(--neutral-500); color: var(--white); }
+
+    .sb-body { padding: 12px; }
+    .sb-title {
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--primary-900);
+        margin-bottom: 4px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.4;
+    }
+    .sb-org { font-size: 11px; color: var(--neutral-500); margin-bottom: 10px; display: flex; align-items: center; gap: 4px; }
+    .sb-org i { color: var(--primary-500); }
+
+    .sb-progress-track {
+        height: 6px;
+        background: var(--neutral-200);
+        border-radius: var(--radius-full);
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+    .sb-progress-fill {
+        height: 100%;
+        background: var(--primary-600);
+        border-radius: var(--radius-full);
+    }
+    .sb-progress-fill.urgent { background: var(--accent-500); }
+
+    .sb-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+    }
+    .sb-meta strong { color: var(--accent-600); }
+    .sb-meta span { color: var(--neutral-600); display: flex; align-items: center; gap: 4px; }
 
     .map-wrapper { 
         position: relative;
@@ -222,6 +283,26 @@
         overflow: hidden;
     }
     #charity_map { width: 100%; height: 100%; z-index: 1; }
+
+    /* Custom Marker Pin */
+    .marker-pin {
+        width: 36px; height: 44px;
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .marker-pin::after {
+        content: '';
+        position: absolute;
+        width: 36px; height: 36px;
+        background: var(--pin-color, var(--primary-600));
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        top: 0; left: 0;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 3px rgba(255,255,255,0.3);
+        z-index: -1;
+    }
+    .marker-pin i { color: white; font-size: 14px; transform: translateY(-4px); }
+
 
     /* Custom Cluster */
     .cluster-bubble {
@@ -369,8 +450,8 @@
     </div>
 </div>
 
-{# Dữ liệu Campaign từ Django — json_script tự động escape an toàn (XSS-proof) #}
-{{ map_data_json|json_script:"map-data" }}
+{# Dữ liệu Campaign từ Django — Đã được xử lý json.dumps(ensure_ascii=False) ở view #}
+<script id="map-data" type="application/json">{{ map_data_json|safe }}</script>
 {% endblock %}
 
 {% block extra_js %}
@@ -384,17 +465,20 @@
     // ============================================================
     // 1. DATA + STATE
     // ============================================================
-    // View truyền list Python; template `|json_script` đã serialize JSON 1 lần
-    // và escape XSS-safe. Chỉ cần JSON.parse 1 lần.
     var ALL = [];
     try {
-        var parsed = JSON.parse(document.getElementById('map-data').textContent);
-        ALL = Array.isArray(parsed) ? parsed : [];
+        var scriptNode = document.getElementById('map-data');
+        if (scriptNode) {
+            ALL = JSON.parse(scriptNode.textContent);
+        }
     } catch (e) {
         console.error('Lỗi parse map-data:', e);
     }
 
     var state = { q: '', status: 'all', category: 'all', region: 'all' };
+
+    // Fallback image constant
+    var DEFAULT_IMG = '/static/client/img/bg_trangchu.jpg';
 
     var REGION_PROVINCES = {
         bac: ['hà nội','hải phòng','quảng ninh','lạng sơn','cao bằng','bắc kạn',
@@ -527,7 +611,7 @@
         return '' +
         '<div class="popup-card">' +
             '<img class="popup-img" src="' + escapeHtml(c.image) + '" alt="" ' +
-                'onerror="this.onerror=null;this.src=\'/static/images/default_program.jpg\'">' +
+                'onerror="this.onerror=null;this.src=\'' + DEFAULT_IMG + '\'">' +
             '<div class="popup-body">' +
                 '<div class="popup-tags">' + statusBadge + catBadge + '</div>' +
                 '<h6 class="popup-title">' + escapeHtml(c.title) + '</h6>' +
@@ -568,11 +652,11 @@
         '<div class="sb-card" data-id="' + c.id + '" data-lat="' + c.lat + '" data-lng="' + c.lng + '">' +
             '<div class="sb-img-wrap">' +
                 '<img src="' + escapeHtml(c.image) + '" alt="" ' +
-                    'onerror="this.onerror=null;this.src=\'/static/images/default_program.jpg\'">' +
+                    'onerror="this.onerror=null;this.src=\'' + DEFAULT_IMG + '\'">' +
                 '<span class="sb-status sb-status-' + escapeHtml(c.status) + '">' + statusLabel + '</span>' +
             '</div>' +
             '<div class="sb-body">' +
-                '<div class="sb-title">' + escapeHtml(c.title) + '</div>' +
+                '<div class="sb-title" title="' + escapeHtml(c.title) + '">' + escapeHtml(c.title) + '</div>' +
                 orgLine +
                 '<div class="sb-progress-track">' +
                     '<div class="sb-progress-fill ' + (progressUrgent ? 'urgent' : '') + '" style="width:' + c.progress_pct + '%"></div>' +
