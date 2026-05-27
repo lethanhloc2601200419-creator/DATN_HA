@@ -51,12 +51,38 @@
     .stat-item p { color: var(--neutral-500); margin: 5px 0 0; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1.5px; }
 
     /* Campaign Card Customization */
-    .card-thumb { height: 240px; overflow: hidden; position: relative; }
+    .card-charity {
+        display: flex;
+        flex-direction: column;
+        transition: 0.3s;
+    }
+    /* Horizontal split on large screens if desired, but here we prioritize breathing room */
+    @media (min-width: 1400px) {
+        /* .card-charity.card-horizontal { flex-direction: row; } */
+    }
+
+    .card-thumb { 
+        height: 240px; 
+        width: 100%;
+        overflow: hidden; 
+        position: relative; 
+        flex-shrink: 0;
+    }
     .card-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1); }
     .card-charity:hover .card-thumb img { transform: scale(1.08); }
     
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 3rem;
+    }
+
     .progress-custom { height: 10px; border-radius: var(--radius-full); background-color: var(--primary-50); margin: 15px 0; }
     .progress-bar-custom { background: var(--primary-700); border-radius: var(--radius-full); }
+
+    .currency-value { white-space: nowrap; }
 
     @media (max-width: 767.98px) {
         .hero-section { min-height: 480px; padding: 60px 0 100px; }
@@ -120,7 +146,7 @@
                 
                 {% for campaign in active_campaigns %}
                 <div class="col-lg-4 col-md-6">
-                    <div class="card-charity h-100 d-flex flex-direction-column">
+                    <div class="card-charity h-100 shadow-sm border-0 bg-white overflow-hidden radius-lg">
                         <div class="card-thumb">
                             <a href="{% url 'client:chitiet_chiendich' campaign.id %}">
                                 <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
@@ -128,7 +154,7 @@
                                      onerror="this.src='https://placehold.co/600x400?text=Chiến+dịch';">
                             </a>
                             <span class="position-absolute top-0 end-0 m-3 badge bg-primary rounded-pill px-3 py-2 shadow-sm">
-                                <i class="bi bi-tag-fill me-1"></i> {{ campaign.category.name|default:"Chung" }}
+                                <i class="fas fa-tag me-1"></i> {{ campaign.category.name|default:"Chung" }}
                             </span>
                             <span class="position-absolute bottom-0 start-0 m-3 badge bg-dark bg-opacity-75 backdrop-blur rounded-pill px-3 py-2">
                                 <i class="far fa-clock me-1"></i> Còn {{ campaign.days_left|default:"30" }} ngày
@@ -143,31 +169,31 @@
                                 <i class="fas fa-circle-check text-primary ms-1 small" title="Đã xác minh"></i>
                             </div>
 
-                            <h5 class="mb-3 fw-bold" style="min-height: 3.6rem;">
-                                <a href="{% url 'client:chitiet_chiendich' campaign.id %}" class="text-decoration-none text-neutral-900 hover-primary">
-                                    {{ campaign.title|truncatechars:60 }}
+                            <h5 class="mb-3 fw-bold">
+                                <a href="{% url 'client:chitiet_chiendich' campaign.id %}" class="text-decoration-none text-neutral-900 hover-primary line-clamp-2">
+                                    {{ campaign.title }}
                                 </a>
                             </h5>
 
                             <div class="mt-auto">
-                                <div class="d-flex justify-content-between small fw-bold mb-1">
-                                    <span class="text-primary">{{ campaign.current_amount|intcomma }} đ</span>
-                                    <span class="text-accent-500" style="color: var(--accent-500);">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
+                                <div class="d-flex justify-content-between align-items-center small fw-bold mb-1">
+                                    <span class="text-primary fs-5 currency-value">{{ campaign.current_amount|intcomma }} đ</span>
+                                    <span class="text-accent-500 fs-5" style="color: var(--accent-500);">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
                                 </div>
                                 <div class="progress progress-custom">
                                     <div class="progress-bar progress-bar-custom" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
                                 </div>
-                                <div class="d-flex justify-content-between small text-muted">
-                                    <span>Mục tiêu: <strong>{{ campaign.target_amount|intcomma }} đ</strong></span>
-                                    <span><strong>{{ campaign.donations.count }}</strong> lượt</span>
+                                <div class="d-flex justify-content-between align-items-center small text-muted">
+                                    <span class="flex-grow-1">Mục tiêu: <strong class="text-dark currency-value">{{ campaign.target_amount|intcomma }} đ</strong></span>
+                                    <span class="ms-2"><strong>{{ campaign.donations.count }}</strong> lượt</span>
                                 </div>
 
                                 {% if user.is_authenticated %}
-                                <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent w-100 py-3 mt-4 rounded-pill">
+                                <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent w-100 py-3 mt-4 rounded-pill fw-bold shadow-accent">
                                     Ủng hộ ngay
                                 </a>
                                 {% else %}
-                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary w-100 py-3 mt-4 rounded-pill">
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary w-100 py-3 mt-4 rounded-pill fw-bold">
                                     Đăng nhập để ủng hộ
                                 </a>
                                 {% endif %}
