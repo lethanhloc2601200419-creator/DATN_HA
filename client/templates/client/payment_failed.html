@@ -5,58 +5,61 @@
 
 {% block extra_css %}
 <style>
-:root {
-            --primary-50: #f3f7ff;
-            --danger-600: #dc2626;
-            --warning-600: #ca8a04;
-            --white: #ffffff;
-        }
-        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: var(--primary-50); }
-        .card-receipt { border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; }
-        .receipt-header { background: linear-gradient(135deg, var(--danger-600) 0%, var(--danger-600) 100%); color: white; padding: 40px 20px; text-align: center; position: relative; }
-        .receipt-header::after {
-            content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
-            background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
-        }
+    .card-receipt { border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; background: var(--white); }
+    .receipt-header { background: linear-gradient(135deg, var(--danger-600) 0%, var(--danger-500) 100%); color: var(--white); padding: 48px 24px; text-align: center; position: relative; }
+    .receipt-header::after {
+        content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
+        background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
+    }
+    .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card card-receipt">
-                    <div class="receipt-header">
-                        <div class="mb-3">
-                            <i class="fas fa-times-circle fa-4x text-white"></i>
-                        </div>
-                        <h4 class="fw-bold mb-1">Thanh toán thất bại!</h4>
-                        <p class="opacity-75 m-0 small">Giao dịch không thể hoàn tất. Vui lòng thử lại.</p>
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card card-receipt">
+                <div class="receipt-header">
+                    <div class="mb-3 shake">
+                        <i class="fas fa-circle-xmark fa-5x text-white shadow-sm rounded-circle"></i>
+                    </div>
+                    <h2 class="fw-800 mb-1">Thanh toán thất bại!</h2>
+                    <p class="opacity-75 m-0 small fw-600">Giao dịch không thể hoàn tất vào lúc này.</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5 pt-5">
+                    <div class="alert bg-danger-100 border-danger-500 py-3 radius-md mb-4 text-danger d-flex align-items-center">
+                        <i class="fas fa-triangle-exclamation me-3 fs-4"></i>
+                        <div class="small fw-bold">Lý do: {{ message|default:"Đã xảy ra lỗi không xác định trong quá trình xử lý thanh toán." }}</div>
                     </div>
 
-                    <div class="card-body p-4 pt-5">
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Lý do:</strong> {{ message|default:"Đã xảy ra lỗi trong quá trình thanh toán." }}
-                        </div>
+                    <div class="bg-light radius-lg border p-4 mb-4">
+                        <h6 class="fw-800 text-dark mb-3 small text-uppercase">Bạn có thể thử các cách sau:</h6>
+                        <ul class="small text-neutral-500 mb-0 ps-3">
+                            <li class="mb-2">Kiểm tra lại số dư tài khoản ngân hàng hoặc ví điện tử.</li>
+                            <li class="mb-2">Đảm bảo kết nối mạng ổn định và thử lại sau ít phút.</li>
+                            <li>Sử dụng một phương thức thanh toán khác nếu lỗi vẫn tiếp diễn.</li>
+                        </ul>
+                    </div>
 
-                        <div class="bg-light rounded p-3 mb-4">
-                            <p class="small text-muted mb-2"><i class="fas fa-info-circle me-1"></i> Bạn có thể thử lại bằng cách:</p>
-                            <ul class="small text-muted mb-0">
-                                <li>Quay lại trang chiến dịch và chọn "Ủng hộ" lần nữa</li>
-                                <li>Chọn hình thức thanh toán khác (Chuyển khoản ngân hàng)</li>
-                                <li>Kiểm tra số dư tài khoản hoặc liên hệ ngân hàng</li>
-                            </ul>
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <a href="/" class="btn btn-primary fw-bold">
-                                <i class="fas fa-home me-2"></i> Về trang chủ
-                            </a>
-                        </div>
+                    <div class="d-grid gap-3 mt-5">
+                        <a href="{% url 'client:trangchu' %}" class="btn btn-primary py-3 fw-800 radius-pill shadow-btn">
+                            <i class="fas fa-rotate-left me-2"></i> THỬ LẠI QUYÊN GÓP
+                        </a>
+                        <a href="/" class="btn btn-light border py-2 small fw-600 radius-pill">
+                            Về trang chủ
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+</style>
 {% endblock %}

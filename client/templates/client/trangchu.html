@@ -6,59 +6,64 @@
 
 {% block extra_css %}
 <style>
-    /* CSS RIÊNG CHO BANNER (CHỈ TRANG CHỦ MỚI CÓ) */
+    /* Hero Section with Enhanced Readability */
     .hero-section {
-        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url("{% static 'client/img/new1.jpg' %}");
+        background: linear-gradient(rgba(10, 22, 40, 0.5), rgba(10, 22, 40, 0.7)), url("{% static 'client/img/new1.jpg' %}");
         background-size: cover;
         background-position: center;
-        height: 520px;
+        min-height: 560px;
         display: flex;
         align-items: center;
         justify-content: center;
         text-align: center;
         color: white;
         position: relative;
+        padding: 100px 0;
     }
-    .hero-title { font-size: 3.5rem; font-weight: 800; text-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; line-height: 1.2; }
+    .hero-title { 
+        font-size: clamp(2.5rem, 8vw, 4rem); 
+        font-weight: 800; 
+        text-shadow: 0 4px 20px rgba(0,0,0,0.4); 
+        margin-bottom: 24px; 
+        line-height: 1.1; 
+    }
+    .hero-subtitle {
+        max-width: 720px;
+        margin: 0 auto 48px;
+        font-size: 1.25rem;
+        opacity: 0.9;
+        font-weight: 400;
+    }
     
-    /* Box thống kê nổi */
-    .stats-container { margin-top: -60px; position: relative; z-index: 10; }
+    /* Stats Box - Floating Glassmorphism Style */
+    .stats-container { margin-top: -80px; position: relative; z-index: 10; }
     .stats-box {
-        background: white; border-radius: 16px; padding: 40px; 
-        box-shadow: 0 15px 40px rgba(0,0,0,0.1); 
-        display: flex; justify-content: space-around; align-items: center;
+        background: var(--white); 
+        border-radius: var(--radius-xl); 
+        padding: 40px; 
+        box-shadow: var(--shadow-lg); 
+        display: flex; 
+        justify-content: space-around; 
+        align-items: center;
+        border: 1px solid var(--primary-100);
     }
-    .stat-item h3 { color: var(--primary-color); font-weight: 800; font-size: 2.2rem; margin: 0; }
-    .stat-item p { color: var(--neutral-500); margin: 0; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 1px; }
+    .stat-item h3 { color: var(--primary-800); font-weight: 800; font-size: 2.5rem; margin: 0; }
+    .stat-item p { color: var(--neutral-500); margin: 5px 0 0; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1.5px; }
 
-    /* Card chiến dịch */
-    .campaign-card {
-        background: white; border-radius: 16px; overflow: hidden; border: 1px solid var(--primary-200); 
-        transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+    /* Campaign Card Customization */
+    .card-thumb { height: 240px; overflow: hidden; position: relative; }
+    .card-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1); }
+    .card-charity:hover .card-thumb img { transform: scale(1.08); }
+    
+    .progress-custom { height: 10px; border-radius: var(--radius-full); background-color: var(--primary-50); margin: 15px 0; }
+    .progress-bar-custom { background: var(--primary-700); border-radius: var(--radius-full); }
+
+    @media (max-width: 767.98px) {
+        .hero-section { min-height: 480px; padding: 60px 0 100px; }
+        .stats-box { flex-direction: column; gap: 30px; padding: 30px; text-align: center; }
+        .stats-container { margin-top: -60px; }
+        .vr { display: none; }
     }
-    .campaign-card:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); border-color: transparent; }
-    
-    .card-thumb { height: 220px; overflow: hidden; position: relative; }
-    .card-thumb img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
-    .campaign-card:hover .card-thumb img { transform: scale(1.1); }
-    
-    .card-body { padding: 25px; flex: 1; display: flex; flex-direction: column; }
-    .card-title a { color: var(--text-dark); text-decoration: none; transition: 0.2s; }
-    .card-title a:hover { color: var(--primary-color); }
-    
-    .btn-donate-card {
-        margin-top: 20px;
-        width: 100%;
-        background: var(--accent-500);
-        color: var(--white);
-        border: 1px solid var(--accent-500);
-        font-weight: 700;
-        padding: 12px;
-        border-radius: 10px;
-        transition: 0.3s;
-    }
-    .btn-donate-card:hover { background: var(--accent-400); color: var(--white); border-color: var(--accent-400); }
 </style>
 {% endblock %}
 
@@ -66,11 +71,16 @@
     <header class="hero-section">
         <div class="container">
             <h1 class="hero-title animate__animated animate__fadeInDown">Trao yêu thương,<br>Nhận niềm vui</h1>
-            <p class="fs-5 mb-5 opacity-75 w-75 mx-auto">Nền tảng gây quỹ từ thiện minh bạch, ứng dụng công nghệ Blockchain để đảm bảo niềm tin cho cộng đồng.</p>
+            <p class="hero-subtitle">Nền tảng gây quỹ từ thiện minh bạch, ứng dụng công nghệ Blockchain để đảm bảo niềm tin tuyệt đối cho cộng đồng.</p>
             
-            <div class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg" style="max-width: 600px; width: 100%;">
-                <input type="text" class="form-control border-0 rounded-pill px-4 py-2" placeholder="Tìm chiến dịch, hoàn cảnh..." style="box-shadow: none;">
-                <button class="btn btn-primary rounded-pill px-4 py-2 fw-bold">Tìm kiếm</button>
+            <div class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg w-100" style="max-width: 640px;">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-0 ps-4">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-0 rounded-pill py-3" placeholder="Tìm chiến dịch, hoàn cảnh..." style="box-shadow: none;">
+                    <button class="btn btn-primary rounded-pill px-5 py-2 fw-bold ms-2">Tìm kiếm</button>
+                </div>
             </div>
         </div>
     </header>
@@ -78,30 +88,30 @@
     <section class="stats-container container mb-5">
         <div class="stats-box">
             <div class="stat-item text-center">
-                <h3>{{ total_donated|intcomma }} đ</h3>
-                <p>Đã quyên góp</p>
+                <h3>{{ total_donated|intcomma }}</h3>
+                <p>VNĐ Đã quyên góp</p>
             </div>
-            <div class="vr mx-3 text-muted opacity-25"></div>
+            <div class="vr text-primary opacity-10" style="width: 2px; height: 50px;"></div>
             <div class="stat-item text-center">
                 <h3>{{ total_campaigns|intcomma }}</h3>
-                <p>Chiến dịch</p>
+                <p>Chiến dịch ý nghĩa</p>
             </div>
-            <div class="vr mx-3 text-muted opacity-25"></div>
+            <div class="vr text-primary opacity-10" style="width: 2px; height: 50px;"></div>
             <div class="stat-item text-center">
                 <h3>100%</h3>
-                <p>Minh bạch Sao kê</p>
+                <p>Minh bạch Blockchain</p>
             </div>
         </div>
     </section>
 
-    <section class="py-5">
+    <section class="py-5 bg-light">
         <div class="container">
             <div class="d-flex justify-content-between align-items-end mb-5">
                 <div>
-                    <h6 class="text-uppercase fw-bold text-danger small mb-1">Vì cộng đồng</h6>
+                    <h6 class="text-uppercase fw-bold text-accent-500 small mb-2" style="color: var(--accent-500);">✨ Vì cộng đồng</h6>
                     <h2 class="fw-bold m-0 display-6">Chiến dịch nổi bật</h2>
                 </div>
-                <a href="#" class="text-decoration-none fw-bold text-dark hover-primary">
+                <a href="#" class="text-decoration-none fw-bold text-primary hover-primary">
                     Xem tất cả <i class="fas fa-arrow-right ms-1"></i>
                 </a>
             </div>
@@ -109,54 +119,56 @@
             <div class="row g-4">
                 
                 {% for campaign in active_campaigns %}
-                <div class="col-md-4">
-                    <div class="campaign-card">
+                <div class="col-lg-4 col-md-6">
+                    <div class="card-charity h-100 d-flex flex-direction-column">
                         <div class="card-thumb">
                             <a href="{% url 'client:chitiet_chiendich' campaign.id %}">
                                 <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
-     alt="{{ campaign.title }}"
-     class="card-img-top object-fit-cover" height="200"
-     onerror="this.src='https://placehold.co/600x400?text=Chiến+dịch';">
+                                     alt="{{ campaign.title }}"
+                                     onerror="this.src='https://placehold.co/600x400?text=Chiến+dịch';">
                             </a>
-                            <span class="position-absolute bottom-0 end-0 m-3 badge bg-dark bg-opacity-75 backdrop-blur rounded-pill px-3 py-2">
+                            <span class="position-absolute top-0 end-0 m-3 badge bg-primary rounded-pill px-3 py-2 shadow-sm">
+                                <i class="bi bi-tag-fill me-1"></i> {{ campaign.category.name|default:"Chung" }}
+                            </span>
+                            <span class="position-absolute bottom-0 start-0 m-3 badge bg-dark bg-opacity-75 backdrop-blur rounded-pill px-3 py-2">
                                 <i class="far fa-clock me-1"></i> Còn {{ campaign.days_left|default:"30" }} ngày
                             </span>
                         </div>
 
-                        <div class="card-body">
+                        <div class="card-body p-4 d-flex flex-column">
                             <div class="d-flex align-items-center mb-3">
                                 <img src="{{ campaign.creator.profile.avatar_url|default:'https://ui-avatars.com/api/?name=Admin' }}" 
-                                     class="rounded-circle me-2" width="30" height="30" style="object-fit: cover;">
-                                <span class="small fw-bold text-secondary">{{ campaign.creator.profile.display_name|default:campaign.creator.username }}</span>
-                                <i class="fas fa-check-circle text-primary ms-1 small" title="Đã xác minh"></i>
+                                     class="rounded-circle me-2 border" width="32" height="32" style="object-fit: cover;">
+                                <span class="small fw-bold text-neutral-700">{{ campaign.creator.profile.display_name|default:campaign.creator.username }}</span>
+                                <i class="fas fa-circle-check text-primary ms-1 small" title="Đã xác minh"></i>
                             </div>
 
-                            <h5 class="card-title mb-3 fw-bold" style="min-height: 3rem;">
-                                <a href="{% url 'client:chitiet_chiendich' campaign.id %}" class="text-decoration-none text-dark">
-                                    {{ campaign.title|truncatechars:50 }}
+                            <h5 class="mb-3 fw-bold" style="min-height: 3.6rem;">
+                                <a href="{% url 'client:chitiet_chiendich' campaign.id %}" class="text-decoration-none text-neutral-900 hover-primary">
+                                    {{ campaign.title|truncatechars:60 }}
                                 </a>
                             </h5>
 
                             <div class="mt-auto">
-                                <div class="d-flex justify-content-between small fw-bold mb-2">
-                                    <span class="text-dark">{{ campaign.current_amount|intcomma }} đ</span>
-                                    <span class="text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
+                                <div class="d-flex justify-content-between small fw-bold mb-1">
+                                    <span class="text-primary">{{ campaign.current_amount|intcomma }} đ</span>
+                                    <span class="text-accent-500" style="color: var(--accent-500);">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
                                 </div>
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                                <div class="progress progress-custom">
+                                    <div class="progress-bar progress-bar-custom" role="progressbar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
                                 </div>
-                                <div class="d-flex justify-content-between small text-muted mt-2">
-                                    <span>MT: {{ campaign.target_amount|intcomma }} đ</span>
-                                    <span>{{ campaign.donations.count }} lượt</span>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>Mục tiêu: <strong>{{ campaign.target_amount|intcomma }} đ</strong></span>
+                                    <span><strong>{{ campaign.donations.count }}</strong> lượt</span>
                                 </div>
 
                                 {% if user.is_authenticated %}
-                                <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-donate-card d-block text-center mt-3">
+                                <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent w-100 py-3 mt-4 rounded-pill">
                                     Ủng hộ ngay
                                 </a>
                                 {% else %}
-                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-donate-card d-block text-center mt-3">
-                                    <i class="fas fa-sign-in-alt me-1"></i> Vui lòng đăng nhập để ủng hộ
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary w-100 py-3 mt-4 rounded-pill">
+                                    Đăng nhập để ủng hộ
                                 </a>
                                 {% endif %}
                             </div>

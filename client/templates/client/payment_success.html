@@ -6,86 +6,42 @@
 
 {% block extra_css %}
 <style>
-:root {
-            --primary-950: #0a1628;
-            --primary-900: #0f2044;
-            --primary-800: #1e3a8a;
-            --primary-700: #2a4fa3;
-            --primary-600: #3b6ac7;
-            --primary-500: #4f84e0;
-            --primary-300: #a8c5f8;
-            --primary-200: #d0e2fd;
-            --primary-100: #e8f1fe;
-            --primary-50: #f3f7ff;
-            --neutral-900: #111827;
-            --neutral-700: #374151;
-            --neutral-500: #6b7280;
-            --neutral-300: #d1d5db;
-            --neutral-100: #f9fafb;
-            --danger-600: #dc2626;
-            --danger-100: #fef2f2;
-            --success-600: #16a34a;
-            --success-100: #f0fdf4;
-            --white: #ffffff;
-        }
-        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: var(--primary-50); }
-        .card-receipt { border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; }
-        .receipt-header { background: linear-gradient(135deg, var(--success-600) 0%, var(--primary-500) 100%); color: white; padding: 40px 20px; text-align: center; position: relative; }
-        .receipt-header::after {
-            content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
-            background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
-        }
-        .hash-box { background: var(--neutral-100); border: 1px dashed var(--neutral-300); padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.78rem; word-break: break-all; color: var(--neutral-700); }
-        .hash-box a { color: var(--primary-600); text-decoration: none; }
-        .hash-box a:hover { text-decoration: underline; }
-        .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: var(--neutral-500); }
-        .badge-provider { background: var(--primary-800); color: white; font-size: 11px; padding: 4px 10px; border-radius: 20px; }
+    .card-receipt { border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; background: var(--white); }
+    .receipt-header { background: linear-gradient(135deg, var(--success-600) 0%, var(--primary-500) 100%); color: var(--white); padding: 48px 24px; text-align: center; position: relative; }
+    .receipt-header::after {
+        content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
+        background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
+    }
+    .hash-box { background: var(--neutral-100); border: 1.5px dashed var(--primary-100); padding: 12px; border-radius: var(--radius-md); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; word-break: break-all; color: var(--primary-700); }
+    .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; color: var(--neutral-500); }
+    .badge-provider { background: var(--primary-800); color: var(--white); font-size: 11px; padding: 6px 14px; border-radius: var(--radius-full); font-weight: 700; box-shadow: var(--shadow-sm); }
 
-        /* Blockchain status card */
-        .bc-card {
-            border-radius: 12px; padding: 18px; margin-bottom: 16px;
-            border: 1px solid var(--primary-200); transition: all 0.3s;
-        }
-        .bc-card.processing { background: linear-gradient(135deg, var(--primary-100), var(--primary-50)); border-color: var(--primary-600); }
-        .bc-card.confirmed { background: linear-gradient(135deg, var(--success-100), var(--success-100)); border-color: var(--success-600); }
-        .bc-card.failed { background: linear-gradient(135deg, var(--danger-100), var(--danger-100)); border-color: var(--danger-600); }
+    /* Blockchain status card */
+    .bc-card { border-radius: var(--radius-lg); padding: 24px; margin-bottom: 16px; border: 1.5px solid var(--primary-100); transition: all 0.4s; }
+    .bc-card.processing { background: linear-gradient(135deg, var(--primary-100), var(--primary-50)); border-color: var(--primary-600); }
+    .bc-card.confirmed { background: linear-gradient(135deg, var(--success-100), var(--success-100)); border-color: var(--success-600); box-shadow: 0 0 20px rgba(22, 163, 74, 0.1); }
+    .bc-card.failed { background: linear-gradient(135deg, var(--danger-100), var(--danger-100)); border-color: var(--danger-600); }
 
-        .tx-row { padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
-        .tx-row:last-child { border-bottom: none; }
-        .tx-icon {
-            width: 36px; height: 36px; border-radius: 50%;
-            display: inline-flex; align-items: center; justify-content: center;
-            font-size: 14px; margin-right: 10px; color: white;
-        }
-        .tx-icon.waiting { background: var(--primary-300); }
-        .tx-icon.pending { background: var(--primary-600); animation: pulse 1.5s infinite; }
-        .tx-icon.done { background: var(--success-600); }
-        .tx-icon.error { background: var(--danger-600); }
+    .tx-row { padding: 16px 0; border-bottom: 1px solid rgba(15, 32, 68, 0.08); }
+    .tx-row:last-child { border-bottom: none; }
+    .tx-icon { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; margin-right: 14px; color: var(--white); flex-shrink: 0; }
+    .tx-icon.waiting { background: var(--neutral-300); }
+    .tx-icon.pending { background: var(--primary-600); animation: pulse-primary 2s infinite; }
+    .tx-icon.done { background: var(--success-600); box-shadow: 0 0 10px rgba(22, 163, 74, 0.3); }
+    .tx-icon.error { background: var(--danger-600); }
 
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 106, 199, 0.45); }
-            50% { box-shadow: 0 0 0 8px rgba(59, 106, 199, 0); }
-        }
+    @keyframes pulse-primary { 0% { box-shadow: 0 0 0 0 rgba(59, 106, 199, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(59, 106, 199, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 106, 199, 0); } }
 
-        .spinner-dot {
-            display: inline-block; width: 6px; height: 6px; background: var(--primary-600);
-            border-radius: 50%; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both;
-        }
-        .spinner-dot:nth-child(1) { animation-delay: -0.32s; }
-        .spinner-dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
+    .spinner-dot { display: inline-block; width: 6px; height: 6px; background: var(--primary-600); border-radius: 50%; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
+    .spinner-dot:nth-child(1) { animation-delay: -0.32s; }
+    .spinner-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
-        .tx-status-badge {
-            font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 10px;
-            text-transform: uppercase;
-        }
-        .tx-status-badge.waiting { background: var(--neutral-100); color: var(--neutral-500); }
-        .tx-status-badge.pending { background: var(--primary-100); color: var(--primary-900); }
-        .tx-status-badge.done { background: var(--success-100); color: var(--success-600); }
-        .tx-status-badge.error { background: var(--danger-100); color: var(--danger-600); }
+    .tx-status-badge { font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.5px; }
+    .tx-status-badge.waiting { background: var(--neutral-200); color: var(--neutral-600); }
+    .tx-status-badge.pending { background: var(--primary-200); color: var(--primary-800); }
+    .tx-status-badge.done { background: var(--success-100); color: var(--success-600); }
+    .tx-status-badge.error { background: var(--danger-100); color: var(--danger-600); }
 </style>
 {% endblock %}
 

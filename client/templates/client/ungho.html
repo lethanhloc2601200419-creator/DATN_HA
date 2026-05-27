@@ -6,78 +6,73 @@
 
 {% block content %}
 <div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-7 mb-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white py-3 border-bottom">
-                    <h5 class="fw-bold m-0 text-danger"><i class="fas fa-heart me-2"></i>Ủng hộ Chiến dịch</h5>
+    <div class="row g-4 justify-content-center">
+        <div class="col-lg-7 mb-4">
+            <div class="card-charity h-100 overflow-hidden shadow-md">
+                <div class="card-header bg-white py-4 px-4 border-bottom">
+                    <h5 class="fw-800 m-0 text-primary"><i class="fas fa-heart text-accent-500 me-2" style="color: var(--accent-500);"></i>Ủng hộ Chiến dịch</h5>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-4 p-md-5">
                     <form method="POST">
                         {% csrf_token %}
                         <input type="hidden" name="device_fingerprint" id="deviceFingerprintInput">
                         
-                        <div class="mb-4">
-                            <label class="fw-bold mb-2">Bạn muốn ủng hộ bao nhiêu?</label>
-                            <div class="input-group input-group-lg">
-                                <input type="number" name="amount" class="form-control fw-bold text-danger" placeholder="Nhập số tiền (VD: 100000)" required min="2000">
-                                <span class="input-group-text fw-bold">VNĐ</span>
+                        <div class="mb-5">
+                            <label class="form-label fw-800 text-dark mb-3">Bạn muốn ủng hộ bao nhiêu? <span class="text-danger">*</span></label>
+                            <div class="input-group input-group-lg shadow-sm radius-md overflow-hidden">
+                                <input type="number" name="amount" class="form-control fw-800 text-accent-600 border-primary-100" placeholder="Nhập số tiền (VNĐ)" required min="2000" style="color: var(--accent-600); font-size: 1.5rem;">
+                                <span class="input-group-text bg-primary-50 border-primary-100 fw-800 text-primary">VNĐ</span>
                             </div>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(50000)">50k</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(100000)">100k</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm me-1 rounded-pill px-3" onclick="setAmount(200000)">200k</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="setAmount(500000)">500k</button>
+                            <div class="mt-3 d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4 py-2 fw-600" onclick="setAmount(50000)">50.000đ</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4 py-2 fw-600" onclick="setAmount(100000)">100.000đ</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4 py-2 fw-600" onclick="setAmount(200000)">200.000đ</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4 py-2 fw-600" onclick="setAmount(500000)">500.000đ</button>
                             </div>
                         </div>
 
                         {% if not user.is_authenticated %}
-                        <div class="row mb-3">
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label class="small fw-bold">Họ và tên</label>
-                                <input type="text" name="donor_name" class="form-control" required>
+                                <label class="small fw-800 text-muted text-uppercase mb-2">Họ và tên</label>
+                                <input type="text" name="donor_name" class="form-control radius-md" required placeholder="Nhập tên của bạn">
                             </div>
                             <div class="col-md-6">
-                                <label class="small fw-bold">Email (nhận thư cảm ơn)</label>
-                                <input type="email" name="donor_email" class="form-control">
+                                <label class="small fw-800 text-muted text-uppercase mb-2">Email (nhận chứng thực)</label>
+                                <input type="email" name="donor_email" class="form-control radius-md" placeholder="email@vi-du.com">
                             </div>
                         </div>
                         {% else %}
-                        <div class="alert alert-info py-2 small rounded-3">
-                            <i class="fas fa-user-check me-1"></i> Bạn đang ủng hộ với tài khoản: <strong>{{ user.username }}</strong>
+                        <div class="alert bg-primary-50 border-primary-100 py-3 radius-md mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user-circle fa-2x text-primary me-3"></i>
+                                <div>
+                                    <div class="text-xs text-muted fw-bold text-uppercase">Tài khoản ủng hộ</div>
+                                    <strong class="text-primary">{{ user.username }}</strong>
+                                </div>
+                            </div>
                         </div>
                         {% endif %}
 
                         <div class="mb-4">
-                            <label class="fw-bold mb-2">Lời nhắn yêu thương</label>
-                            <textarea name="message" class="form-control" rows="3" placeholder="Gửi lời chúc đến hoàn cảnh..."></textarea>
+                            <label class="small fw-800 text-muted text-uppercase mb-2">Lời nhắn yêu thương</label>
+                            <textarea name="message" class="form-control radius-md" rows="3" placeholder="Gửi lời chúc tốt đẹp nhất đến hoàn cảnh này..."></textarea>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="fw-bold mb-2">Hình thức thanh toán</label>
-                            <!-- <div class="border rounded p-3 mb-2 bg-light">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment_method" id="bank" value="bank_transfer" checked>
-                                    <label class="form-check-label fw-bold" for="bank">
-                                        <i class="fas fa-university me-2 text-primary"></i> Chuyển khoản Ngân hàng
+                        <div class="mb-5">
+                            <label class="small fw-800 text-muted text-uppercase mb-3 d-block">Hình thức thanh toán</label>
+                            <div class="radius-lg border border-primary-100 p-4 bg-primary-50 shadow-inner">
+                                <div class="form-check d-flex align-items-center gap-3">
+                                    <input class="form-check-input flex-shrink-0" type="radio" name="payment_method" id="payos" value="payos" checked style="width: 20px; height: 20px;">
+                                    <label class="form-check-label fw-800 text-primary m-0" for="payos">
+                                        <i class="fas fa-qrcode text-accent-500 me-2" style="color: var(--accent-500);"></i> Thanh toán qua PayOS (VietQR)
                                     </label>
-                                    <div class="small text-muted ms-4 mt-1">Hệ thống sẽ tạo mã QR tự động ở bước tiếp theo.</div>
                                 </div>
-                            </div> -->
-                            <div class="border rounded p-3 mb-2 bg-light">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment_method" id="payos" value="payos" checked>
-                                    <label class="form-check-label fw-bold" for="payos">
-                                        <i class="fas fa-qrcode me-2 text-danger"></i> Thanh toán qua PayOS
-                                    </label>
-                                    <div class="small text-muted ms-4 mt-1">Hệ thống tạo checkout URL và VietQR để bạn thanh toán trực tuyến.</div>
-                                </div>
+                                <div class="small text-muted mt-2 ms-5 ps-1">Hệ thống sẽ tạo mã QR cá nhân hóa để bạn quét mã thanh toán an toàn.</div>
                             </div>
                         </div>
 
-                        
-
-                        <button type="submit" class="btn btn-danger w-100 py-3 fw-bold fs-5 shadow-sm rounded-pill">
+                        <button type="submit" class="btn btn-accent w-100 py-3 fw-800 fs-5 radius-pill shadow-accent">
                             TIẾP TỤC ỦNG HỘ <i class="fas fa-arrow-right ms-2"></i>
                         </button>
                     </form>
@@ -85,40 +80,55 @@
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 sticky-top" style="top: 100px;">
-               <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
-         class="w-100 object-fit-cover" 
-         style="height: 400px;" 
-         alt="{{ campaign.title }}"
-         onerror="this.src='https://placehold.co/800x400?text=Chiến+dịch';">
+        <div class="col-lg-4">
+            <div class="card-charity shadow-md sticky-top" style="top: 100px;">
+                <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
+                     class="w-100 object-fit-cover" 
+                     style="height: 240px;" 
+                     alt="{{ campaign.title }}"
+                     onerror="this.src='https://placehold.co/800x400?text=Chiến+dịch';">
     
-                <div class="card-body">
-                    <h6 class="fw-bold mb-3 lh-base">{{ campaign.title }}</h6>
+                <div class="card-body p-4">
+                    <h6 class="fw-800 mb-4 lh-base text-dark">{{ campaign.title }}</h6>
                     
-                    <div class="d-flex justify-content-between small mb-1">
+                    <div class="d-flex justify-content-between small fw-800 mb-2">
                         <span class="text-muted">Tiến độ</span>
-                        <span class="fw-bold text-danger">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
+                        <span class="text-accent-600" style="color: var(--accent-600);">{{ campaign.get_percentage|stringformat:".1f" }}%</span>
                     </div>
-                    <div class="progress mb-3" style="height: 6px;">
-                        <div class="progress-bar bg-primary" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%"></div>
+                    <div class="progress shadow-sm mb-4" style="height: 10px; border-radius: 5px; background: var(--primary-50);">
+                        <div class="progress-bar" style="width: {{ campaign.get_percentage|stringformat:'.0f' }}%; background-color: var(--primary-800);"></div>
                     </div>
 
-                    <ul class="list-unstyled small text-muted bg-light p-3 rounded mb-0">
-                        <li class="mb-2 d-flex justify-content-between">
-                            <span>Mục tiêu:</span> 
-                            <span class="fw-bold text-dark">{{ campaign.target_amount|intcomma }} đ</span>
-                        </li>
-                        <li class="d-flex justify-content-between">
-                            <span>Đã quyên góp:</span> 
-                            <span class="fw-bold text-danger">{{ campaign.current_amount|intcomma }} đ</span>
-                        </li>
-                    </ul>
+                    <div class="bg-light p-3 radius-md border">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted small fw-bold">Mục tiêu:</span> 
+                            <span class="fw-800 text-dark small">{{ campaign.target_amount|intcomma }} đ</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold">Đã góp:</span> 
+                            <span class="fw-800 text-accent-500 small" style="color: var(--accent-500);">{{ campaign.current_amount|intcomma }} đ</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-top">
+                        <div class="d-flex gap-3 align-items-center">
+                            <i class="fas fa-shield-halved text-success fs-4"></i>
+                            <div>
+                                <small class="fw-800 d-block text-dark small text-uppercase">Minh bạch 100%</small>
+                                <small class="text-muted text-xs">Giao dịch được xác thực bởi Blockchain.</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .shadow-inner { box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+</style>
 {% endblock %}
 
 {% block extra_js %}

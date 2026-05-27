@@ -3,99 +3,98 @@
 {% load humanize %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <h2 class="page-title">Quản lý Giải ngân (V3 — EIP-712 Multisig + PayOS)</h2>
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Giải ngân</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Quản lý Giải ngân <span class="badge bg-primary-100 text-primary fs-6 ms-2">V3 — EIP-712 Multisig + PayOS</span></h2>
+        {% if role != 'supervisor' %}
+        <button type="button" class="btn btn-primary px-4 radius-pill shadow-btn" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="fas fa-plus-circle me-2"></i> Tạo yêu cầu giải ngân
+        </button>
+        {% endif %}
+    </div>
 
     {# ============================================================ #}
     {# V3 STATS DASHBOARD — 4 state chính theo v3_status.             #}
     {# ============================================================ #}
-    <div class="row g-3 mt-2 mb-4">
+    <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body text-center">
-                    <div class="metric-value text-warning">{{ stats.pending_multisig }}</div>
-                    <div class="metric-label">
-                        <i class="fas fa-signature me-1"></i> Chờ ký duyệt
-                    </div>
-                    <div class="small text-muted mt-1">Pending_Multisig</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1"><i class="fas fa-signature me-1"></i> Chờ ký duyệt</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.pending_multisig }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body text-center">
-                    <div class="metric-value text-primary">{{ stats.ready_to_payout }}</div>
-                    <div class="metric-label">
-                        <i class="fas fa-paper-plane me-1"></i> Sẵn sàng giải ngân
-                    </div>
-                    <div class="small text-muted mt-1">Ready_to_Payout</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1"><i class="fas fa-paper-plane me-1"></i> Sẵn sàng giải ngân</div>
+                <div class="h3 fw-800 m-0 text-primary">{{ stats.ready_to_payout }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body text-center">
-                    <div class="metric-value text-info">{{ stats.fiat_transferred }}</div>
-                    <div class="metric-label">
-                        <i class="fas fa-university me-1"></i> Đang xử lý Bank
-                    </div>
-                    <div class="small text-muted mt-1">Fiat_Transferred</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-info shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1"><i class="fas fa-university me-1"></i> Đang xử lý Bank</div>
+                <div class="h3 fw-800 m-0 text-info">{{ stats.fiat_transferred }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body text-center">
-                    <div class="metric-value text-success">{{ stats.completed_audited }}</div>
-                    <div class="metric-label">
-                        <i class="fas fa-check-circle me-1"></i> Đã hoàn tất
-                    </div>
-                    <div class="small text-muted mt-1">Completed_&_Audited</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1"><i class="fas fa-check-circle me-1"></i> Đã hoàn tất</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.completed_audited }}</div>
             </div>
         </div>
+        
+        <div class="col-md-6">
+            <div class="card-charity p-3 bg-light border border-primary-100 shadow-sm d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng tiền yêu cầu (đang xem)</div>
+                    <div class="h4 fw-800 m-0 text-primary">{{ stats.total_requested|intcomma }}đ</div>
+                </div>
+                <i class="fas fa-money-bill-transfer fa-2x text-primary opacity-25"></i>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card-charity p-3 bg-success-50 border border-success-200 shadow-sm d-flex justify-content-between align-items-center" style="background-color: var(--success-100);">
+                <div>
+                    <div class="text-xs text-success fw-800 text-uppercase mb-1">Đã giải ngân & audit</div>
+                    <div class="h4 fw-800 m-0 text-success">{{ stats.total_disbursed|intcomma }}đ</div>
+                </div>
+                <i class="fas fa-shield-check fa-2x text-success opacity-25"></i>
+            </div>
+        </div>
+        
         {% if stats.payout_failed %}
-        <div class="col-md-3">
-            <div class="card admin-stat-card border-danger">
-                <div class="card-body text-center">
-                    <div class="metric-value text-danger">{{ stats.payout_failed }}</div>
-                    <div class="metric-label">
-                        <i class="fas fa-exclamation-triangle me-1"></i> Payout Failed
-                    </div>
-                </div>
+        <div class="col-12">
+            <div class="alert bg-danger-100 border-danger-500 text-danger fw-bold d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-3 fs-4"></i> CẢNH BÁO: Có {{ stats.payout_failed }} yêu cầu giải ngân bị thất bại!
             </div>
         </div>
         {% endif %}
-        <div class="col-md-6">
-            <div class="card admin-stat-card">
-                <div class="card-body text-start">
-                    <div class="metric-value text-success">{{ stats.total_disbursed|intcomma }}đ</div>
-                    <div class="metric-label">Đã giải ngân & audit</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card admin-stat-card">
-                <div class="card-body text-start">
-                    <div class="metric-value text-primary">{{ stats.total_requested|intcomma }}đ</div>
-                    <div class="metric-label">Tổng tiền yêu cầu của danh sách đang xem</div>
-                </div>
-            </div>
-        </div>
     </div>
 
     {# ============================================================ #}
     {# FILTER + ACTIONS                                               #}
     {# ============================================================ #}
-    <div class="card admin-toolbar">
-        <div class="card-body">
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc danh sách</h6>
+        </div>
+        <div class="card-body p-4">
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-4">
-                    <input type="text" name="q" class="form-control" placeholder="Tìm tiêu đề, mục đích, đơn vị thụ hưởng..." value="{{ query }}">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm tiêu đề, mục đích, đơn vị..." value="{{ query }}">
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">Tất cả V3 status</option>
+                        <option value="">— Tất cả trạng thái V3 —</option>
                         <option value="pending_multisig" {% if selected_status == 'pending_multisig' %}selected{% endif %}>Chờ ký duyệt</option>
                         <option value="ready_to_payout" {% if selected_status == 'ready_to_payout' %}selected{% endif %}>Sẵn sàng giải ngân</option>
                         <option value="fiat_transferred" {% if selected_status == 'fiat_transferred' %}selected{% endif %}>Đang xử lý Bank</option>
@@ -105,26 +104,19 @@
                 </div>
                 <div class="col-md-3">
                     <select name="campaign" class="form-select">
-                        <option value="">-- Tất cả chiến dịch --</option>
+                        <option value="">— Tất cả chiến dịch —</option>
                         {% for c in campaigns %}
                         <option value="{{ c.id }}" {% if selected_campaign == c.id|stringformat:'d' %}selected{% endif %}>{{ c.title|truncatechars:40 }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Lọc</button>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC DỮ LIỆU</button>
                 </div>
-                <div class="col-md-12 text-end">
-                    <div class="admin-actions justify-content-end">
-                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
-                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
-                        <a href="{% url 'admin_panel:quanly_giaingan' %}" class="btn btn-outline-primary">Xóa lọc</a>
-                        {% if role != 'supervisor' %}
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
-                            <i class="fas fa-plus-circle"></i> Tạo yêu cầu giải ngân
-                        </button>
-                        {% endif %}
-                    </div>
+                <div class="col-md-12 text-end mt-2">
+                    <a href="{{ export_csv_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-csv me-1"></i> Xuất CSV</a>
+                    <a href="{{ export_excel_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-excel me-1"></i> Xuất Excel</a>
+                    <a href="{% url 'admin_panel:quanly_giaingan' %}" class="small fw-bold text-decoration-none"><i class="fas fa-rotate-left me-1"></i> Xóa lọc</a>
                 </div>
             </form>
         </div>
@@ -133,392 +125,396 @@
     {# ============================================================ #}
     {# PROPOSALS TABLE — V3 actions column                            #}
     {# ============================================================ #}
-    <div class="card admin-shell-card">
-        <div class="card-header">
-            <i class="fas fa-money-check-alt me-1"></i> Danh sách đề xuất giải ngân
-            <span class="badge bg-info ms-2">V3 EIP-712 Multisig</span>
-        </div>
-        <div class="card-body p-0">
-            <form method="post">
+    <div class="card-charity overflow-hidden border-0 shadow-sm mb-5">
+        <form method="post">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ current_url }}">
-            <div class="p-3 border-bottom bg-light">
-                <div class="row g-2 align-items-center">
-                    <div class="col-md-4">
-                        <select name="bulk_action" class="form-select">
-                            <option value="">-- Bulk action --</option>
-                            <option value="reject">Từ chối nhiều dòng</option>
-                            <option value="delete">Xóa nhiều dòng</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các đề xuất đã chọn?')">Áp dụng</button>
-                    </div>
-                    {% if role == 'admin' %}
-                    <div class="col-md-5 text-end small text-muted">
-                        <i class="fas fa-info-circle"></i> Admin acts as <strong>relayer</strong> — gas được Admin trả tự động khi submit multisig & burn.
-                    </div>
-                    {% endif %}
+
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        <option value="reject">Từ chối nhiều dòng</option>
+                        <option value="delete">Xóa nhiều dòng</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Áp dụng thao tác cho các đề xuất đã chọn?')">Áp dụng</button>
                 </div>
+                {% if role == 'admin' %}
+                <div class="small text-muted fw-600">
+                    <i class="fas fa-info-circle text-primary"></i> Admin đóng vai trò <strong>relayer</strong> (Trả gas tự động khi submit multisig & burn).
+                </div>
+                {% endif %}
             </div>
+
             <div class="table-responsive">
-            <table class="table admin-table">
-                <thead>
-                    <tr>
-                        <th width="4%"><input type="checkbox" id="select-all-proposals"></th>
-                        <th width="5%">ID</th>
-                        <th width="22%">Chiến dịch</th>
-                        <th width="15%">Tiêu đề</th>
-                        <th width="12%">Số tiền</th>
-                        <th width="14%">V3 Status</th>
-                        <th width="28%">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in proposals %}
-                    <tr>
-                        <td><input type="checkbox" class="row-checkbox-proposal" name="selected_ids" value="{{ item.obj.id }}"></td>
-                        <td>{{ item.obj.id }}</td>
-                        <td>
-                            <strong>{{ item.obj.campaign.title|truncatechars:30 }}</strong>
-                            {% if item.obj.campaign.organization %}
-                            <br><small class="text-muted">{{ item.obj.campaign.organization.name }}</small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong>{{ item.obj.title }}</strong>
-                            {% if item.obj.purpose %}
-                            <br><small class="text-muted">{{ item.obj.purpose|truncatechars:40 }}</small>
-                            {% endif %}
-                        </td>
-                        <td class="fw-bold text-danger">{{ item.obj.amount_requested|intcomma }}đ</td>
-
-                        {# =============================================================== #}
-                        {# V3 STATUS COLUMN — hiển thị state theo v3_status + signature progress. #}
-                        {# =============================================================== #}
-                        <td>
-                            {% if item.obj.v3_status == 'v3_not_started' or item.obj.v3_status == 'pending_multisig' %}
-                                <span class="badge bg-warning text-dark">
-                                    <i class="fas fa-signature"></i> Chờ ký duyệt
-                                </span>
-                                <div class="mt-2 small">
-                                    <strong>{{ item.sig_count }}/3</strong> chữ ký EIP-712
-                                </div>
-                                <div class="progress mt-1" style="height: 6px;">
-                                    {% widthratio item.sig_count 3 100 as sig_pct %}
-                                    <div class="progress-bar bg-warning" style="width: {{ sig_pct }}%"></div>
-                                </div>
-                                <div class="mt-1 small">
-                                    {% if item.has_org_sig %}<span class="badge bg-success">Org ✓</span>{% else %}<span class="badge bg-light text-dark border">Org</span>{% endif %}
-                                    {% if item.has_supervisor_sig %}<span class="badge bg-success">Sup ✓</span>{% else %}<span class="badge bg-light text-dark border">Sup</span>{% endif %}
-                                    {% if item.has_admin_sig %}<span class="badge bg-success">Adm ✓</span>{% else %}<span class="badge bg-light text-dark border">Adm</span>{% endif %}
-                                </div>
-                            {% elif item.obj.v3_status == 'ready_to_payout' %}
-                                <span class="badge bg-primary">
-                                    <i class="fas fa-paper-plane"></i> Sẵn sàng giải ngân
-                                </span>
-                                {% if item.obj.multisig_confirmed_at %}
-                                <div class="small text-muted mt-1">Multisig confirmed: {{ item.obj.multisig_confirmed_at|date:"d/m H:i" }}</div>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-proposals" class="form-check-input"></th>
+                            <th width="5%">ID</th>
+                            <th width="22%">Chiến dịch</th>
+                            <th width="15%">Tiêu đề</th>
+                            <th width="12%">Số tiền</th>
+                            <th width="14%">V3 Status</th>
+                            <th width="28%" class="text-end pe-4">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in proposals %}
+                        <tr>
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-proposal form-check-input" name="selected_ids" value="{{ item.obj.id }}"></td>
+                            <td class="small fw-bold text-muted">#{{ item.obj.id }}</td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ item.obj.campaign.title|truncatechars:30 }}</div>
+                                {% if item.obj.campaign.organization %}
+                                <div class="text-xs text-muted"><i class="fas fa-building me-1"></i> {{ item.obj.campaign.organization.name }}</div>
                                 {% endif %}
-                            {% elif item.obj.v3_status == 'payout_processing' %}
-                                <span class="badge bg-info text-dark">
-                                    <i class="fas fa-spinner fa-spin"></i> PayOS processing
-                                </span>
-                                {% if item.obj.payos_payout_id %}
-                                <div class="small text-muted mt-1 text-break">ID: <code>{{ item.obj.payos_payout_id|truncatechars:24 }}</code></div>
+                            </td>
+                            <td>
+                                <div class="fw-800 text-primary">{{ item.obj.title }}</div>
+                                {% if item.obj.purpose %}
+                                <div class="text-xs text-muted text-truncate" style="max-width: 200px;">{{ item.obj.purpose }}</div>
                                 {% endif %}
-                            {% elif item.obj.v3_status == 'fiat_transferred' %}
-                                <span class="badge bg-info">
-                                    <i class="fas fa-university"></i> Fiat đã chuyển
-                                </span>
-                                <div class="small text-muted mt-1">
-                                    <i class="fas fa-clock"></i> Chờ burn on-chain…
-                                </div>
-                            {% elif item.obj.v3_status == 'completed_audited' %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check-double"></i> Đã hoàn tất
-                                </span>
-                                {% if item.obj.burn_completed_at %}
-                                <div class="small text-muted mt-1">Burn: {{ item.obj.burn_completed_at|date:"d/m H:i" }}</div>
+                            </td>
+                            <td><div class="fw-800 text-accent-600">{{ item.obj.amount_requested|intcomma }}đ</div></td>
+
+                            {# =============================================================== #}
+                            {# V3 STATUS COLUMN — hiển thị state theo v3_status + signature progress. #}
+                            {# =============================================================== #}
+                            <td>
+                                {% if item.obj.v3_status == 'v3_not_started' or item.obj.v3_status == 'pending_multisig' %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning px-2 py-1 small">
+                                        <i class="fas fa-signature me-1"></i> Chờ ký duyệt
+                                    </span>
+                                    <div class="mt-2 text-xs fw-bold">
+                                        {{ item.sig_count }}/3 chữ ký
+                                    </div>
+                                    <div class="progress mt-1 mb-1" style="height: 6px; border-radius: 4px;">
+                                        {% widthratio item.sig_count 3 100 as sig_pct %}
+                                        <div class="progress-bar bg-warning" style="width: {{ sig_pct }}%"></div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        {% if item.has_org_sig %}<span class="badge bg-success" style="font-size: 9px;" title="Organization">Org ✓</span>{% else %}<span class="badge bg-light text-muted border" style="font-size: 9px;">Org</span>{% endif %}
+                                        {% if item.has_supervisor_sig %}<span class="badge bg-success" style="font-size: 9px;" title="Supervisor">Sup ✓</span>{% else %}<span class="badge bg-light text-muted border" style="font-size: 9px;">Sup</span>{% endif %}
+                                        {% if item.has_admin_sig %}<span class="badge bg-success" style="font-size: 9px;" title="Admin">Adm ✓</span>{% else %}<span class="badge bg-light text-muted border" style="font-size: 9px;">Adm</span>{% endif %}
+                                    </div>
+                                {% elif item.obj.v3_status == 'ready_to_payout' %}
+                                    <span class="badge bg-primary-100 text-primary border border-primary-200 px-2 py-1 small">
+                                        <i class="fas fa-paper-plane me-1"></i> Sẵn sàng G.Ngân
+                                    </span>
+                                    {% if item.obj.multisig_confirmed_at %}
+                                    <div class="text-xs text-muted mt-1">Confirmed: {{ item.obj.multisig_confirmed_at|date:"d/m H:i" }}</div>
+                                    {% endif %}
+                                {% elif item.obj.v3_status == 'payout_processing' %}
+                                    <span class="badge bg-info-subtle text-info border border-info px-2 py-1 small">
+                                        <i class="fas fa-spinner fa-spin me-1"></i> PayOS processing
+                                    </span>
+                                {% elif item.obj.v3_status == 'fiat_transferred' %}
+                                    <span class="badge bg-info px-2 py-1 small">
+                                        <i class="fas fa-university me-1"></i> Fiat đã chuyển
+                                    </span>
+                                    <div class="text-xs text-muted mt-1">
+                                        <i class="fas fa-clock"></i> Chờ burn on-chain…
+                                    </div>
+                                {% elif item.obj.v3_status == 'completed_audited' %}
+                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small">
+                                        <i class="fas fa-check-double me-1"></i> Đã hoàn tất
+                                    </span>
+                                    {% if item.obj.burn_completed_at %}
+                                    <div class="text-xs text-muted mt-1">Burned: {{ item.obj.burn_completed_at|date:"d/m H:i" }}</div>
+                                    {% endif %}
+                                {% elif item.obj.v3_status == 'payout_failed' %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1 small">
+                                        <i class="fas fa-times-circle me-1"></i> Thất bại
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span>
                                 {% endif %}
-                            {% elif item.obj.v3_status == 'payout_failed' %}
-                                <span class="badge bg-danger">
-                                    <i class="fas fa-times-circle"></i> Payout failed
-                                </span>
-                                {% if item.obj.payout_error %}
-                                <div class="small text-danger mt-1">{{ item.obj.payout_error|truncatechars:60 }}</div>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span>
-                            {% endif %}
-                        </td>
+                            </td>
 
-                        {# =============================================================== #}
-                        {# ACTIONS COLUMN — dynamic theo v3_status                         #}
-                        {# =============================================================== #}
-                        <td>
-                            <div class="admin-actions flex-wrap">
+                            {# =============================================================== #}
+                            {# ACTIONS COLUMN — dynamic theo v3_status                         #}
+                            {# =============================================================== #}
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-1 flex-wrap">
 
-                            {# ---- Detail button luôn hiện ---- #}
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}">
-                                <i class="fas fa-eye"></i> Chi tiết
-                            </button>
+                                {# ---- Detail button luôn hiện ---- #}
+                                <button type="button" class="btn btn-sm btn-white border shadow-sm" data-bs-toggle="modal" data-bs-target="#detailModal{{ item.obj.id }}" title="Chi tiết">
+                                    <i class="fas fa-eye text-primary"></i>
+                                </button>
 
-                            {# ---- IPFS evidence ---- #}
-                            {% if item.obj.evidence_url %}
-                            <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Mở hóa đơn IPFS">
-                                <i class="fas fa-file-invoice"></i> IPFS
-                            </a>
-                            {% endif %}
-
-                            {# ---- PENDING_MULTISIG: Ký EIP-712 ---- #}
-                            {% if item.can_sign %}
-                            <button type="button" class="btn btn-sm btn-primary"
-                                    onclick="window.V3Disbursement.signAs({{ item.obj.id }}, '{{ item.can_sign_as }}')">
-                                <i class="fas fa-signature"></i> Ký duyệt ({{ item.can_sign_as|title }})
-                            </button>
-                            {% elif item.already_signed %}
-                            <button type="button" class="btn btn-sm btn-success" disabled title="Bạn đã ký rồi">
-                                <i class="fas fa-check"></i> Đã ký ({{ item.can_sign_as|title }})
-                            </button>
-                            {% endif %}
-
-                            {# ---- Admin: Relay multisig khi đủ 3 sig ---- #}
-                            {% if item.can_relay_multisig %}
-                            <button type="button" class="btn btn-sm btn-warning"
-                                    onclick="window.V3Disbursement.relayMultisig({{ item.obj.id }})"
-                                    title="Submit 3 sigs lên smart3 (Admin trả gas)">
-                                <i class="fas fa-upload"></i> Relay lên chain
-                            </button>
-                            {% endif %}
-                            {% if item.relay_pending %}
-                            <button type="button" class="btn btn-sm btn-secondary" disabled>
-                                <i class="fas fa-spinner fa-spin"></i> Đang chờ relay confirm
-                            </button>
-                            {% endif %}
-
-                            {# ---- READY_TO_PAYOUT: PayOS Payout AUTO (luồng mới) ---- #}
-                            {# Không còn nút "Thanh toán PayOS" / scan QR — đó là luồng CŨ #}
-                            {# (donor pay-in). Luồng V3 dùng PayOS Payout API: 1 click → #}
-                            {# tiền tự chuyển từ Kênh Chi sang STK org (không cần QR). #}
-                            {% if item.can_trigger_payout %}
-                            <button type="button" class="btn btn-sm btn-success fw-bold"
-                                    onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
-                                    style="box-shadow: 0 2px 8px rgba(40,167,69,0.4);"
-                                    title="Gửi lệnh PayOS Payout — tiền sẽ tự động chuyển vào STK của tổ chức">
-                                <i class="fas fa-paper-plane"></i> Thực thi PayOS (Auto)
-                            </button>
-                            {% endif %}
-
-                            {# ---- FIAT_TRANSFERRED: chờ webhook (disabled) ---- #}
-                            {% if item.obj.v3_status == 'fiat_transferred' %}
-                            <button type="button" class="btn btn-sm btn-info" disabled>
-                                <i class="fas fa-spinner fa-spin"></i> Đã nhận webhook, đang burn…
-                            </button>
-                            {% endif %}
-                            {% if item.obj.v3_status == 'payout_processing' %}
-                            <button type="button" class="btn btn-sm btn-info" disabled>
-                                <i class="fas fa-spinner fa-spin"></i> Đang chờ PayOS webhook…
-                            </button>
-                            {% endif %}
-
-                            {# ---- PAYOUT_PROCESSING (DEV-ONLY): Simulate webhook ---- #}
-                            {# Gate bằng `debug` để không lộ nút này ra production UI. #}
-                            {% if debug and role == 'admin' and item.obj.v3_status == 'payout_processing' %}
-                            <button type="button" class="btn btn-sm btn-outline-secondary"
-                                    onclick="window.V3Disbursement.simulateWebhook({{ item.obj.id }})"
-                                    title="[DEV] giả PayOS webhook success">
-                                <i class="fas fa-flask"></i> Simulate Webhook
-                            </button>
-                            {% endif %}
-
-                            {# ---- COMPLETED_AUDITED: 2 proof badges ---- #}
-                            {% if item.obj.v3_status == 'completed_audited' %}
-                                {% if item.obj.bank_tx_id %}
-                                <span class="badge bg-primary" title="Bank Transaction ID từ PayOS">
-                                    <i class="fas fa-university"></i> Bank: {{ item.obj.bank_tx_id|truncatechars:16 }}
-                                </span>
-                                {% endif %}
-                                {% if item.obj.burn_tx_hash %}
-                                <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" rel="noopener"
-                                   class="btn btn-sm btn-outline-danger" title="Xem burn tx trên Etherscan">
-                                    <i class="fas fa-fire"></i> Burn Tx
+                                {# ---- IPFS evidence ---- #}
+                                {% if item.obj.evidence_url %}
+                                <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-white border shadow-sm text-success" title="Mở hóa đơn IPFS">
+                                    <i class="fas fa-file-invoice"></i> IPFS
                                 </a>
                                 {% endif %}
-                            {% endif %}
 
-                            {# ---- Admin có thể reject ở pre-payout phases ---- #}
-                            {# Dùng boolean `can_reject` đã compute ở view, tránh fragile string containment. #}
-                            {% if item.can_reject %}
-                            <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-outline-danger"
-                               onclick="return confirm('Từ chối yêu cầu này?')">
-                                <i class="fas fa-times"></i> Từ chối
-                            </a>
-                            {% endif %}
+                                {# ---- PENDING_MULTISIG: Ký EIP-712 ---- #}
+                                {% if item.can_sign %}
+                                <button type="button" class="btn btn-sm btn-primary fw-bold shadow-sm"
+                                        onclick="window.V3Disbursement.signAs({{ item.obj.id }}, '{{ item.can_sign_as }}')">
+                                    <i class="fas fa-signature me-1"></i> Ký duyệt ({{ item.can_sign_as|title }})
+                                </button>
+                                {% elif item.already_signed %}
+                                <button type="button" class="btn btn-sm btn-success fw-bold opacity-75" disabled title="Bạn đã ký rồi">
+                                    <i class="fas fa-check me-1"></i> Đã ký ({{ item.can_sign_as|title }})
+                                </button>
+                                {% endif %}
 
-                            </div>
-                        </td>
-                    </tr>
+                                {# ---- Admin: Relay multisig khi đủ 3 sig ---- #}
+                                {% if item.can_relay_multisig %}
+                                <button type="button" class="btn btn-sm btn-warning fw-bold shadow-sm"
+                                        onclick="window.V3Disbursement.relayMultisig({{ item.obj.id }})"
+                                        title="Submit 3 sigs lên smart3 (Admin trả gas)">
+                                    <i class="fas fa-upload me-1"></i> Relay lên chain
+                                </button>
+                                {% endif %}
+                                {% if item.relay_pending %}
+                                <button type="button" class="btn btn-sm btn-secondary opacity-75" disabled>
+                                    <i class="fas fa-spinner fa-spin me-1"></i> Đang chờ confirm
+                                </button>
+                                {% endif %}
 
-                    {# =============================================================== #}
-                    {# DETAIL MODAL — gồm V3 audit trail                                #}
-                    {# =============================================================== #}
-                    <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header admin-modal-header">
-                                    <h5 class="modal-title"><i class="fas fa-info-circle"></i> Chi tiết đề xuất #{{ item.obj.id }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                {# ---- READY_TO_PAYOUT: PayOS Payout AUTO ---- #}
+                                {% if item.can_trigger_payout %}
+                                <button type="button" class="btn btn-sm btn-accent fw-bold shadow-accent"
+                                        onclick="window.V3Disbursement.triggerPayout({{ item.obj.id }})"
+                                        title="Gửi lệnh PayOS Payout — tiền sẽ tự động chuyển vào STK của tổ chức">
+                                    <i class="fas fa-paper-plane me-1"></i> Thực thi PayOS
+                                </button>
+                                {% endif %}
+
+                                {# ---- FIAT_TRANSFERRED/PROCESSING ---- #}
+                                {% if item.obj.v3_status == 'fiat_transferred' or item.obj.v3_status == 'payout_processing' %}
+                                <button type="button" class="btn btn-sm btn-info opacity-75 text-white" disabled>
+                                    <i class="fas fa-spinner fa-spin"></i> Chờ hệ thống...
+                                </button>
+                                {% endif %}
+
+                                {# ---- DEV-ONLY Simulate ---- #}
+                                {% if debug and role == 'admin' and item.obj.v3_status == 'payout_processing' %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        onclick="window.V3Disbursement.simulateWebhook({{ item.obj.id }})"
+                                        title="[DEV] giả PayOS webhook success">
+                                    <i class="fas fa-flask"></i> Simulate
+                                </button>
+                                {% endif %}
+
+                                {# ---- COMPLETED_AUDITED: Burn Tx ---- #}
+                                {% if item.obj.v3_status == 'completed_audited' and item.obj.burn_tx_hash %}
+                                    <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" rel="noopener"
+                                       class="btn btn-sm btn-outline-success fw-bold" title="Xem burn tx trên Etherscan">
+                                        <i class="fas fa-fire me-1"></i> Burn Tx
+                                    </a>
+                                {% endif %}
+
+                                {# ---- Admin Reject ---- #}
+                                {% if item.can_reject %}
+                                <a href="{% url 'admin_panel:huy_giaingan' item.obj.id %}" class="btn btn-sm btn-white border shadow-sm text-danger"
+                                   onclick="return confirm('Từ chối yêu cầu này?')" title="Từ chối">
+                                    <i class="fas fa-xmark"></i>
+                                </a>
+                                {% endif %}
+
                                 </div>
-                                <div class="modal-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <p><strong>Chiến dịch:</strong> {{ item.obj.campaign.title }}</p>
-                                            <p><strong>Tiêu đề:</strong> {{ item.obj.title }}</p>
-                                            <p><strong>Số tiền:</strong> <span class="text-danger fw-bold">{{ item.obj.amount_requested|intcomma }}đ</span></p>
-                                            <p><strong>Mục đích:</strong> {{ item.obj.purpose|default:"—" }}</p>
-                                            <p><strong>Đơn vị thụ hưởng:</strong> {{ item.obj.recipient_name|default:"—" }}</p>
+                            </td>
+                        </tr>
+
+                        {# =============================================================== #}
+                        {# DETAIL MODAL — gồm V3 audit trail                                #}
+                        {# =============================================================== #}
+                        <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
+                                    <div class="modal-header bg-primary text-white border-0 py-4">
+                                        <h5 class="modal-title fw-800"><i class="fas fa-info-circle me-2"></i> Chi tiết đề xuất #{{ item.obj.id }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body p-4 p-md-5 bg-light">
+                                        <div class="bg-white p-4 radius-md border shadow-sm mb-4">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Chiến dịch</p>
+                                                    <p class="fw-600 text-dark">{{ item.obj.campaign.title }}</p>
+
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Tiêu đề</p>
+                                                    <p class="fw-600 text-dark">{{ item.obj.title }}</p>
+
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Số tiền</p>
+                                                    <p class="text-accent-600 fw-800 fs-4 mb-3">{{ item.obj.amount_requested|intcomma }}đ</p>
+
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Đơn vị thụ hưởng</p>
+                                                    <p class="fw-600 text-dark">{{ item.obj.recipient_name|default:"—" }}</p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">V3 Status</p>
+                                                    <p><span class="badge bg-primary px-3 py-2 radius-pill">{{ item.obj.get_v3_status_display }}</span></p>
+
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Người tạo</p>
+                                                    <p class="fw-600 text-dark">{{ item.obj.created_by.get_full_name|default:item.obj.created_by.username }}</p>
+
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Ngày tạo</p>
+                                                    <p class="fw-600 text-dark">{{ item.obj.created_at|date:"d/m/Y H:i" }}</p>
+
+                                                    {% if item.obj.evidence_url %}
+                                                    <p class="mb-2 text-muted small text-uppercase fw-bold">Minh chứng</p>
+                                                    <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success fw-bold radius-pill">
+                                                        <i class="fas fa-file-invoice me-1"></i> Xem tài liệu
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
                                             {% if item.obj.ipfs_cid %}
-                                            <p><strong>IPFS CID:</strong> <code>{{ item.obj.ipfs_cid }}</code></p>
+                                            <hr class="opacity-10 my-3">
+                                            <div class="d-flex align-items-center">
+                                                <span class="text-muted small fw-bold me-2">IPFS CID:</span>
+                                                <code class="bg-primary-50 text-primary px-2 py-1 radius-sm small">{{ item.obj.ipfs_cid }}</code>
+                                            </div>
                                             {% endif %}
                                         </div>
-                                        <div class="col-md-6">
-                                            <p><strong>Người tạo:</strong> {{ item.obj.created_by.get_full_name|default:item.obj.created_by.username }}</p>
-                                            <p><strong>Ngày tạo:</strong> {{ item.obj.created_at|date:"d/m/Y H:i" }}</p>
-                                            <p><strong>V3 Status:</strong> <span class="badge bg-secondary">{{ item.obj.get_v3_status_display }}</span></p>
-                                            {% if item.obj.evidence_url %}
-                                            <p><strong>Hóa đơn / minh chứng:</strong> <a href="{{ item.obj.evidence_url }}" target="_blank" rel="noopener">Mở tài liệu</a></p>
+
+                                        {# ---- V3 AUDIT TRAIL ---- #}
+                                        <h6 class="fw-800 mt-4 mb-3 text-primary"><i class="fas fa-list-check me-2"></i> V3 Audit Trail</h6>
+                                        <div class="list-group shadow-sm radius-md border-0">
+                                            <div class="list-group-item bg-white border-primary-100 py-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-dark">Phase 1 — Proposal + IPFS</strong>
+                                                        <div class="text-xs text-muted mt-1">Lưu trữ minh chứng phi tập trung</div>
+                                                    </div>
+                                                    <span class="badge bg-success radius-pill px-3"><i class="fas fa-check me-1"></i> Done</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="list-group-item bg-white border-primary-100 py-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-dark">Phase 2 — 3 chữ ký EIP-712</strong>
+                                                        <div class="text-xs text-muted mt-1">
+                                                            Organization {% if item.has_org_sig %}<span class="text-success fw-bold">✓</span>{% else %}⏳{% endif %} ·
+                                                            Supervisor {% if item.has_supervisor_sig %}<span class="text-success fw-bold">✓</span>{% else %}⏳{% endif %} ·
+                                                            Admin {% if item.has_admin_sig %}<span class="text-success fw-bold">✓</span>{% else %}⏳{% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <span class="badge {% if item.sig_count == 3 %}bg-success{% else %}bg-warning-subtle text-warning border border-warning{% endif %} radius-pill px-3">
+                                                        {{ item.sig_count }}/3
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div class="list-group-item bg-white border-primary-100 py-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-dark">Phase 3a — Relay Multisig on-chain</strong>
+                                                        {% if item.obj.multisig_confirmed_tx_hash %}
+                                                        <div class="text-xs mt-1">
+                                                            <a href="https://sepolia.etherscan.io/tx/{{ item.obj.multisig_confirmed_tx_hash|urlencode }}" target="_blank" class="text-decoration-none">
+                                                                {{ item.obj.multisig_confirmed_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
+                                                            </a>
+                                                        </div>
+                                                        {% elif item.relay_pending %}
+                                                        <div class="text-xs text-muted mt-1"><i class="fas fa-spinner fa-spin text-primary"></i> Đang chờ Sepolia confirm.</div>
+                                                        {% else %}
+                                                        <div class="text-xs text-muted mt-1">Chưa relay.</div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <span class="badge {% if item.obj.multisig_confirmed_tx_hash %}bg-success{% else %}bg-light text-muted border{% endif %} radius-pill px-3">
+                                                        {% if item.obj.multisig_confirmed_tx_hash %}<i class="fas fa-check me-1"></i> Done{% elif item.relay_pending %}Pending{% else %}Waiting{% endif %}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div class="list-group-item bg-white border-primary-100 py-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-dark">Phase 3b — PayOS Payout</strong>
+                                                        {% if item.obj.payos_payout_id %}
+                                                        <div class="text-xs text-muted mt-1">ID: <code>{{ item.obj.payos_payout_id }}</code></div>
+                                                        {% endif %}
+                                                        {% if item.obj.bank_tx_id %}
+                                                        <div class="text-xs mt-1 text-primary">Bank Tx: <code>{{ item.obj.bank_tx_id }}</code></div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <span class="badge {% if item.obj.bank_tx_id %}bg-success{% elif item.obj.payos_payout_id %}bg-info-subtle text-info border border-info{% else %}bg-light text-muted border{% endif %} radius-pill px-3">
+                                                        {% if item.obj.bank_tx_id %}<i class="fas fa-check me-1"></i> Done{% elif item.obj.payos_payout_id %}Processing{% else %}Waiting{% endif %}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div class="list-group-item bg-white border-primary-100 py-3">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong class="text-dark">Phase 4 — Burn VNDT on-chain</strong>
+                                                        {% if item.obj.burn_tx_hash %}
+                                                        <div class="text-xs mt-1">
+                                                            <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" class="text-decoration-none text-success">
+                                                                {{ item.obj.burn_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
+                                                            </a>
+                                                        </div>
+                                                        {% else %}
+                                                        <div class="text-xs text-muted mt-1">Chưa burn.</div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <span class="badge {% if item.obj.burn_tx_hash %}bg-success{% else %}bg-light text-muted border{% endif %} radius-pill px-3">
+                                                        {% if item.obj.burn_tx_hash %}<i class="fas fa-fire me-1"></i> Burned{% else %}Waiting{% endif %}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {% if item.obj.payout_error %}
+                                        <div class="alert bg-danger-100 border-danger-500 text-danger mt-4 radius-md">
+                                            <strong><i class="fas fa-exclamation-triangle me-2"></i> Lỗi gần nhất:</strong><br>
+                                            <span class="small fw-600">{{ item.obj.payout_error }}</span>
+                                        </div>
+                                        {% endif %}
+
+                                        <div class="bg-white p-4 radius-md border shadow-sm mt-4">
+                                            <h6 class="fw-800 text-dark mb-2">Mô tả chi tiết</h6>
+                                            <p class="text-muted small lh-lg mb-4">{{ item.obj.description|linebreaksbr }}</p>
+
+                                            {% if item.obj.proof_images %}
+                                            <h6 class="fw-800 text-dark mb-2">Ảnh minh chứng</h6>
+                                            <div class="d-flex gap-3 flex-wrap">
+                                                {% for img in item.obj.proof_images %}
+                                                <a href="{{ img }}" target="_blank" class="d-block overflow-hidden radius-md border shadow-sm hover-up">
+                                                    <img src="{{ img }}" style="height: 100px; width: 140px; object-fit: cover;">
+                                                </a>
+                                                {% endfor %}
+                                            </div>
                                             {% endif %}
                                         </div>
                                     </div>
-                                    <hr>
-
-                                    {# ---- V3 AUDIT TRAIL ---- #}
-                                    <h6 class="fw-bold mt-3"><i class="fas fa-list-check"></i> V3 Audit Trail</h6>
-                                    <div class="list-group mb-3">
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Phase 1 — Proposal + IPFS</strong>
-                                                    <div class="small text-muted">CID: <code>{{ item.obj.ipfs_cid|default:"—" }}</code></div>
-                                                </div>
-                                                <span class="badge bg-success">Done</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Phase 2 — 3 chữ ký EIP-712</strong>
-                                                    <div class="small text-muted">
-                                                        Organization {% if item.has_org_sig %}✅{% else %}⏳{% endif %} ·
-                                                        Supervisor {% if item.has_supervisor_sig %}✅{% else %}⏳{% endif %} ·
-                                                        Admin {% if item.has_admin_sig %}✅{% else %}⏳{% endif %}
-                                                    </div>
-                                                </div>
-                                                <span class="badge {% if item.sig_count == 3 %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                                    {{ item.sig_count }}/3
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Phase 3a — Relay Multisig on-chain</strong>
-                                                    {% if item.obj.multisig_confirmed_tx_hash %}
-                                                    <div class="small">
-                                                        <a href="https://sepolia.etherscan.io/tx/{{ item.obj.multisig_confirmed_tx_hash|urlencode }}" target="_blank">
-                                                            {{ item.obj.multisig_confirmed_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
-                                                        </a>
-                                                    </div>
-                                                    {% elif item.relay_pending %}
-                                                    <div class="small text-muted">Đã gửi tx, đang chờ Sepolia confirm.</div>
-                                                    {% else %}
-                                                    <div class="small text-muted">Chưa relay.</div>
-                                                    {% endif %}
-                                                </div>
-                                                <span class="badge {% if item.obj.multisig_confirmed_tx_hash %}bg-success{% else %}bg-light text-dark{% endif %}">
-                                                    {% if item.obj.multisig_confirmed_tx_hash %}Done{% elif item.relay_pending %}Pending{% else %}Waiting{% endif %}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Phase 3b — PayOS Payout</strong>
-                                                    {% if item.obj.payos_payout_id %}
-                                                    <div class="small text-muted">payout_id: <code>{{ item.obj.payos_payout_id }}</code></div>
-                                                    {% endif %}
-                                                    {% if item.obj.bank_tx_id %}
-                                                    <div class="small">Bank Tx: <code>{{ item.obj.bank_tx_id }}</code></div>
-                                                    {% endif %}
-                                                </div>
-                                                <span class="badge {% if item.obj.bank_tx_id %}bg-success{% elif item.obj.payos_payout_id %}bg-info text-dark{% else %}bg-light text-dark{% endif %}">
-                                                    {% if item.obj.bank_tx_id %}Done{% elif item.obj.payos_payout_id %}Processing{% else %}Waiting{% endif %}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Phase 4 — Burn VNDT on-chain</strong>
-                                                    {% if item.obj.burn_tx_hash %}
-                                                    <div class="small">
-                                                        <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank">
-                                                            {{ item.obj.burn_tx_hash|truncatechars:30 }} <i class="fas fa-external-link-alt"></i>
-                                                        </a>
-                                                    </div>
-                                                    {% else %}
-                                                    <div class="small text-muted">Chưa burn.</div>
-                                                    {% endif %}
-                                                </div>
-                                                <span class="badge {% if item.obj.burn_tx_hash %}bg-success{% else %}bg-light text-dark{% endif %}">
-                                                    {% if item.obj.burn_tx_hash %}Burned 🔥{% else %}Waiting{% endif %}
-                                                </span>
-                                            </div>
-                                        </div>
+                                    <div class="modal-footer bg-light border-0 py-3 px-4">
+                                        <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Đóng chi tiết</button>
                                     </div>
-
-                                    {% if item.obj.payout_error %}
-                                    <div class="alert alert-danger small">
-                                        <strong><i class="fas fa-exclamation-triangle"></i> Lỗi gần nhất:</strong><br>
-                                        {{ item.obj.payout_error }}
-                                    </div>
-                                    {% endif %}
-
-                                    <hr>
-                                    <p><strong>Mô tả chi tiết:</strong></p>
-                                    <p>{{ item.obj.description|linebreaks }}</p>
-                                    {% if item.obj.proof_images %}
-                                    <p><strong>Ảnh minh chứng:</strong></p>
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        {% for img in item.obj.proof_images %}
-                                        <a href="{{ img }}" target="_blank">
-                                            <img src="{{ img }}" style="height: 80px; border-radius: 8px;" class="border">
-                                        </a>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="admin-empty">Chưa có đề xuất giải ngân nào.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="admin-empty py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Chưa có đề xuất giải ngân nào.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            </form>
-        </div>
+        </form>
     </div>
-</div>
+    </div>
+
+    <style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+    .opacity-20 { opacity: 0.2; }
+    .hover-up { transition: 0.3s; }
+    .hover-up:hover { transform: translateY(-3px); }
+    </style></div>
 
 {% if role != 'supervisor' %}
 {# ============================================================ #}

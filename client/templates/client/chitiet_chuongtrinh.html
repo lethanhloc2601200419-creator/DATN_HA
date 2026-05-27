@@ -4,66 +4,89 @@
 
 {% block content %}
 <div class="container py-5">
-    <div class="row mb-5">
+    <div class="row g-5 mb-5 align-items-center">
         <div class="col-md-5">
-            {% if program.image %}
-            <img src="{{ program.image.url }}" class="img-fluid rounded shadow w-100" style="object-fit: cover; height: 300px;">
-            {% endif %}
+            <div class="card-charity overflow-hidden shadow-lg">
+                {% if program.image %}
+                <img src="{{ program.image.url }}" class="w-100 object-fit-cover" style="height: 340px;" alt="{{ program.name }}">
+                {% else %}
+                <img src="{% static 'images/default_program.jpg' %}" class="w-100 object-fit-cover" style="height: 340px;">
+                {% endif %}
+            </div>
         </div>
         <div class="col-md-7">
-            <h2 class="fw-bold text-danger">{{ program.name }}</h2>
-            <p class="text-muted"><i class="fas fa-building"></i> Tổ chức: <strong>{{ program.organization.name }}</strong></p>
-            <p><i class="fas fa-map-marker-alt text-primary"></i> Địa điểm: {{ program.beneficiary_address|default:"Đang cập nhật" }}</p>
-            
-            <div class="card bg-light border-0 p-3 mb-3">
-                <h5 class="fw-bold">Mục tiêu chương trình:</h5>
-                <h3 class="text-success">{{ program.total_target_amount|intcomma }} VNĐ</h3>
+            <h6 class="text-accent-500 fw-bold text-uppercase mb-2" style="color: var(--accent-500);">Chương trình mục tiêu</h6>
+            <h1 class="fw-800 text-primary mb-3">{{ program.name }}</h1>
+            <div class="d-flex gap-4 mb-4 flex-wrap">
+                <span class="small text-muted"><i class="fas fa-building me-2 text-primary"></i>Tổ chức: <strong class="text-dark">{{ program.organization.name }}</strong></span>
+                <span class="small text-muted"><i class="fas fa-map-marker-alt me-2 text-primary"></i>Địa điểm: <strong class="text-dark">{{ program.beneficiary_address|default:"Toàn quốc" }}</strong></span>
             </div>
             
-            <p>{{ program.description|linebreaksbr }}</p>
+            <div class="bg-primary-50 p-4 radius-lg border border-primary-100 mb-4">
+                <span class="text-muted small fw-bold text-uppercase d-block mb-1">Mục tiêu quyên góp tổng cộng</span>
+                <h3 class="text-primary fw-800 m-0">{{ program.total_target_amount|intcomma }} VNĐ</h3>
+            </div>
+            
+            <div class="lh-lg text-secondary text-justify">
+                {{ program.description|linebreaksbr }}
+            </div>
         </div>
     </div>
 
-    <hr>
+    <hr class="opacity-10 my-5">
 
     <div class="row mt-4">
-        <h3 class="fw-bold mb-4 text-center">💖 Các Chiến Dịch Đang Gây Quỹ</h3>
+        <div class="text-center mb-5">
+            <h3 class="fw-800 mb-2">💖 Các Chiến Dịch Đang Gây Quỹ</h3>
+            <p class="text-muted">Chung tay góp sức cho những hoàn cảnh cụ thể trong chương trình này</p>
+        </div>
         
-        {% for camp in campaigns %}
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div style="height: 200px; overflow: hidden;">
-                    {% if camp.cover_image %}
-                    <img src="{{ camp.cover_image.url }}" class="card-img-top h-100 w-100" style="object-fit: cover;">
-                    {% else %}
-                    <img src="{% static 'images/default_campaign.jpg' %}" class="card-img-top h-100 w-100">
-                    {% endif %}
-                </div>
-                
-                <div class="card-body">
-                    <h5 class="card-title fw-bold">{{ camp.title }}</h5>
-                    <div class="progress my-2" style="height: 10px;">
-                        <div class="progress-bar bg-primary" role="progressbar" style="width: 50%"></div>
+        <div class="row g-4">
+            {% for camp in campaigns %}
+            <div class="col-lg-4 col-md-6">
+                <div class="card-charity h-100 d-flex flex-column">
+                    <div style="height: 200px; overflow: hidden; position: relative;">
+                        {% if camp.cover_image %}
+                        <img src="{{ camp.cover_image.url }}" class="w-100 h-100 object-fit-cover">
+                        {% else %}
+                        <img src="{% static 'images/default_campaign.jpg' %}" class="w-100 h-100 object-fit-cover">
+                        {% endif %}
+                        <span class="position-absolute top-0 end-0 m-2 badge bg-primary rounded-pill px-2 py-1 shadow-sm small">
+                            {{ camp.status_label|default:"Đang chạy" }}
+                        </span>
                     </div>
-                    <div class="d-flex justify-content-between small fw-bold">
-                        <span>Đã góp: {{ camp.current_amount|intcomma }}đ</span>
-                        <span class="text-muted">Mục tiêu: {{ camp.target_amount|intcomma }}đ</span>
+                    
+                    <div class="card-body p-4 d-flex flex-column">
+                        <h5 class="card-title fw-bold mb-3 text-dark" style="min-height: 3rem;">{{ camp.title|truncatechars:50 }}</h5>
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between small fw-bold mb-1">
+                                <span class="text-primary">{{ camp.current_amount|intcomma }}đ</span>
+                                <span class="text-muted">{{ camp.get_percentage|stringformat:".0f" }}%</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 8px; border-radius: 10px; background-color: var(--primary-50);">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ camp.get_percentage|stringformat:'.0f' }}%"></div>
+                            </div>
+                            <a href="{% url 'client:chitiet_chiendich' camp.id %}" class="btn btn-accent w-100 rounded-pill py-2 fw-bold">
+                                <i class="fas fa-heart me-1"></i> Xem chi tiết
+                            </a>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="card-footer bg-white border-top-0 text-center pb-3">
-                    <a href="{% url 'client:chitiet_chiendich' camp.id %}" class="btn btn-danger w-100 rounded-pill">
-                        <i class="fas fa-heart"></i> Ủng hộ ngay
-                    </a>
                 </div>
             </div>
+            {% empty %}
+            <div class="col-12 text-center py-5">
+                <div class="bg-light p-5 radius-lg border border-dashed">
+                    <i class="fas fa-heart-crack fa-3x text-muted opacity-20 mb-3"></i>
+                    <p class="text-muted mb-0">Chương trình này hiện chưa có chiến dịch gây quỹ nào đang chạy.</p>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        {% empty %}
-        <div class="col-12 text-center py-5">
-            <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" width="100" class="mb-3 opacity-50">
-            <p class="text-muted">Chương trình này hiện chưa có chiến dịch gây quỹ nào đang chạy.</p>
-        </div>
-        {% endfor %}
     </div>
 </div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .opacity-20 { opacity: 0.2; }
+</style>
 {% endblock %}

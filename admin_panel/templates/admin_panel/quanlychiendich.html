@@ -6,68 +6,74 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     .campaign-location-map {
-        width: 100%;
-        height: 260px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
+        width: 100%; height: 280px;
+        border: 1.5px solid var(--primary-100);
+        border-radius: var(--radius-md);
         overflow: hidden;
+        margin-top: 10px;
     }
 </style>
-<div class="container-fluid px-4">
-    <h2 class="page-title">Quản lý Chiến dịch Gây quỹ</h2>
 
-    <div class="row g-3 mb-3">
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Chiến dịch</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Quản lý Chiến dịch Gây quỹ</h2>
+        <button type="button" class="btn btn-primary px-4 radius-pill shadow-btn" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus-circle me-2"></i> Tạo Chiến dịch mới
+        </button>
+    </div>
+
+    <div class="row g-4 mb-4">
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-primary">{{ stats.total }}</div>
-                    <div class="metric-label">Tổng chiến dịch</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng chiến dịch</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-success">{{ stats.active }}</div>
-                    <div class="metric-label">Đang gây quỹ</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang gây quỹ</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.active }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-warning">{{ stats.pending }}</div>
-                    <div class="metric-label">Chờ duyệt</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Chờ phê duyệt</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.pending }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-danger">{{ stats.rejected }}</div>
-                    <div class="metric-label">Bị từ chối</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-12">
-            <div class="card admin-stat-card mt-1">
-                <div class="card-body text-start">
-                    <div class="metric-value text-info">{{ stats.total_raised|intcomma }}đ</div>
-                    <div class="metric-label">Tổng đã huy động của danh sách đang xem</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-danger shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Bị từ chối</div>
+                <div class="h3 fw-800 m-0 text-danger">{{ stats.rejected }}</div>
             </div>
         </div>
     </div>
 
-    <div class="card admin-toolbar">
-        <div class="card-body">
-            <form method="GET" class="row g-3 align-items-center">
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc danh sách</h6>
+            {% if stats.total_raised %}
+            <span class="badge bg-primary-100 text-primary border border-primary-200">Tổng huy động: {{ stats.total_raised|intcomma }}đ</span>
+            {% endif %}
+        </div>
+        <div class="card-body p-4">
+            <form method="GET" class="row g-3">
                 <div class="col-md-4">
-                    <input type="text" name="q" class="form-control" placeholder="Tìm tên chiến dịch..." value="{{ query }}">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm tên chiến dịch..." value="{{ query }}">
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">Tất cả trạng thái</option>
+                        <option value="">— Mọi trạng thái —</option>
                         <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Đang gây quỹ</option>
                         <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ duyệt</option>
                         <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Bị từ chối</option>
@@ -78,168 +84,127 @@
                 <div class="col-md-3">
                     {% if role == 'admin' %}
                     <select name="org" class="form-select">
-                        <option value="">Tất cả tổ chức</option>
+                        <option value="">— Mọi tổ chức —</option>
                         {% for org in orgs %}
                         <option value="{{ org.id }}" {% if selected_org == org.id|stringformat:'s' %}selected{% endif %}>{{ org.name }}</option>
                         {% endfor %}
                     </select>
                     {% else %}
                     <input type="hidden" name="org" value="{{ selected_org }}">
-                    <div class="form-control d-flex align-items-center bg-white text-muted">
-                        {{ orgs.0.name|default:"Tổ chức của bạn" }}
-                    </div>
+                    <input type="text" class="form-control bg-light" value="{{ orgs.0.name|default:'Tổ chức của bạn' }}" readonly>
                     {% endif %}
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Lọc</button>
-                </div>
-                <div class="col-md-12 text-end">
-                    <div class="admin-actions justify-content-end">
-                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
-                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
-                        <a href="{% url 'admin_panel:quanlychiendich' %}" class="btn btn-outline-primary">Xóa lọc</a>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                            <i class="fas fa-plus-circle"></i> Tạo Chiến dịch mới
-                        </button>
-                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC DỮ LIỆU</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card admin-shell-card">
-        <div class="card-header">
-            <i class="fas fa-list me-1"></i> Danh sách Chiến dịch
-        </div>
-        <div class="card-body p-0">
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{{ current_url }}">
-                <div class="p-3 border-bottom bg-light">
-                    <div class="row g-2 align-items-center">
-                        <div class="col-md-4">
-                            <select name="bulk_action" class="form-select">
-                                <option value="">-- Bulk action --</option>
-                                {% if role == 'admin' %}
-                                <option value="approve">Duyệt nhiều dòng</option>
-                                <option value="reject">Từ chối nhiều dòng</option>
-                                {% endif %}
-                                <option value="hide">Ẩn nhiều dòng</option>
-                                <option value="delete">Xóa nhiều dòng</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các chiến dịch đã chọn?')">Áp dụng</button>
-                        </div>
-                    </div>
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ current_url }}">
+            
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        {% if role == 'admin' %}
+                        <option value="approve">Duyệt các dòng đã chọn</option>
+                        <option value="reject">Từ chối các dòng đã chọn</option>
+                        {% endif %}
+                        <option value="hide">Ẩn các dòng đã chọn</option>
+                        <option value="delete">Xóa vĩnh viễn</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Xác nhận thực hiện hành động hàng loạt?')">Áp dụng</button>
                 </div>
-            <div class="table-responsive">
-            <table class="table admin-table">
-                <thead>
-                    <tr>
-                        <th width="4%"><input type="checkbox" id="select-all-campaigns"></th>
-                        <th width="5%">ID</th>
-                        <th width="10%">Ảnh</th>
-                        <th width="30%">Tên Chiến dịch</th>
-                        <th width="15%">Tiến độ</th>
-                        <th width="10%">Trạng thái</th>
-                        <th width="20%">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in campaigns %}
-                    <tr>
-                        <td><input type="checkbox" class="row-checkbox-campaign" name="selected_ids" value="{{ c.id }}"></td>
-                        <td>{{ c.id }}</td>
-                        <td class="text-center">
-                            {% if c.avatar_image_url %}
-                            <img src="{{ c.avatar_image_url }}" class="rounded border"
-                                style="height: 50px; width: 50px; object-fit: cover;">
-                            {% else %}
-                            <span class="badge bg-secondary">No img</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong>{{ c.title }}</strong><br>
-                            <small class="text-muted">
-                                <i class="fas fa-calendar"></i> {{ c.end_date|date:"d/m/Y" }}
-                                {% if c.target_program %} | Thuộc: {{ c.target_program.name }} {% endif %}
-                            </small>
-                        </td>
-                        <td>
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span>{{ c.current_amount|intcomma }}</span>
-                                <span class="text-muted">/ {{ c.target_amount|intcomma }}</span>
-                            </div>
-                            <div class="progress" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: {{ c.get_percentage }}%"></div>
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            {% if c.status == 'active' %} <span class="badge bg-success">Đang chạy</span>
-                            {% elif c.status == 'pending' %} <span class="badge bg-warning text-dark">Chờ duyệt</span>
-                            {% elif c.status == 'rejected' %} <span class="badge bg-danger">Từ chối</span>
-                            {% else %} <span class="badge bg-secondary">{{ c.status }}</span> {% endif %}
-                        </td>
-                        <td>
-                           <div class="admin-actions">
-                           <button type="button" class="btn btn-sm btn-primary"
-        title="Chỉnh sửa"
-        data-bs-toggle="modal" 
-        data-bs-target="#editModal"
-        
-        data-id="{{ c.id }}"
-        
-        data-avatar="{{ c.avatar_image_url|default:'' }}"
-        data-cover="{{ c.cover_image_url|default:'' }}"
-
-        data-title="{{ c.title }}"
-        data-amount="{{ c.target_amount|stringformat:'d' }}" 
-        data-start="{{ c.start_date|date:'Y-m-d' }}"
-        data-end="{{ c.end_date|date:'Y-m-d' }}"
-        data-short="{{ c.short_description }}"
-        data-full="{{ c.full_description }}"
-        
-        data-org="{{ c.organization.id }}"
-        data-prog="{{ c.target_program.id|default_if_none:'' }}"
-        data-cat="{{ c.category.id|default_if_none:'' }}"
-        data-occ="{{ c.occasion.id|default_if_none:'' }}"
-        data-province="{{ c.beneficiary_province|default:'' }}"
-        data-ward="{{ c.beneficiary_ward|default:'' }}"
-        data-address="{{ c.beneficiary_address|default:'' }}"
-        data-lat="{{ c.beneficiary_lat|default:'' }}"
-        data-lng="{{ c.beneficiary_lng|default:'' }}"
-
-        onclick="fillDataToModal(this)">
-    <i class="fas fa-edit"></i>
-</button>
-
-                            {% if role == 'admin' and c.status == 'pending' %}
-                            <a href="{% url 'admin_panel:duyet_chiendich' c.id %}" class="btn btn-sm btn-success"><i
-                                    class="fas fa-check"></i></a>
-                            <a href="{% url 'admin_panel:huy_chiendich' c.id %}" class="btn btn-sm btn-warning"><i
-                                    class="fas fa-times"></i></a>
-                            {% endif %}
-
-                            <a href="{% url 'admin_panel:xoa_chiendich' c.id %}" class="btn btn-sm btn-danger"
-                                onclick="return confirm('Xóa vĩnh viễn?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="admin-empty">Chưa có dữ liệu.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                <div class="d-flex gap-2">
+                    <a href="{{ export_csv_url }}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-file-csv me-1"></i> CSV</a>
+                    <a href="{{ export_excel_url }}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-file-excel me-1"></i> Excel</a>
+                </div>
             </div>
-            </form>
-        </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-campaigns" class="form-check-input"></th>
+                            <th width="10%">Ảnh</th>
+                            <th width="35%">Thông tin chiến dịch</th>
+                            <th width="15%">Tiến độ</th>
+                            <th width="15%" class="text-center">Trạng thái</th>
+                            <th width="21%" class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in campaigns %}
+                        <tr>
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-campaign form-check-input" name="selected_ids" value="{{ c.id }}"></td>
+                            <td>
+                                {% if c.avatar_image_url %}
+                                <img src="{{ c.avatar_image_url }}" class="rounded shadow-sm border" style="height: 52px; width: 52px; object-fit: cover;">
+                                {% else %}
+                                <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted small fw-bold" style="height: 52px; width: 52px;">NO IMG</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ c.title }}</div>
+                                <div class="text-xs text-muted">
+                                    <i class="fas fa-id-card me-1"></i> ID: {{ c.id }}
+                                    <span class="mx-2">|</span>
+                                    <i class="fas fa-calendar-alt me-1"></i> {{ c.end_date|date:"d/m/Y" }}
+                                    {% if c.target_program %}
+                                    <span class="mx-2">|</span>
+                                    <i class="fas fa-layer-group me-1"></i> {{ c.target_program.name }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-between text-xs fw-800 mb-1">
+                                    <span class="text-primary">{{ c.current_amount|intcomma }}đ</span>
+                                    <span class="text-muted">{{ c.get_percentage }}%</span>
+                                </div>
+                                <div class="progress" style="height: 6px; border-radius: 10px;">
+                                    <div class="progress-bar bg-success" style="width: {{ c.get_percentage }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                {% if c.status == 'active' %} <span class="badge bg-success-subtle text-success border border-success px-3 py-2 radius-pill">Đang chạy</span>
+                                {% elif c.status == 'pending' %} <span class="badge bg-warning-subtle text-warning border border-warning px-3 py-2 radius-pill">Chờ duyệt</span>
+                                {% elif c.status == 'rejected' %} <span class="badge bg-danger-subtle text-danger border border-danger px-3 py-2 radius-pill">Từ chối</span>
+                                {% else %} <span class="badge bg-light text-muted border px-3 py-2 radius-pill">{{ c.status|upper }}</span> {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group shadow-sm radius-md overflow-hidden">
+                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa" data-bs-toggle="modal" data-bs-target="#editModal" data-id="{{ c.id }}" data-avatar="{{ c.avatar_image_url|default:'' }}" data-cover="{{ c.cover_image_url|default:'' }}" data-title="{{ c.title }}" data-amount="{{ c.target_amount|stringformat:'d' }}" data-start="{{ c.start_date|date:'Y-m-d' }}" data-end="{{ c.end_date|date:'Y-m-d' }}" data-short="{{ c.short_description }}" data-full="{{ c.full_description }}" data-org="{{ c.organization.id }}" data-prog="{{ c.target_program.id|default_if_none:'' }}" data-cat="{{ c.category.id|default_if_none:'' }}" data-occ="{{ c.occasion.id|default_if_none:'' }}" data-province="{{ c.beneficiary_province|default:'' }}" data-ward="{{ c.beneficiary_ward|default:'' }}" data-address="{{ c.beneficiary_address|default:'' }}" data-lat="{{ c.beneficiary_lat|default:'' }}" data-lng="{{ c.beneficiary_lng|default:'' }}" onclick="fillDataToModal(this)">
+                                        <i class="fas fa-pen-to-square text-primary"></i>
+                                    </button>
+                                    
+                                    {% if role == 'admin' and c.status == 'pending' %}
+                                    <a href="{% url 'admin_panel:duyet_chiendich' c.id %}" class="btn btn-sm btn-white border-end" title="Duyệt"><i class="fas fa-circle-check text-success"></i></a>
+                                    <a href="{% url 'admin_panel:huy_chiendich' c.id %}" class="btn btn-sm btn-white border-end" title="Hủy"><i class="fas fa-circle-xmark text-warning"></i></a>
+                                    {% endif %}
+                                    
+                                    <a href="{% url 'admin_panel:xoa_chiendich' c.id %}" class="btn btn-sm btn-white" title="Xóa" onclick="return confirm('Xóa vĩnh viễn chiến dịch này?')"><i class="fas fa-trash-can text-danger"></i></a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="admin-empty py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Chưa có dữ liệu chiến dịch nào.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
     </div>
 </div>
+{% endblock %}
 
 {% if role == 'admin' %}
 <div class="modal fade" id="depositPoolModal" tabindex="-1">

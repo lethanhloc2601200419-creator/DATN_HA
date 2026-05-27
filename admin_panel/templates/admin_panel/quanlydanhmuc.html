@@ -1,186 +1,193 @@
 {% extends 'admin_panel/trangchu.html' %}
 {% load static %}
 {% block content %}
-    <div class="container-fluid px-4">
-  <h2 class="page-title">Quản lý Danh mục Chiến dịch</h2>
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Danh mục</li>
+        </ol>
+    </nav>
 
-  <div class="row g-3 mb-3">
-    <div class="col-md-4">
-      <div class="card admin-stat-card">
-        <div class="card-body">
-          <div class="metric-value text-primary">{{ stats.total }}</div>
-          <div class="metric-label">Tổng danh mục</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card admin-stat-card">
-        <div class="card-body">
-          <div class="metric-value text-success">{{ stats.active }}</div>
-          <div class="metric-label">Đang hiển thị</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card admin-stat-card">
-        <div class="card-body">
-          <div class="metric-value text-warning">{{ stats.inactive }}</div>
-          <div class="metric-label">Đang ẩn</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- FORM -->
-  <form method="post" class="card admin-toolbar">
-    {% csrf_token %}
-    <input type="hidden" name="id" id="cat-id">
-
-    <div class="card-body">
-    <div class="row g-3 align-items-start">
-      <div class="col-md-3">
-        <input name="name" id="cat-name" class="form-control" placeholder="Tên danh mục" required>
-      </div>
-      <div class="col-md-3">
-        <input name="slug" id="cat-slug" class="form-control" placeholder="slug-danh-muc" required>
-      </div>
-      
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100">
-          <i class="fas fa-save me-1"></i> Lưu
-        </button>
-      </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Quản lý Danh mục Chiến dịch</h2>
     </div>
 
-    <textarea name="description" id="cat-desc"
-      class="form-control mt-2" placeholder="Mô tả"></textarea>
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng danh mục</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang hiển thị</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.active }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang tạm ẩn</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.inactive }}</div>
+            </div>
+        </div>
     </div>
-  </form>
 
-  <div class="card admin-toolbar">
-    <div class="card-body">
-      <form method="get" class="row g-3 align-items-center">
-        <div class="col-md-6">
-          <input type="text" name="q" class="form-control" placeholder="Tìm tên, slug, mô tả..." value="{{ query }}">
+    <!-- THÊM/SỬA DANH MỤC -->
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary" id="form-title"><i class="fas fa-plus-circle me-2"></i> Thêm Danh mục mới</h6>
         </div>
-        <div class="col-md-3">
-          <select name="status" class="form-select">
-            <option value="">Tất cả trạng thái</option>
-            <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Hiện</option>
-            <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Ẩn</option>
-          </select>
+        <div class="card-body p-4 bg-light">
+            <form method="post" class="bg-white p-4 radius-md border shadow-sm">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="cat-id">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted mb-2">Tên danh mục *</label>
+                        <input name="name" id="cat-name" class="form-control" placeholder="VD: Trẻ em vùng cao" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small text-muted mb-2">Slug (URL) *</label>
+                        <input name="slug" id="cat-slug" class="form-control" placeholder="VD: tre-em-vung-cao" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100 fw-bold radius-md py-2">
+                            <i class="fas fa-save me-1"></i> LƯU DANH MỤC
+                        </button>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <label class="fw-bold small text-muted mb-2">Mô tả</label>
+                        <textarea name="description" id="cat-desc" class="form-control" rows="2" placeholder="Mô tả ngắn về danh mục..."></textarea>
+                    </div>
+                </div>
+            </form>
         </div>
-        <div class="col-md-3 text-end">
-          <div class="admin-actions justify-content-end">
-            <a href="{{ export_csv_url }}" class="btn btn-outline-primary">
-              <i class="fas fa-file-csv me-1"></i> CSV
-            </a>
-            <a href="{{ export_excel_url }}" class="btn btn-outline-success">
-              <i class="fas fa-file-excel me-1"></i> Excel
-            </a>
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-filter me-1"></i> Lọc
-            </button>
-          </div>
-        </div>
-      </form>
     </div>
-  </div>
 
-  <!-- DANH SÁCH -->
-  <div class="card admin-shell-card">
-    <div class="card-header">
-      <i class="fas fa-tags me-1"></i> Danh sách Danh mục
-    </div>
-    <div class="card-body p-0">
-      <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ current_url }}">
-      <div class="p-3 border-bottom bg-light">
-        <div class="row g-2 align-items-center">
-          <div class="col-md-4">
-            <select name="bulk_action" class="form-select">
-              <option value="">-- Bulk action --</option>
-              <option value="activate">Hiện nhiều dòng</option>
-              <option value="deactivate">Ẩn nhiều dòng</option>
-              <option value="delete">Xóa nhiều dòng</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các dòng đã chọn?')">
-              Áp dụng
-            </button>
-          </div>
+    <!-- BỘ LỌC -->
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Lọc danh sách</h6>
         </div>
-      </div>
-      <div class="table-responsive">
-  <table class="table admin-table">
-    <thead>
-      <tr>
-        <th width="5%"><input type="checkbox" id="select-all-categories"></th>
-        <th>Tên</th>
-        <th>Slug</th>
-        <th>Trạng thái</th>
-        <th>Hành động</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for c in categories %}
-      <tr>
-        <td><input type="checkbox" class="row-checkbox-category" name="selected_ids" value="{{ c.id }}"></td>
-        <td>{{ c.name }}</td>
-        <td>{{ c.slug }}</td>
-        <td>
-          {% if c.is_active %}
-            <span class="badge bg-success">Hiện</span>
-          {% else %}
-            <span class="badge bg-secondary">Ẩn</span>
-          {% endif %}
-        </td>
-        <td>
-          <div class="admin-actions">
-          <button type="button" class="btn btn-sm btn-primary"
-            onclick="editCategory('{{ c.id }}','{{ c.name }}','{{ c.slug }}','{{ c.description }}')">
-            <i class="fas fa-edit me-1"></i> Sửa
-          </button>
-          <a href="{% url 'admin_panel:toggle_category' c.id %}"
-             class="btn btn-sm {% if c.is_active %}btn-warning{% else %}btn-success{% endif %}">
-             {% if c.is_active %}
-             <i class="fas fa-eye-slash me-1"></i> Ẩn
-             {% else %}
-             <i class="fas fa-eye me-1"></i> Hiện
-             {% endif %}
-          </a>
-          </div>
-        </td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="5" class="admin-empty">Chưa có danh mục nào.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-      </div>
-      </form>
+        <div class="card-body p-4">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm tên, slug, mô tả..." value="{{ query }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">— Trạng thái —</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Đang hiển thị</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Đang ẩn</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC</button>
+                </div>
+                <div class="col-md-12 text-end mt-2">
+                    <a href="{{ export_csv_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-csv me-1"></i> Xuất CSV</a>
+                    <a href="{{ export_excel_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-excel me-1"></i> Xuất Excel</a>
+                    <a href="{% url 'admin_panel:quanlydanhmuc' %}" class="small fw-bold text-decoration-none"><i class="fas fa-rotate-left me-1"></i> Xóa lọc</a>
+                </div>
+            </form>
+        </div>
     </div>
-  </div>
+
+    <!-- DANH SÁCH -->
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ current_url }}">
+            
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        <option value="activate">Hiện nhiều dòng</option>
+                        <option value="deactivate">Ẩn nhiều dòng</option>
+                        <option value="delete">Xóa vĩnh viễn</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Áp dụng thao tác cho các danh mục đã chọn?')">Áp dụng</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-categories" class="form-check-input"></th>
+                            <th width="25%">Tên Danh mục</th>
+                            <th width="25%">Slug (URL)</th>
+                            <th width="20%">Mô tả</th>
+                            <th width="10%" class="text-center">Trạng thái</th>
+                            <th width="16%" class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in categories %}
+                        <tr class="{% if not c.is_active %}bg-light opacity-75{% endif %}">
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-category form-check-input" name="selected_ids" value="{{ c.id }}"></td>
+                            <td class="fw-800 text-dark">{{ c.name }}</td>
+                            <td><code class="bg-primary-50 text-primary px-2 py-1 radius-sm small">{{ c.slug }}</code></td>
+                            <td class="small text-muted">{{ c.description|truncatechars:50|default:"—" }}</td>
+                            <td class="text-center">
+                                {% if c.is_active %}
+                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1 radius-pill small"><i class="fas fa-eye me-1"></i> Hiển thị</span>
+                                {% else %}
+                                    <span class="badge bg-secondary px-2 py-1 radius-pill small"><i class="fas fa-eye-slash me-1"></i> Đang ẩn</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group shadow-sm radius-md overflow-hidden">
+                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa"
+                                            onclick="editCategory('{{ c.id }}','{{ c.name|escapejs }}','{{ c.slug|escapejs }}','{{ c.description|escapejs }}')">
+                                        <i class="fas fa-pen-to-square text-primary"></i>
+                                    </button>
+                                    <a href="{% url 'admin_panel:toggle_category' c.id %}" class="btn btn-sm btn-white border-end" title="{% if c.is_active %}Ẩn danh mục{% else %}Hiện danh mục{% endif %}">
+                                        {% if c.is_active %}<i class="fas fa-eye-slash text-warning"></i>{% else %}<i class="fas fa-eye text-success"></i>{% endif %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="admin-empty py-5 text-center">
+                                <i class="fas fa-tags fa-3x text-muted opacity-20 mb-3 d-block"></i>
+                                <p class="text-muted">Chưa có danh mục nào.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    </div>
 </div>
 
+<style>
+    .fw-800 { font-weight: 800; }
+    .opacity-20 { opacity: 0.2; }
+</style>
+
 <script>
-function editCategory(id, name, slug, desc, icon, order) {
-  document.getElementById('cat-id').value = id;
-  document.getElementById('cat-name').value = name;
-  document.getElementById('cat-slug').value = slug;
-  document.getElementById('cat-desc').value = desc;
- 
- 
+function editCategory(id, name, slug, desc) {
+    document.getElementById('cat-id').value = id;
+    document.getElementById('cat-name').value = name;
+    document.getElementById('cat-slug').value = slug;
+    document.getElementById('cat-desc').value = desc;
+    document.getElementById('form-title').innerHTML = '<i class="fas fa-edit me-2"></i> Cập nhật Danh mục';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 document.getElementById('select-all-categories')?.addEventListener('change', function() {
-  document.querySelectorAll('.row-checkbox-category').forEach(cb => {
-    cb.checked = this.checked;
-  });
+    document.querySelectorAll('.row-checkbox-category').forEach(cb => {
+        cb.checked = this.checked;
+    });
 });
 </script>
 

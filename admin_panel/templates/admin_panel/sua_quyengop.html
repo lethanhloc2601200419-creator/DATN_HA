@@ -2,108 +2,136 @@
 {% load humanize %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card admin-toolbar mb-3">
-            <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:quanly_quyengop' %}" class="text-decoration-none">Quản lý Quyên góp</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Chỉnh sửa Giao dịch #{{ donation.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card-charity bg-white p-4 d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 shadow-sm border-0 border-top border-4 border-primary">
                 <div>
-                    <div class="metric-label mb-1">Giao dịch</div>
-                    <div class="metric-value text-primary">#{{ donation.id }}</div>
+                    <div class="text-xs text-muted fw-800 text-uppercase mb-1">Mã Giao dịch</div>
+                    <div class="h4 fw-800 m-0 text-primary">#{{ donation.id }}</div>
                 </div>
                 <div>
-                    <div class="metric-label mb-1">Trạng thái</div>
+                    <div class="text-xs text-muted fw-800 text-uppercase mb-1">Trạng thái Blockchain</div>
                     {% if donation.is_valid %}
-                        <span class="badge bg-success">Hash hợp lệ</span>
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 radius-pill"><i class="fas fa-shield-check me-1"></i> Hash hợp lệ</span>
                     {% else %}
-                        <span class="badge bg-danger">Bị thay đổi</span>
+                        <span class="badge bg-danger-subtle text-danger border border-danger px-3 py-2 radius-pill"><i class="fas fa-triangle-exclamation me-1"></i> Dữ liệu bị thay đổi</span>
                     {% endif %}
                 </div>
                 <div>
-                    <div class="metric-label mb-1">Số tiền</div>
-                    <div class="metric-value text-danger">{{ donation.amount|intcomma }}đ</div>
+                    <div class="text-xs text-muted fw-800 text-uppercase mb-1">Số tiền (Gốc)</div>
+                    <div class="h4 fw-800 m-0 text-danger">{{ donation.amount|intcomma }}đ</div>
                 </div>
-                <div class="admin-actions">
-                    <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-primary">Quay lại</a>
+                <div>
+                    <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-secondary fw-bold radius-pill px-4"><i class="fas fa-arrow-left me-1"></i> Quay lại</a>
                 </div>
             </div>
-        </div>
-        <div class="card admin-shell-card">
-            <div class="card-header">
-                <h5 class="m-0 fw-bold text-danger">
-                    <i class="fas fa-user-secret me-2"></i>Chỉnh sửa Giao dịch #{{ donation.id }}
-                </h5>
-            </div>
-            <div class="card-body p-4">
-                
-                <div class="alert alert-warning border-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Cảnh báo:</strong> Việc sửa đổi số tiền tại đây sẽ khiến mã Hash không khớp. 
-                    Hệ thống Blockchain bên Client sẽ báo lỗi <strong>"Dữ liệu bị thay đổi"</strong>.
-                </div>
 
-                <div class="card admin-subcard border-0 mb-3">
-                    <div class="card-body">
+            <div class="card-charity overflow-hidden border-0 shadow-sm">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h5 class="m-0 fw-800 text-primary">
+                        <i class="fas fa-pen-to-square me-2"></i> Chỉnh sửa Thông tin Giao dịch
+                    </h5>
+                </div>
+                <div class="card-body p-4 p-md-5 bg-light">
+                    
+                    <div class="alert bg-warning-100 border-warning-500 text-dark radius-md mb-4 shadow-sm d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle fs-3 text-warning me-3"></i>
+                        <div>
+                            <strong class="d-block mb-1">CẢNH BÁO MINH BẠCH:</strong>
+                            <span class="small">Việc sửa đổi số tiền hoặc dữ liệu nhạy cảm tại đây sẽ khiến mã Hash không khớp. Hệ thống Blockchain bên Client sẽ báo lỗi <strong>"Dữ liệu bị thay đổi"</strong> để đảm bảo tính công khai.</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 radius-md border shadow-sm mb-4">
+                        <h6 class="text-primary fw-800 mb-3 text-uppercase small"><i class="fas fa-info-circle me-2"></i> Thông tin hiện tại</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <div class="small text-muted">Người ủng hộ</div>
-                                <div class="fw-bold">{{ donation.donor_name|default:"Ẩn danh" }}</div>
+                                <div class="small text-muted fw-bold mb-1">Người ủng hộ</div>
+                                <div class="fw-600 text-dark">{{ donation.donor_name|default:"Ẩn danh" }}</div>
                             </div>
                             <div class="col-md-6">
-                                <div class="small text-muted">Tạo lúc</div>
-                                <div class="fw-bold">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
+                                <div class="small text-muted fw-bold mb-1">Thời gian tạo</div>
+                                <div class="fw-600 text-dark">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="small text-muted">Hash hiện tại</div>
-                                <div class="fw-bold text-truncate">{{ donation.hash|default:"—" }}</div>
+                            <div class="col-md-12">
+                                <div class="small text-muted fw-bold mb-1">Mã Hash giao dịch (Seal)</div>
+                                <div class="bg-light p-2 radius-sm border text-primary font-monospace small text-truncate">{{ donation.hash|default:"—" }}</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="small text-muted">Previous hash</div>
-                                <div class="fw-bold text-truncate">{{ donation.previous_hash|default:"—" }}</div>
+                            <div class="col-md-12">
+                                <div class="small text-muted fw-bold mb-1">Mã Hash liên kết (Chain)</div>
+                                <div class="bg-light p-2 radius-sm border text-muted font-monospace small text-truncate">{{ donation.previous_hash|default:"—" }}</div>
                             </div>
                         </div>
                     </div>
+
+                    <form method="POST" class="bg-white p-4 radius-md border shadow-sm">
+                        {% csrf_token %}
+                        <h6 class="text-success fw-800 mb-3 text-uppercase small"><i class="fas fa-edit me-2"></i> Form cập nhật</h6>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label class="fw-bold small text-muted mb-2">Người ủng hộ</label>
+                                {{ form.donor_name }}
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="fw-bold small text-muted mb-2">Số tiền (VNĐ)</label>
+                                {{ form.amount }}
+                                <div class="text-xs text-warning mt-1 fw-bold"><i class="fas fa-lightbulb me-1"></i> Thử sửa số tiền này để test chức năng cảnh báo Blockchain bên Client.</div>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="fw-bold small text-muted mb-2">Lời nhắn</label>
+                                {{ form.message }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted mb-2">Trạng thái</label>
+                                {{ form.status }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted mb-2">Phương thức thanh toán</label>
+                                {{ form.payment_method }}
+                            </div>
+                        </div>
+
+                        <hr class="opacity-10 my-4">
+                        
+                        <div class="d-flex justify-content-end gap-3">
+                            <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-secondary fw-bold radius-pill px-4">Hủy bỏ</a>
+                            <button type="submit" class="btn btn-primary fw-bold radius-pill px-5 shadow-btn">
+                                <i class="fas fa-save me-2"></i> LƯU THAY ĐỔI
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                <form method="POST">
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label class="fw-bold small text-muted">Người ủng hộ</label>
-                        {{ form.donor_name }}
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="fw-bold small text-muted">Số tiền (VNĐ)</label>
-                        {{ form.amount }}
-                        <div class="form-text">Thử sửa số tiền này để test chức năng Blockchain.</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="fw-bold small text-muted">Lời nhắn</label>
-                        {{ form.message }}
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="fw-bold small text-muted">Trạng thái</label>
-                            {{ form.status }}
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="fw-bold small text-muted">Phương thức</label>
-                            {{ form.payment_method }}
-                        </div>
-                    </div>
-
-                    <hr>
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-primary">Hủy bỏ</a>
-                        <button type="submit" class="btn btn-primary fw-bold">
-                            <i class="fas fa-save me-1"></i> Lưu thay đổi
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+    form input, form select, form textarea {
+        border: 1.5px solid var(--primary-100) !important;
+        border-radius: var(--radius-md) !important;
+        padding: 10px 16px !important;
+        background: var(--neutral-50) !important;
+    }
+    form input:focus, form select:focus, form textarea:focus {
+        background: var(--white) !important;
+        border-color: var(--primary-500) !important;
+        box-shadow: 0 0 0 3px var(--primary-100) !important;
+    }
+</style>
 {% endblock %}

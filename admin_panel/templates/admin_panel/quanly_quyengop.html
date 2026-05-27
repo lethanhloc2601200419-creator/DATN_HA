@@ -2,165 +2,172 @@
 {% load humanize %}
 
 {% block content %}
-<div class="container-fluid px-4">
-<h2 class="page-title">Quản lý Quyên góp</h2>
-<div class="row g-3 mb-3">
-    <div class="col-md-3">
-        <div class="card admin-stat-card">
-            <div class="card-body">
-                <div class="metric-value text-primary">{{ stats.total }}</div>
-                <div class="metric-label">Tổng giao dịch</div>
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Quyên góp</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Lịch sử Quyên góp</h2>
+        <div class="d-flex gap-2">
+            <a href="{{ export_csv_url }}" class="btn btn-outline-secondary px-3"><i class="fas fa-file-csv me-1"></i> Xuất CSV</a>
+            <a href="{{ export_excel_url }}" class="btn btn-outline-secondary px-3"><i class="fas fa-file-excel me-1"></i> Xuất Excel</a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng giao dịch</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Thành công</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.completed }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang chờ xử lý</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.pending }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-charity p-3 border-start border-4 border-danger shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng tiền hoàn tất</div>
+                <div class="h3 fw-800 m-0 text-danger" style="font-size: 1.5rem;">{{ stats.amount_total|intcomma }}đ</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card admin-stat-card">
-            <div class="card-body">
-                <div class="metric-value text-success">{{ stats.completed }}</div>
-                <div class="metric-label">Hoàn tất</div>
-            </div>
+
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc nâng cao</h6>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card admin-stat-card">
-            <div class="card-body">
-                <div class="metric-value text-warning">{{ stats.pending }}</div>
-                <div class="metric-label">Đang chờ</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card admin-stat-card">
-            <div class="card-body">
-                <div class="metric-value text-danger">{{ stats.amount_total|intcomma }}đ</div>
-                <div class="metric-label">Tổng tiền hoàn tất</div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="card admin-toolbar">
-    <div class="card-body">
-        <form method="GET" class="row g-3 align-items-center">
-            <div class="col-md-4">
-                <input type="text" name="q" class="form-control" placeholder="Tìm người ủng hộ, chiến dịch, mã giao dịch..." value="{{ query }}">
-            </div>
-            <div class="col-md-2">
-                <select name="status" class="form-select">
-                    <option value="">Tất cả trạng thái</option>
-                    <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
-                    <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Thành công</option>
-                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>Thất bại</option>
-                    <option value="refunded" {% if selected_status == 'refunded' %}selected{% endif %}>Hoàn tiền</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select name="payment_method" class="form-select">
-                    <option value="">Tất cả phương thức</option>
-                    <option value="vietqr" {% if selected_payment_method == 'vietqr' %}selected{% endif %}>VietQR</option>
-                    <option value="vnpay" {% if selected_payment_method == 'vnpay' %}selected{% endif %}>VNPay</option>
-                    <option value="bank_transfer" {% if selected_payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <input type="date" name="from" class="form-control" value="{{ created_from }}">
-            </div>
-            <div class="col-md-2">
-                <input type="date" name="to" class="form-control" value="{{ created_to }}">
-            </div>
-            <div class="col-md-12 text-end">
-                <div class="admin-actions justify-content-end">
-                    <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
-                    <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
-                    <a href="{% url 'admin_panel:quanly_quyengop' %}" class="btn btn-outline-primary">Xóa lọc</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-filter me-1"></i> Lọc
-                    </button>
+        <div class="card-body p-4">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm người ủng hộ, chiến dịch, mã..." value="{{ query }}">
+                    </div>
                 </div>
-            </div>
-        </form>
+                <div class="col-md-2">
+                    <select name="status" class="form-select">
+                        <option value="">— Trạng thái —</option>
+                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
+                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Thành công</option>
+                        <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>Thất bại</option>
+                        <option value="refunded" {% if selected_status == 'refunded' %}selected{% endif %}>Hoàn tiền</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="payment_method" class="form-select">
+                        <option value="">— Phương thức —</option>
+                        <option value="vietqr" {% if selected_payment_method == 'vietqr' %}selected{% endif %}>VietQR</option>
+                        <option value="vnpay" {% if selected_payment_method == 'vnpay' %}selected{% endif %}>VNPay</option>
+                        <option value="bank_transfer" {% if selected_payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="from" class="form-control" value="{{ created_from }}" title="Từ ngày">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">LỌC</button>
+                </div>
+                <div class="col-md-12 text-end mt-2">
+                    <a href="{% url 'admin_panel:quanly_quyengop' %}" class="small text-decoration-none fw-bold"><i class="fas fa-rotate-left me-1"></i> Xóa tất cả bộ lọc</a>
+                </div>
+            </form>
+        </div>
     </div>
-</div>
-<div class="card admin-shell-card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="m-0 fw-bold text-primary">Danh sách Quyên góp (Donations)</h6>
-    </div>
-    <div class="card-body p-0">
+
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ current_url }}">
-            <div class="p-3 border-bottom bg-light">
+            
+            <div class="p-3 bg-light border-bottom">
                 <div class="row g-2 align-items-center">
-                    <div class="col-md-4">
-                        <select name="bulk_action" class="form-select">
-                            <option value="">-- Bulk action --</option>
-                            <option value="completed">Duyệt nhiều dòng</option>
+                    <div class="col-md-3">
+                        <select name="bulk_action" class="form-select form-select-sm">
+                            <option value="">-- Hành động hàng loạt --</option>
+                            <option value="completed">Duyệt thành công</option>
                             <option value="pending">Chuyển về chờ xử lý</option>
                             <option value="failed">Đánh dấu thất bại</option>
                             <option value="refunded">Đánh dấu hoàn tiền</option>
-                            <option value="delete">Xóa nhiều dòng</option>
+                            <option value="delete">Xóa vĩnh viễn</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các giao dịch đã chọn?')">Áp dụng</button>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold w-100" onclick="return confirm('Xác nhận thực hiện hành động?')">Áp dụng</button>
                     </div>
                 </div>
             </div>
-        <div class="table-responsive">
-            <table class="table admin-table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="select-all-donations"></th>
-                        <th class="ps-4">ID</th>
-                        <th>Người ủng hộ</th>
-                        <th>Số tiền</th>
-                        <th>Chiến dịch</th>
-                        <th>Trạng thái</th>
-                        <th>Blockchain</th>
-                        <th class="text-end pe-4">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for d in donations %}
-                    <tr>
-                        <td><input type="checkbox" class="row-checkbox-donation" name="selected_ids" value="{{ d.id }}"></td>
-                        <td class="ps-4 fw-bold">#{{ d.id }}</td>
-                        <td>
-                            <div class="fw-bold text-dark">{{ d.donor_name|default:"Ẩn danh" }}</div>
-                            <div class="small text-muted">{{ d.created_at|date:"d/m/Y H:i" }}</div>
-                        </td>
-                        <td class="fw-bold text-danger">{{ d.amount|intcomma }} đ</td>
-                        <td>{{ d.campaign.title|truncatechars:30 }}</td>
-                        <td>
-                            {% if d.status == 'completed' %}
-                                <span class="badge bg-success">Thành công</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Chờ xử lý</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if d.is_valid %}
-                                <i class="fas fa-check-circle text-success" title="Hợp lệ"></i>
-                            {% else %}
-                                <i class="fas fa-exclamation-triangle text-danger" title="Bị thay đổi!"></i>
-                            {% endif %}
-                        </td>
-                        <td class="text-end pe-4">
-                            <div class="admin-actions justify-content-end">
-                            <a href="{% url 'admin_panel:sua_quyengop' d.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-edit"></i> Sửa
-                            </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="8" class="admin-empty">Chưa có dữ liệu</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-donations" class="form-check-input"></th>
+                            <th width="8%">Mã</th>
+                            <th width="20%">Người ủng hộ</th>
+                            <th width="15%">Số tiền</th>
+                            <th width="25%">Chiến dịch</th>
+                            <th width="12%" class="text-center">Trạng thái</th>
+                            <th width="8%" class="text-center">Hợp lệ</th>
+                            <th width="8%" class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in donations %}
+                        <tr>
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-donation form-check-input" name="selected_ids" value="{{ d.id }}"></td>
+                            <td class="small fw-bold text-muted">#{{ d.id }}</td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ d.donor_name|default:"Nhà hảo tâm ẩn danh" }}</div>
+                                <div class="text-xs text-muted"><i class="far fa-clock me-1"></i>{{ d.created_at|date:"H:i d/m/Y" }}</div>
+                            </td>
+                            <td><div class="fw-800 text-accent-600">{{ d.amount|intcomma }}đ</div></td>
+                            <td class="small fw-600 text-primary">{{ d.campaign.title|truncatechars:45 }}</td>
+                            <td class="text-center">
+                                {% if d.status == 'completed' %}
+                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small">Thành công</span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning px-2 py-1 small">Chờ xử lý</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if d.is_valid %}
+                                    <i class="fas fa-circle-check text-success fs-5" title="Dữ liệu nguyên vẹn"></i>
+                                {% else %}
+                                    <i class="fas fa-triangle-exclamation text-danger fs-5" title="CẢNH BÁO: Dữ liệu bị thay đổi!"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'admin_panel:sua_quyengop' d.id %}" class="btn btn-sm btn-white border shadow-sm" title="Sửa">
+                                    <i class="fas fa-pen-to-square text-primary"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="admin-empty py-5">
+                                <i class="fas fa-receipt fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Chưa có giao dịch quyên góp nào.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </form>
     </div>
-</div>
 </div>
 <script>
 document.getElementById('select-all-donations')?.addEventListener('change', function() {

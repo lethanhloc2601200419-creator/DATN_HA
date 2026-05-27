@@ -1,0 +1,284 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+
+{% block title %}Tạo Chiến Dịch Mới - Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    .create-page { background-color: var(--primary-50); padding: 60px 0; min-height: calc(100vh - 100px); }
+    
+    /* Progress Indicator */
+    .step-indicator { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .step-indicator::before { content: ""; position: absolute; top: 20px; left: 0; right: 0; height: 2px; background: var(--primary-200); z-index: 1; }
+    .step-item { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .step-number { 
+        width: 40px; height: 40px; border-radius: 50%; background: var(--white); border: 2px solid var(--primary-200); 
+        display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--neutral-500); transition: 0.3s;
+    }
+    .step-item.active .step-number { background: var(--primary-800); border-color: var(--primary-800); color: var(--white); box-shadow: var(--shadow-btn); }
+    .step-item.completed .step-number { background: var(--success-600); border-color: var(--success-600); color: var(--white); }
+    .step-label { font-size: 13px; font-weight: 600; color: var(--neutral-500); }
+    .step-item.active .step-label { color: var(--primary-800); }
+
+    /* Form Container */
+    .form-card { max-width: 800px; margin: 0 auto; }
+    .form-step { display: none; }
+    .form-step.active { display: block; animation: fadeIn 0.4s ease-out; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Image Preview */
+    .image-preview-box { 
+        width: 100%; height: 300px; border: 2px dashed var(--primary-200); border-radius: var(--radius-lg);
+        display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--neutral-100);
+        cursor: pointer; transition: 0.3s;
+    }
+    .image-preview-box:hover { border-color: var(--primary-400); background: var(--primary-50); }
+    .image-preview-box img { width: 100%; height: 100%; object-fit: cover; }
+    
+    /* Map Picker */
+    #map-picker { height: 350px; border-radius: var(--radius-lg); border: 1px solid var(--primary-200); }
+
+    .required-star { color: var(--danger-600); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="create-page">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-800 text-primary">Bắt đầu hành trình nhân ái</h2>
+            <p class="text-muted">Chia sẻ câu chuyện của bạn để kết nối với hàng ngàn tấm lòng vàng.</p>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step-item active" id="step-node-1">
+                <div class="step-number">1</div>
+                <div class="step-label">Thông tin</div>
+            </div>
+            <div class="step-item" id="step-node-2">
+                <div class="step-number">2</div>
+                <div class="step-label">Chi tiết & Ảnh</div>
+            </div>
+            <div class="step-item" id="step-node-3">
+                <div class="step-number">3</div>
+                <div class="step-label">Xác nhận</div>
+            </div>
+        </div>
+
+        <div class="card-charity form-card p-4 p-md-5">
+            <form id="campaignForm" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <!-- STEP 1: Basic Info -->
+                <div class="form-step active" id="step-1">
+                    <h4 class="fw-bold mb-4"><i class="fas fa-info-circle text-primary me-2"></i>Thành phần cơ bản</h4>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-600">Tên chiến dịch <span class="required-star">*</span></label>
+                        <input type="text" name="title" class="form-control form-control-lg" placeholder="VD: Giúp đỡ trẻ em vùng cao..." required>
+                        <div class="form-text">Hãy đặt tên ngắn gọn và truyền cảm hứng.</div>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Danh mục <span class="required-star">*</span></label>
+                            <select name="category" class="form-select" required>
+                                <option value="" selected disabled>Chọn danh mục...</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Mục tiêu quyên góp (VNĐ) <span class="required-star">*</span></label>
+                            <input type="number" name="target_amount" class="form-control fw-bold text-primary" placeholder="VD: 50000000" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Hạn kết thúc <span class="required-star">*</span></label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Thuộc chương trình</label>
+                            <select name="program" class="form-select">
+                                <option value="">Không (Chiến dịch độc lập)</option>
+                                {% for prog in programs %}
+                                <option value="{{ prog.id }}">{{ prog.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-5">
+                        <button type="button" class="btn btn-primary px-5 radius-pill fw-bold" onclick="nextStep(2)">Tiếp theo <i class="fas fa-arrow-right ms-2"></i></button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Story & Assets -->
+                <div class="form-step" id="step-2">
+                    <h4 class="fw-bold mb-4"><i class="fas fa-image text-primary me-2"></i>Chi tiết & Hình ảnh</h4>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-600">Câu chuyện chiến dịch <span class="required-star">*</span></label>
+                        <textarea name="full_description" class="form-control" rows="8" placeholder="Hãy mô tả chi tiết về hoàn cảnh, mục đích và cách thức sử dụng số tiền quyên góp..." required></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-600">Ảnh bìa chiến dịch <span class="required-star">*</span></label>
+                        <input type="file" name="cover_image" id="cover_image_input" class="d-none" accept="image/*" onchange="previewImage(this)">
+                        <div class="image-preview-box" onclick="document.getElementById('cover_image_input').click()">
+                            <div id="preview-placeholder" class="text-center text-muted">
+                                <i class="fas fa-cloud-upload-alt fa-3x mb-3 opacity-50"></i>
+                                <p class="mb-0">Bấm để tải ảnh lên (Khuyên dùng 1200x600px)</p>
+                            </div>
+                            <img id="image-preview" class="d-none">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-600">Vị trí thực hiện chiến dịch <span class="required-star">*</span></label>
+                        <div id="map-picker" class="mb-2 shadow-sm"></div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <input type="text" name="lat" id="lat-input" class="form-control form-control-sm" placeholder="Latitude" readonly required>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" name="lng" id="lng-input" class="form-control form-control-sm" placeholder="Longitude" readonly required>
+                            </div>
+                        </div>
+                        <input type="text" name="address" class="form-control mt-2" placeholder="Địa chỉ chi tiết (Số nhà, đường, phường/xã...)">
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-5">
+                        <button type="button" class="btn btn-light border px-4 radius-pill fw-bold" onclick="prevStep(1)"><i class="fas fa-arrow-left me-2"></i> Quay lại</button>
+                        <button type="button" class="btn btn-primary px-5 radius-pill fw-bold" onclick="nextStep(3)">Tiếp theo <i class="fas fa-arrow-right ms-2"></i></button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Review -->
+                <div class="form-step" id="step-3">
+                    <h4 class="fw-bold mb-4"><i class="fas fa-check-double text-primary me-2"></i>Kiểm tra lại thông tin</h4>
+
+                    <div class="bg-primary-50 p-4 radius-lg border border-primary-100 mb-4">
+                        <div class="row g-3">
+                            <div class="col-sm-4 text-muted small fw-bold">Tên chiến dịch:</div>
+                            <div class="col-sm-8 fw-bold" id="review-title">—</div>
+                            
+                            <div class="col-sm-4 text-muted small fw-bold">Mục tiêu:</div>
+                            <div class="col-sm-8 text-primary fw-800" id="review-target">—</div>
+
+                            <div class="col-sm-4 text-muted small fw-bold">Ngày kết thúc:</div>
+                            <div class="col-sm-8" id="review-date">—</div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning small radius-md mb-4">
+                        <i class="fas fa-triangle-exclamation me-2"></i>
+                        <strong>Lưu ý:</strong> Chiến dịch của bạn sẽ được gửi tới đội ngũ quản trị để phê duyệt trước khi hiển thị công khai. Quá trình này thường mất từ 12-24 giờ làm việc.
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="terms" required>
+                        <label class="form-check-label small" for="terms">
+                            Tôi cam kết thông tin cung cấp là hoàn toàn chính xác và chịu trách nhiệm trước pháp luật về mục đích sử dụng quỹ.
+                        </label>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-5">
+                        <button type="button" class="btn btn-light border px-4 radius-pill fw-bold" onclick="prevStep(2)"><i class="fas fa-arrow-left me-2"></i> Quay lại</button>
+                        <button type="submit" class="btn btn-accent px-5 radius-pill fw-bold shadow-accent">
+                            GỬI YÊU CẦU PHÊ DUYỆT <i class="fas fa-paper-plane ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let currentStep = 1;
+
+    function nextStep(step) {
+        // Simple validation for step 1
+        if (step === 2) {
+            const title = document.querySelector('input[name="title"]').value;
+            const target = document.querySelector('input[name="target_amount"]').value;
+            if (!title || !target) { alert('Vui lòng điền đầy đủ các thông tin bắt buộc.'); return; }
+        }
+        
+        // Prepare review data for step 3
+        if (step === 3) {
+            document.getElementById('review-title').textContent = document.querySelector('input[name="title"]').value;
+            document.getElementById('review-target').textContent = new Intl.NumberFormat('vi-VN').format(document.querySelector('input[name="target_amount"]').value) + ' VNĐ';
+            document.getElementById('review-date').textContent = document.querySelector('input[name="end_date"]').value;
+            
+            // Validate step 2
+            const desc = document.querySelector('textarea[name="full_description"]').value;
+            const lat = document.getElementById('lat-input').value;
+            if (!desc || !lat) { alert('Vui lòng cung cấp mô tả và chọn vị trí trên bản đồ.'); return; }
+        }
+
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-node-${currentStep}`).classList.add('completed');
+        
+        currentStep = step;
+        
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        document.getElementById(`step-node-${currentStep}`).classList.add('active');
+        window.scrollTo(0, 0);
+
+        if (step === 2) {
+            setTimeout(initMap, 100); // Wait for animation
+        }
+    }
+
+    function prevStep(step) {
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-node-${currentStep}`).classList.remove('active');
+        
+        currentStep = step;
+        
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        document.getElementById(`step-node-${step}`).classList.remove('completed');
+        window.scrollTo(0, 0);
+    }
+
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('image-preview').src = e.target.result;
+                document.getElementById('image-preview').classList.remove('d-none');
+                document.getElementById('preview-placeholder').classList.add('d-none');
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    let map;
+    let marker;
+
+    function initMap() {
+        if (map) return;
+        
+        map = L.map('map-picker').setView([16.047079, 108.206230], 6);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+
+        map.on('click', function(e) {
+            if (marker) map.removeLayer(marker);
+            marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('lat-input').value = e.latlng.lat.toFixed(6);
+            document.getElementById('lng-input').value = e.latlng.lng.toFixed(6);
+        });
+    }
+</script>
+{% endblock %}

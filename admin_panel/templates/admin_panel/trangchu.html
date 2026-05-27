@@ -8,11 +8,12 @@
   <title>Hệ thống Quản trị - Quỹ Nhân Ái</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   
   <style>
     :root {
+      /* Primary Brand Colors - Navy Trust */
       --primary-950: #0a1628;
       --primary-900: #0f2044;
       --primary-800: #1e3a8a;
@@ -24,535 +25,280 @@
       --primary-200: #d0e2fd;
       --primary-100: #e8f1fe;
       --primary-50: #f3f7ff;
+
+      /* Accent Colors - Action Orange */
+      --accent-600: #ea580c;
       --accent-500: #f97316;
       --accent-400: #fb923c;
       --accent-100: #fff7ed;
+
+      /* Semantic Colors */
       --success-600: #16a34a;
       --success-100: #f0fdf4;
       --danger-600: #dc2626;
       --danger-100: #fef2f2;
       --warning-600: #ca8a04;
       --warning-100: #fefce8;
+
+      /* Neutral Colors */
       --neutral-900: #111827;
       --neutral-700: #374151;
       --neutral-500: #6b7280;
       --neutral-300: #d1d5db;
       --neutral-100: #f9fafb;
       --white: #ffffff;
-      --radius-sm: 6px;
+
+      /* UI constants */
       --radius-md: 10px;
       --radius-lg: 16px;
-      --shadow-card: 0 1px 4px rgba(30, 58, 138, 0.08), 0 0 0 0.5px rgba(30, 58, 138, 0.10);
-      --shadow-btn: 0 2px 8px rgba(30, 58, 138, 0.25);
+      --shadow-sm: 0 1px 2px rgba(15, 32, 68, 0.05);
+      --shadow-md: 0 4px 12px rgba(15, 32, 68, 0.08);
+      --shadow-lg: 0 8px 32px rgba(15, 32, 68, 0.12);
       --font-sans: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+      --sidebar-width: 260px;
     }
+
     body {
-      background-color: var(--primary-50);
+      background-color: var(--neutral-100);
       font-family: var(--font-sans);
       color: var(--neutral-900);
       overflow-x: hidden;
     }
 
-    /* HEADER */
-    .header {
+    /* HEADER / TOPBAR */
+    .admin-header {
       position: fixed;
-      top: 0;
-      width: 100%;
-      z-index: 1000;
+      top: 0; left: 0; right: 0;
+      z-index: 1040;
       background: var(--white);
-      border-bottom: 1px solid var(--primary-200);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      height: 60px;
+      border-bottom: 1px solid var(--primary-100);
+      height: 70px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .header h2 {
-      color: var(--primary-900);
-      margin: 0;
-      padding: 0 20px;
-      line-height: 60px;
-      font-size: 22px;
-      font-weight: 700;
-      cursor: pointer;
+    .admin-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none !important;
+      color: var(--primary-800) !important;
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: -0.5px;
+    }
+
+    /* SIDEBAR */
+    .admin-sidebar {
+      position: fixed;
+      top: 70px;
+      left: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - 70px);
+      background-color: var(--white);
+      border-right: 1px solid var(--primary-100);
+      z-index: 1030;
+      overflow-y: auto;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar-section-title {
+      padding: 24px 24px 8px;
+      color: var(--neutral-500);
+      font-size: 11px;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
 
-    .btn-logout {
-      background: var(--primary-800);
-      border: 1px solid var(--primary-800);
-      color: var(--white);
-      padding: 5px 15px;
-      border-radius: 20px;
-      transition: all 0.3s;
-      margin-right: 20px;
-    }
-
-    .btn-logout:hover {
-      background: var(--primary-700);
-      color: var(--white);
-    }
-
-    /* SIDEBAR */
-    .slide {
-      position: fixed;
-      top: 60px;
-      left: 0;
-      width: 250px;
-      height: calc(100vh - 60px);
-      background-color: var(--white);
-      padding-top: 20px;
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-      overflow-y: auto;
-    }
-
-    .slide h6 {
-      padding-left: 20px;
-      color: var(--neutral-500);
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      margin-top: 20px;
-    }
-
-    .slide ul {
-      list-style: none;
-      padding: 0 10px;
-    }
-
-    .slide ul li {
-      margin-bottom: 5px;
-    }
-
-    .slide ul li a {
+    .sidebar-nav { list-style: none; padding: 0 12px; margin: 0; }
+    .sidebar-nav li { margin-bottom: 4px; }
+    .sidebar-nav a {
       display: flex;
       align-items: center;
       color: var(--neutral-700);
-      text-decoration: none;
-      padding: 12px 15px;
-      border-radius: 8px;
-      font-weight: 500;
-      font-size: 15px;
-      transition: all 0.2s;
+      text-decoration: none !important;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14.5px;
+      transition: 0.2s;
     }
-
-    .slide ul li a:hover {
-      background-color: var(--primary-100);
-      color: var(--primary-800);
-    }
-    
-    .slide ul li a.active {
-      background-color: var(--primary-100);
-      color: var(--primary-800);
-      font-weight: 700;
-    }
-
-    .slide ul li a i {
-      width: 25px;
-      margin-right: 10px;
-      font-size: 18px;
-    }
+    .sidebar-nav a i { width: 24px; font-size: 18px; margin-right: 12px; opacity: 0.7; }
+    .sidebar-nav a:hover { background-color: var(--primary-50); color: var(--primary-800); }
+    .sidebar-nav a.active { background-color: var(--primary-800); color: var(--white); box-shadow: var(--shadow-md); }
+    .sidebar-nav a.active i { opacity: 1; }
 
     /* MAIN CONTENT */
-    .main-content {
-      margin-left: 250px;
-      padding: 80px 30px 30px; /* Top padding để tránh header */
+    .admin-main {
+      margin-left: var(--sidebar-width);
+      padding: 100px 32px 48px;
       min-height: 100vh;
+      transition: all 0.3s;
     }
 
-    /* DASHBOARD CARDS */
-    .dashboard-card {
+    /* DASHBOARD ELEMENTS */
+    .stat-card {
       border: none;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      color: var(--white);
+      box-shadow: var(--shadow-md);
       transition: transform 0.3s;
       height: 100%;
-      overflow: hidden;
+    }
+    .stat-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+    .stat-card .metric-value { font-size: 1.75rem; font-weight: 800; margin: 8px 0 4px; }
+    .stat-card .metric-label { font-size: 0.85rem; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .stat-icon {
+        position: absolute; right: -10px; bottom: -10px;
+        font-size: 5rem; opacity: 0.15; transform: rotate(-15deg);
     }
 
-    .dashboard-card:hover {
-      transform: translateY(-5px);
-    }
+    .bg-grad-primary { background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-900) 100%); }
+    .bg-grad-success { background: linear-gradient(135deg, #059669 0%, #166534 100%); }
+    .bg-grad-info    { background: linear-gradient(135deg, #0284c7 0%, #1e40af 100%); }
+    .bg-grad-warning { background: linear-gradient(135deg, #d97706 0%, #9a3412 100%); }
 
-    .card-icon {
-      font-size: 2.5rem;
-      opacity: 0.2;
-      position: absolute;
-      right: 20px;
-      bottom: 20px;
-    }
-
-    .bg-gradient-primary { background: linear-gradient(45deg, var(--primary-700), var(--primary-900)); color: var(--white); }
-    .bg-gradient-success { background: linear-gradient(45deg, var(--success-600), var(--primary-700)); color: var(--white); }
-    .bg-gradient-info    { background: linear-gradient(45deg, var(--primary-500), var(--primary-700)); color: var(--white); }
-    .bg-gradient-warning { background: linear-gradient(45deg, var(--warning-600), var(--accent-500)); color: var(--white); }
-    .btn-primary {
-      background: var(--primary-800);
-      border-color: var(--primary-800);
-      color: var(--white);
-      box-shadow: var(--shadow-btn);
-    }
-    .btn-primary:hover {
-      background: var(--primary-700);
-      border-color: var(--primary-700);
-      color: var(--white);
-    }
-    .btn-success {
-      background: var(--success-600);
-      border-color: var(--success-600);
-      color: var(--white);
-    }
-    .btn-success:hover {
-      background: var(--success-600);
-      border-color: var(--success-600);
-      color: var(--white);
-    }
-    .btn-warning {
-      background: var(--warning-600);
-      border-color: var(--warning-600);
-      color: var(--white);
-    }
-    .btn-warning:hover {
-      background: var(--warning-600);
-      border-color: var(--warning-600);
-      color: var(--white);
-    }
-    .btn-outline-primary {
-      color: var(--primary-800);
-      border-color: var(--primary-800);
-    }
-    .btn-outline-primary:hover {
-      color: var(--white);
-      background: var(--primary-700);
-      border-color: var(--primary-700);
-    }
-    .btn-outline-success {
-      color: var(--success-600);
-      border-color: var(--success-600);
-    }
-    .btn-outline-success:hover {
-      color: var(--white);
-      background: var(--success-600);
-      border-color: var(--success-600);
-    }
-    .text-primary {
-      color: var(--primary-700) !important;
-    }
-    .bg-primary {
-      background-color: var(--primary-800) !important;
-    }
-    .page-title {
-      margin: 0 0 1.25rem;
-      color: var(--primary-900);
-      font-size: 1.7rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .admin-shell-card,
-    .admin-toolbar,
-    .admin-stat-card,
-    .admin-subcard {
-      border: 1px solid var(--primary-200);
+    /* UI HELPERS */
+    .card-charity {
+      border: 1px solid var(--primary-100);
       border-radius: var(--radius-lg);
       background: var(--white);
-      box-shadow: var(--shadow-card);
+      box-shadow: var(--shadow-sm);
     }
-    .admin-shell-card .card-header,
-    .admin-toolbar .card-header,
-    .admin-subcard .card-header {
-      border-bottom: 1px solid var(--primary-200);
-      background: linear-gradient(180deg, var(--white) 0%, var(--primary-50) 100%);
-      color: var(--primary-900);
-      font-weight: 700;
-      padding: 1rem 1.25rem;
+    .btn { border-radius: 999px; font-weight: 600; padding: 0.5rem 1.5rem; transition: 0.2s; }
+    .btn-sm { padding: 0.4rem 1rem; font-size: 13px; }
+    .badge { border-radius: 999px; font-weight: 700; padding: 0.5em 0.85em; }
+    .radius-pill { border-radius: 9999px !important; }
+    .fw-800 { font-weight: 800; }
+    .text-trust { color: var(--primary-800); }
+
+    /* MOBILE TOGGLE */
+    .sidebar-backdrop {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(10, 22, 40, 0.4); backdrop-filter: blur(4px);
+        z-index: 1020; display: none;
     }
-    .admin-shell-card .card-body,
-    .admin-toolbar .card-body,
-    .admin-subcard .card-body {
-      padding: 1.25rem;
-    }
-    .admin-section-title {
-      margin: 1.25rem 0 0.85rem;
-      padding-top: 0.85rem;
-      border-top: 1px solid var(--primary-200);
-      color: var(--primary-800);
-      font-size: 0.96rem;
-      font-weight: 700;
-    }
-    .admin-toolbar {
-      margin: 1rem 0 1.5rem;
-    }
-    .admin-toolbar .form-control,
-    .admin-toolbar .form-select,
-    .admin-shell-card .form-control,
-    .admin-shell-card .form-select,
-    .admin-subcard .form-control,
-    .admin-subcard .form-select {
-      min-height: 44px;
-      border-color: var(--primary-200);
-      border-radius: var(--radius-md);
-      box-shadow: none;
-    }
-    .admin-toolbar .form-control:focus,
-    .admin-toolbar .form-select:focus,
-    .admin-shell-card .form-control:focus,
-    .admin-shell-card .form-select:focus,
-    .admin-subcard .form-control:focus,
-    .admin-subcard .form-select:focus {
-      border-color: var(--primary-400);
-      box-shadow: 0 0 0 0.2rem rgba(79, 132, 224, 0.16);
-    }
-    .admin-table {
-      margin-bottom: 0;
-      vertical-align: middle;
-    }
-    .admin-table thead th {
-      border-bottom: 1px solid var(--primary-200);
-      background: var(--primary-50);
-      color: var(--primary-900);
-      font-size: 0.85rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-      padding: 0.95rem 1rem;
-    }
-    .admin-table tbody td {
-      border-color: var(--primary-100);
-      padding: 0.95rem 1rem;
-      color: var(--neutral-900);
-    }
-    .admin-table tbody tr:hover {
-      background: rgba(79, 132, 224, 0.04);
-    }
-    .admin-table.table-sm thead th,
-    .admin-table.table-sm tbody td {
-      padding: 0.75rem 0.85rem;
-    }
-    .admin-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .admin-actions .btn {
-      border-radius: 999px;
-    }
-    .admin-stat-card .card-body {
-      padding: 0.72rem 0.85rem;
-      text-align: center;
-    }
-    .admin-stat-card .metric-value {
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.05;
-    }
-    .admin-stat-card .metric-label {
-      margin-top: 0.2rem;
-      color: var(--neutral-500);
-      font-size: 0.8rem;
-      font-weight: 500;
-      line-height: 1.2;
-    }
-    @media (max-width: 768px) {
-      .admin-stat-card .metric-value {
-        font-size: 1.18rem;
-      }
-      .admin-stat-card .metric-label {
-        font-size: 0.76rem;
-      }
-    }
-    .admin-modal-header {
-      background: linear-gradient(135deg, var(--primary-900), var(--primary-700));
-      color: var(--white);
-      border-bottom: 0;
-      padding: 1rem 1.25rem;
-    }
-    .admin-modal-header .modal-title {
-      font-weight: 700;
-    }
-    .admin-modal-header .btn-close {
-      filter: invert(1) grayscale(100%) brightness(200%);
-    }
-    .admin-empty {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: var(--neutral-500);
-    }
-    .btn {
-      border-radius: 999px;
-      font-weight: 600;
-    }
-    .btn-sm {
-      padding: 0.45rem 0.8rem;
-    }
-    .btn-light,
-    .btn-secondary {
-      background: var(--white);
-      border-color: var(--primary-200);
-      color: var(--primary-800);
-    }
-    .btn-light:hover,
-    .btn-secondary:hover {
-      background: var(--primary-50);
-      border-color: var(--primary-300);
-      color: var(--primary-800);
-    }
-    .badge {
-      border-radius: 999px;
-      font-weight: 700;
-      padding: 0.5em 0.75em;
+
+    @media (max-width: 991.98px) {
+      .admin-sidebar { transform: translateX(-100%); }
+      .admin-sidebar.show { transform: translateX(0); }
+      .admin-main { margin-left: 0; padding: 90px 16px 32px; }
+      .sidebar-backdrop.show { display: block; }
     }
 
     /* Toast Notification System */
     .toast-container {
         position: fixed;
-        top: 70px;
-        right: 20px;
-        z-index: 9999;
+        top: 80px;
+        right: 24px;
+        z-index: 1100;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
         max-width: 400px;
-        width: 100%;
+        width: calc(100% - 48px);
     }
     .toast-notification {
         display: flex;
         align-items: flex-start;
         gap: 12px;
-        padding: 14px 18px;
-        border-radius: 10px;
-        background: white;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+        padding: 16px 20px;
+        border-radius: var(--radius-md);
+        background: var(--white);
+        box-shadow: var(--shadow-lg);
         border-left: 4px solid var(--neutral-500);
         transform: translateX(120%);
         opacity: 0;
         transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-        cursor: pointer;
         position: relative;
         overflow: hidden;
     }
-    .toast-notification.show {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    .toast-notification.hide {
-        transform: translateX(120%);
-        opacity: 0;
-    }
-    .toast-notification .toast-icon {
-        font-size: 18px;
-        min-width: 22px;
-        text-align: center;
-        margin-top: 1px;
-    }
-    .toast-notification .toast-body {
-        flex: 1;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--neutral-900);
-        line-height: 1.5;
-    }
-    .toast-notification .toast-close {
-        background: none;
-        border: none;
-        color: var(--neutral-500);
-        font-size: 16px;
-        cursor: pointer;
-        padding: 0;
-        line-height: 1;
-        transition: color 0.2s;
-    }
-    .toast-notification .toast-close:hover { color: var(--neutral-900); }
-    .toast-notification .toast-progress {
-        position: absolute;
-        bottom: 0;
-        left: 4px;
-        right: 0;
-        height: 3px;
-        border-radius: 0 0 10px 0;
-        background: currentColor;
-        opacity: 0.3;
-        transform-origin: left;
+    .toast-notification.show { transform: translateX(0); opacity: 1; }
+    .toast-notification.hide { transform: translateX(120%); opacity: 0; }
+    .toast-icon { font-size: 20px; min-width: 24px; text-align: center; }
+    .toast-body { flex: 1; font-size: 14px; font-weight: 500; color: var(--neutral-900); }
+    .toast-close { background: none; border: none; color: var(--neutral-500); font-size: 18px; cursor: pointer; padding: 0; }
+    .toast-progress {
+        position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+        background: currentColor; opacity: 0.2; transform-origin: left;
         animation: toastProgress 5s linear forwards;
     }
-    @keyframes toastProgress {
-        from { transform: scaleX(1); }
-        to { transform: scaleX(0); }
-    }
-    .toast-notification.toast-success { border-left-color: var(--success-600); }
-    .toast-notification.toast-success .toast-icon { color: var(--success-600); }
-    .toast-notification.toast-success .toast-progress { color: var(--success-600); }
-    .toast-notification.toast-error { border-left-color: var(--danger-600); }
-    .toast-notification.toast-error .toast-icon { color: var(--danger-600); }
-    .toast-notification.toast-error .toast-progress { color: var(--danger-600); }
-    .toast-notification.toast-warning { border-left-color: var(--warning-600); }
-    .toast-notification.toast-warning .toast-icon { color: var(--warning-600); }
-    .toast-notification.toast-warning .toast-progress { color: var(--warning-600); }
-    .toast-notification.toast-info { border-left-color: var(--primary-500); }
-    .toast-notification.toast-info .toast-icon { color: var(--primary-500); }
-    .toast-notification.toast-info .toast-progress { color: var(--primary-500); }
-
+    @keyframes toastProgress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+    .toast-success { border-left-color: var(--success-600); color: var(--success-600); }
+    .toast-error { border-left-color: var(--danger-600); color: var(--danger-600); }
+    .toast-warning { border-left-color: var(--warning-600); color: var(--warning-600); }
+    .toast-info { border-left-color: var(--primary-600); color: var(--primary-600); }
   </style>
 </head>
 
 <body>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-  <div class="header d-flex justify-content-between align-items-center">
-    <h2 onclick="window.location.href='{% url 'admin_panel:trangchu' %}'">
-      <i class="fas fa-heartbeat me-2"></i> QUỸ NHÂN ÁI
-    </h2>
-    <form action="{% url 'admin_panel:dangxuat' %}" method="POST" class="d-inline-block">
-      {% csrf_token %}
-      <button class="btn-logout" type="submit">
-        <i class="fas fa-sign-out-alt"></i> Đăng xuất
-      </button>
-    </form>
-  </div>
+  <header class="admin-header">
+    <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-light d-lg-none radius-md" id="sidebarToggle" style="padding: 8px 12px;">
+            <i class="fas fa-bars-staggered"></i>
+        </button>
+        <a href="{% url 'admin_panel:trangchu' %}" class="admin-logo">
+            <i class="fas fa-shield-heart fa-lg"></i>
+            <span>NHÂN ÁI ADMIN</span>
+        </a>
+    </div>
 
-  <div class="slide">
-    
-    <h6>Tổng quan</h6>
-    <ul>
-      <li><a href="{% url 'admin_panel:trangchu' %}"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-end d-none d-md-block">
+            <div class="small fw-800 text-primary">{{ user.username }}</div>
+            <div class="text-xs text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">{{ role|upper }} ACCOUNT</div>
+        </div>
+        <form action="{% url 'admin_panel:dangxuat' %}" method="POST" class="m-0">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm radius-pill px-3 fw-bold" type="submit">
+                <i class="fas fa-sign-out-alt me-1"></i> Thoát
+            </button>
+        </form>
+    </div>
+  </header>
+
+  <aside class="admin-sidebar" id="adminSidebar">
+    <div class="sidebar-section-title">Tổng quan</div>
+    <ul class="sidebar-nav">
+      <li><a href="{% url 'admin_panel:trangchu' %}" class="{% if request.path == '/admin/' %}active{% endif %}"><i class="fas fa-chart-pie"></i> Dashboard</a></li>
     </ul>
 
-    <h6>Quản lý Quyên góp</h6>
-    <ul>
-      <li><a href="{% url 'admin_panel:quanlychiendich' %}"><i class="fas fa-flag"></i> Quản lý chiến dịch</a></li>
-      <li><a href="{% url 'admin_panel:quanlychuongtrinh' %}"><i class="fas fa-bullseye"></i> Quản lý chương trình mục tiêu</a></li>
-      <li>
-          <a href="{% url 'admin_panel:quanly_quyengop' %}">
-              <i class="fas fa-hand-holding-usd"></i> Quản lý tiền ủng hộ
-          </a>
-      </li>
-      <li>
-          <a href="{% url 'admin_panel:quanly_giaingan' %}">
-              <i class="fas fa-money-check-alt"></i> Quản lý giải ngân
-          </a>
-      </li>
+    <div class="sidebar-section-title">Nghiệp vụ</div>
+    <ul class="sidebar-nav">
+      <li><a href="{% url 'admin_panel:quanlychiendich' %}" class="{% if '/chiendich/' in request.path %}active{% endif %}"><i class="fas fa-flag-checkered"></i> Quản lý chiến dịch</a></li>
+      <li><a href="{% url 'admin_panel:quanlychuongtrinh' %}" class="{% if '/chuongtrinh/' in request.path %}active{% endif %}"><i class="fas fa-bullseye"></i> Chương trình mục tiêu</a></li>
+      <li><a href="{% url 'admin_panel:quanly_quyengop' %}" class="{% if '/quyengop/' in request.path %}active{% endif %}"><i class="fas fa-hand-holding-heart"></i> Quản lý ủng hộ</a></li>
+      <li><a href="{% url 'admin_panel:quanly_giaingan' %}" class="{% if '/giaingan/' in request.path %}active{% endif %}"><i class="fas fa-money-bill-transfer"></i> Quản lý giải ngân</a></li>
       {% if role == 'admin' %}
-      <li><a href="{% url 'admin_panel:quanlytochuc' %}"><i class="fas fa-building"></i> Quản lý tổ chức</a></li>
+      <li><a href="{% url 'admin_panel:quanlytochuc' %}" class="{% if '/tochuc/' in request.path %}active{% endif %}"><i class="fas fa-building-ngo"></i> Quản lý tổ chức</a></li>
       {% endif %}
     </ul>
 
     {% if role == 'admin' %}
-    <h6>Hệ thống (Admin Only)</h6>
-    <ul>
-      <li><a href="{% url 'admin_panel:quanlydanhmuc' %}"><i class="fas fa-tags"></i> Danh mục</a></li>
-      <li><a href="#"><i class="fas fa-users"></i> Quản lý Người dùng</a></li>
-      <li><a href="#"><i class="fas fa-cogs"></i> Cấu hình chung</a></li>
+    <div class="sidebar-section-title">Hệ thống</div>
+    <ul class="sidebar-nav">
+      <li><a href="{% url 'admin_panel:quanlydanhmuc' %}" class="{% if '/danhmuc/' in request.path %}active{% endif %}"><i class="fas fa-tags"></i> Danh mục</a></li>
+      <li><a href="#"><i class="fas fa-users-gear"></i> Quản lý người dùng</a></li>
+      <li><a href="#"><i class="fas fa-sliders"></i> Cấu hình chung</a></li>
     </ul>
     {% endif %}
 
     {% if role == 'partner' %}
-    <h6>Tài khoản Tổ chức</h6>
-    <ul>
-      <li><a href="#"><i class="fas fa-user-edit"></i> Hồ sơ Tổ chức</a></li>
+    <div class="sidebar-section-title">Tài khoản</div>
+    <ul class="sidebar-nav">
+      <li><a href="#"><i class="fas fa-id-card"></i> Hồ sơ tổ chức</a></li>
       <li><a href="#"><i class="fas fa-key"></i> Đổi mật khẩu</a></li>
     </ul>
     {% endif %}
-
-  </div>
+  </aside>
 
   <!-- Toast Notifications -->
   <div class="toast-container" id="toastContainer">
@@ -560,15 +306,10 @@
           {% for message in messages %}
               <div class="toast-notification toast-{{ message.tags|default:'info' }}">
                   <div class="toast-icon">
-                      {% if 'success' in message.tags %}
-                          <i class="fas fa-check-circle"></i>
-                      {% elif 'error' in message.tags %}
-                          <i class="fas fa-exclamation-circle"></i>
-                      {% elif 'warning' in message.tags %}
-                          <i class="fas fa-exclamation-triangle"></i>
-                      {% else %}
-                          <i class="fas fa-info-circle"></i>
-                      {% endif %}
+                      {% if 'success' in message.tags %}<i class="fas fa-circle-check text-success"></i>
+                      {% elif 'error' in message.tags %}<i class="fas fa-circle-exclamation text-danger"></i>
+                      {% elif 'warning' in message.tags %}<i class="fas fa-triangle-exclamation text-warning"></i>
+                      {% else %}<i class="fas fa-circle-info text-primary"></i>{% endif %}
                   </div>
                   <div class="toast-body">{{ message }}</div>
                   <button class="toast-close" onclick="dismissToast(this.parentElement)">&times;</button>
@@ -578,98 +319,88 @@
       {% endif %}
   </div>
 
-  <div class="main-content">
-    
+  <main class="admin-main">
     {% block content %}
-    <div class="alert alert-white shadow-sm border-0 d-flex align-items-center mb-4" style="background: white; border-left: 5px solid var(--primary-700) !important;">
-        <div class="fs-4 me-3 text-primary"><i class="fas fa-user-circle"></i></div>
+    <div class="alert bg-white shadow-sm border-0 d-flex align-items-center mb-5 p-4 radius-lg" style="border-left: 6px solid var(--primary-800) !important;">
+        <div class="fs-1 me-4 text-primary opacity-50"><i class="fas fa-user-shield"></i></div>
         <div>
-            Xin chào, 
-            {% if role == 'admin' %}
-                <strong class="text-danger">QUẢN TRỊ VIÊN HỆ THỐNG (SUPER ADMIN)</strong>
-                <div class="small text-muted">Bạn có toàn quyền quản lý hệ thống.</div>
-            {% else %}
-                <strong class="text-primary">ĐỐI TÁC {{ user.managed_organizations.first.name|upper }}</strong>
-                <div class="small text-muted">Chào mừng bạn quay trở lại quản lý tổ chức.</div>
-            {% endif %}
+            <div class="text-xs text-muted fw-800 text-uppercase mb-1" style="letter-spacing: 1px; font-size: 10px;">Phiên làm việc hiện tại</div>
+            <h5 class="m-0 text-dark">Xin chào, 
+                {% if role == 'admin' %}
+                    <span class="text-danger fw-800">SUPER ADMIN</span>
+                {% else %}
+                    <span class="text-primary fw-800">ĐỐI TÁC {{ user.managed_organizations.first.name|upper }}</span>
+                {% endif %}
+            </h5>
+            <div class="small text-muted mt-1">Chào mừng bạn quay trở lại hệ thống quản lý Quỹ Nhân Ái.</div>
         </div>
     </div>
 
-    <h4 class="mb-3 text-secondary fw-bold">Thống kê hoạt động</h4>
-    <div class="row g-4">
-        
+    <div class="row g-4 mb-5">
         <div class="col-xl-3 col-md-6">
-            <div class="card dashboard-card bg-gradient-success">
-                <div class="card-body">
-                    <h6 class="text-uppercase mb-1">Tổng tiền quyên góp</h6>
-                    <div class="h3 mb-0 fw-bold">{{ total_donations_amount|intcomma }} đ</div>
-                    <i class="fas fa-dollar-sign card-icon"></i>
-                </div>
+            <div class="stat-card bg-grad-success">
+                <div class="metric-label">Tổng ủng hộ</div>
+                <div class="metric-value">{{ total_donations_amount|intcomma }}đ</div>
+                <i class="fas fa-hand-holding-dollar stat-icon"></i>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
-            <div class="card dashboard-card bg-gradient-primary">
-                <div class="card-body">
-                    <h6 class="text-uppercase mb-1">Chiến dịch Gây quỹ</h6>
-                    <div class="h3 mb-0 fw-bold">{{ total_campaigns }}</div>
-                    <small>Chiến dịch đang/đã chạy</small>
-                    <i class="fas fa-flag card-icon"></i>
-                </div>
+            <div class="stat-card bg-grad-primary">
+                <div class="metric-label">Chiến dịch</div>
+                <div class="metric-value">{{ total_campaigns }}</div>
+                <i class="fas fa-flag stat-icon"></i>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
-            <div class="card dashboard-card bg-gradient-info">
-                <div class="card-body">
-                    <h6 class="text-uppercase mb-1">Chương trình Mục tiêu</h6>
-                    <div class="h3 mb-0 fw-bold">{{ total_programs }}</div>
-                    <small>Chương trình dài hạn</small>
-                    <i class="fas fa-bullseye card-icon"></i>
-                </div>
+            <div class="stat-card bg-grad-info">
+                <div class="metric-label">Chương trình</div>
+                <div class="metric-value">{{ total_programs }}</div>
+                <i class="fas fa-bullseye stat-icon"></i>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
-            <div class="card dashboard-card bg-gradient-warning">
-                <div class="card-body">
-                    {% if role == 'admin' %}
-                        <h6 class="text-uppercase mb-1">Tổ chức Đối tác</h6>
-                        <div class="h3 mb-0 fw-bold">{{ orgs_count|default:"--" }}</div>
-                        <small>Đơn vị hợp tác</small>
-                        <i class="fas fa-handshake card-icon"></i>
-                    {% else %}
-                        <h6 class="text-uppercase mb-1">Trạng thái</h6>
-                        <div class="h4 mb-0 fw-bold">ĐANG HOẠT ĐỘNG</div>
-                        <small>Tài khoản đã xác thực</small>
-                        <i class="fas fa-check-circle card-icon"></i>
-                    {% endif %}
-                </div>
+            <div class="stat-card bg-grad-warning">
+                {% if role == 'admin' %}
+                    <div class="metric-label">Tổ chức đối tác</div>
+                    <div class="metric-value">{{ orgs_count|default:"0" }}</div>
+                    <i class="fas fa-handshake-angle stat-icon"></i>
+                {% else %}
+                    <div class="metric-label">Trạng thái</div>
+                    <div class="metric-value" style="font-size: 1.1rem;">ĐANG HOẠT ĐỘNG</div>
+                    <i class="fas fa-circle-check stat-icon"></i>
+                {% endif %}
             </div>
         </div>
-
     </div>
 
-    <div class="row mt-4">
-        <div class="col-lg-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white py-3">
-                    <h6 class="m-0 fw-bold text-primary">Hoạt động gần đây</h6>
-                </div>
-                <div class="card-body text-center py-5 text-muted">
-                    <i class="fas fa-chart-area fa-3x mb-3 text-gray-300"></i>
-                    <p>Chưa có dữ liệu thống kê chi tiết.</p>
-                </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card-charity bg-white p-5 text-center">
+                <i class="fas fa-chart-line fa-4x text-primary opacity-10 mb-4"></i>
+                <h5 class="text-muted fw-800">Hoạt động gần đây</h5>
+                <p class="text-muted small">Hệ thống đang thu thập dữ liệu thống kê chi tiết của bạn.</p>
             </div>
         </div>
     </div>
     {% endblock %}
-
-  </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+  // Sidebar Toggle Logic
+  const sidebar = document.getElementById('adminSidebar');
+  const toggleBtn = document.getElementById('sidebarToggle');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  function toggleSidebar() {
+      sidebar.classList.toggle('show');
+      backdrop.classList.toggle('show');
+  }
+
+  toggleBtn?.addEventListener('click', toggleSidebar);
+  backdrop?.addEventListener('click', toggleSidebar);
+
   // Toast Notification System
   function dismissToast(el) {
       el.classList.remove('show');
@@ -679,12 +410,8 @@
   document.addEventListener('DOMContentLoaded', function() {
       var toasts = document.querySelectorAll('.toast-notification');
       toasts.forEach(function(toast, index) {
-          setTimeout(function() {
-              toast.classList.add('show');
-          }, index * 150);
-          setTimeout(function() {
-              dismissToast(toast);
-          }, 5000 + index * 150);
+          setTimeout(function() { toast.classList.add('show'); }, index * 150);
+          setTimeout(function() { dismissToast(toast); }, 5000 + index * 150);
       });
   });
   </script>

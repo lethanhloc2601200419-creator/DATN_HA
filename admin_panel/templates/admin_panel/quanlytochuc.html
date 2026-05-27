@@ -2,293 +2,253 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <h2 class="page-title">Quản lý Tổ chức từ thiện</h2>
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Tổ chức</li>
+        </ol>
+    </nav>
 
-    <div class="row g-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Quản lý Tổ chức Đối tác</h2>
+        <button type="button" class="btn btn-primary px-4 radius-pill shadow-btn" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus-circle me-2"></i> Thêm Tổ chức mới
+        </button>
+    </div>
+
+    <div class="row g-4 mb-4">
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-primary">{{ stats.total }}</div>
-                    <div class="metric-label">Tổng tổ chức</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng tổ chức</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-success">{{ stats.verified }}</div>
-                    <div class="metric-label">Đã xác thực</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đã xác thực</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.verified }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-warning">{{ stats.locked }}</div>
-                    <div class="metric-label">Đang khóa</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang khóa</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.locked }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-info">{{ stats.with_wallet }}</div>
-                    <div class="metric-label">Có ví crypto</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-info shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Có ví crypto</div>
+                <div class="h3 fw-800 m-0 text-info">{{ stats.with_wallet }}</div>
             </div>
         </div>
     </div>
 
-    <div class="card admin-toolbar">
-        <div class="card-body">
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc danh sách</h6>
+        </div>
+        <div class="card-body p-4">
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-5">
-                    <input type="text" name="q" class="form-control"
-                           placeholder="Tìm theo tên, SĐT, ngân hàng, người quản lý..."
-                           value="{{ query }}">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm theo tên, SĐT, ngân hàng, quản lý..." value="{{ query }}">
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">Tất cả trạng thái</option>
+                        <option value="">— Trạng thái —</option>
                         <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Đã xác thực</option>
                         <option value="locked" {% if selected_status == 'locked' %}selected{% endif %}>Đang khóa</option>
                     </select>
                 </div>
-                <div class="col-md-4 text-end">
-                    <div class="admin-actions justify-content-end">
-                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
-                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
-                        <a href="{% url 'admin_panel:quanlytochuc' %}" class="btn btn-outline-primary">Xóa lọc</a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i> Tìm
-                        </button>
-                    </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC</button>
                 </div>
-                <div class="col-md-12 text-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus-circle"></i> Thêm Tổ chức mới
-                    </button>
+                <div class="col-md-12 text-end mt-2">
+                    <a href="{{ export_csv_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-csv me-1"></i> Xuất CSV</a>
+                    <a href="{{ export_excel_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-excel me-1"></i> Xuất Excel</a>
+                    <a href="{% url 'admin_panel:quanlytochuc' %}" class="small fw-bold text-decoration-none"><i class="fas fa-rotate-left me-1"></i> Xóa lọc</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card admin-shell-card">
-        <div class="card-header">
-            <i class="fas fa-building me-1"></i> Danh sách Tổ chức
-        </div>
-        <div class="card-body p-0">
-            <form method="post">
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
+        <form method="post">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ current_url }}">
-            <div class="p-3 border-bottom bg-light">
-                <div class="row g-2 align-items-center">
-                    <div class="col-md-4">
-                        <select name="bulk_action" class="form-select">
-                            <option value="">-- Bulk action --</option>
-                            <option value="verify">Duyệt nhiều dòng</option>
-                            <option value="lock">Khóa nhiều dòng</option>
-                            <option value="delete">Xóa nhiều dòng</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các tổ chức đã chọn?')">Áp dụng</button>
-                    </div>
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        <option value="verify">Duyệt nhiều dòng</option>
+                        <option value="lock">Khóa nhiều dòng</option>
+                        <option value="delete">Xóa nhiều dòng</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Áp dụng thao tác cho các tổ chức đã chọn?')">Áp dụng</button>
                 </div>
             </div>
             <div class="table-responsive">
-            <table class="table admin-table">
-                <thead>
-                    <tr>
-                        <th width="4%"><input type="checkbox" id="select-all-orgs"></th>
-                        <th width="5%">ID</th>
-                        <th width="10%">Logo</th>
-                        <th width="25%">Tên Tổ chức / Quản lý</th>
-                        <th width="25%">Thông tin Ngân hàng</th>
-                        <th width="15%">Trạng thái</th>
-                        <th width="20%">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for org in orgs %}
-                    <tr class="{% if not org.is_verified %}table-secondary{% endif %}">
-                        <td><input type="checkbox" class="row-checkbox-org" name="selected_ids" value="{{ org.id }}"></td>
-                        <td>{{ org.id }}</td>
-                        <td class="text-center">
-                            {% if org.logo_url %}
-                                <img src="/media/{{ org.logo_url }}" onerror="this.src='{{ org.logo_url }}'" class="rounded border" style="height: 50px; width: 50px; object-fit: cover;">
-                            {% else %}
-                                <span class="badge bg-secondary">No img</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong>{{ org.name }}</strong><br>
-                            
-                            {% if org.manager %}
-                                <span class="badge bg-info text-dark mt-1">
-                                    <i class="fas fa-user-shield"></i> {{ org.manager.username }}
-                                </span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark mt-1">Chưa có quản lý</span>
-                            {% endif %}
-                            <br>
-                            <small class="text-muted"><i class="fas fa-phone"></i> {{ org.contact_phone }}</small>
-                        </td>
-                        <td>
-                            <small>
-                                <strong>NH:</strong> {{ org.bank_name }}<br>
-                                <strong>STK:</strong> {{ org.bank_account_number }}<br>
-                                <strong>Chủ TK:</strong> {{ org.bank_account_name }}
-                            </small>
-                        </td>
-                        <td class="text-center">
-                            {% if org.is_verified %}
-                                <span class="badge bg-success"><i class="fas fa-check-circle"></i> Đang hoạt động</span>
-                            {% else %}
-                                <span class="badge bg-secondary"><i class="fas fa-lock"></i> Đang khóa</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="admin-actions">
-                            <button type="button" class="btn btn-sm btn-primary"
-                                    title="Sửa thông tin"
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#editModal"
-                                    onclick="fillEditForm(
-                                        '{{ org.id }}',
-                                        '{{ org.name|escapejs }}',
-                                        '{{ org.contact_phone|default_if_none:'' }}',
-                                        '{{ org.bank_name|default_if_none:''|escapejs }}',
-                                        '{{ org.bank_account_number|default_if_none:'' }}',
-                                        '{{ org.bank_account_name|default_if_none:''|escapejs }}',
-                                        '{{ org.description|default_if_none:''|escapejs }}',
-                                        '{{ org.wallet_address|default_if_none:'' }}',
-                                        '{{ org.payos_client_id|default_if_none:'' }}',
-                                        '{{ org.payos_api_key|default_if_none:'' }}',
-                                        '{{ org.payos_checksum_key|default_if_none:'' }}'
-                                    )">
-                                <i class="fas fa-edit"></i>
-                            </button>
-
-                            <a href="{% url 'admin_panel:khoa_tochuc' org.id %}" 
-                               class="btn btn-sm {% if org.is_verified %}btn-warning{% else %}btn-success{% endif %}"
-                               title="{% if org.is_verified %}Khóa tổ chức này{% else %}Kích hoạt lại{% endif %}"
-                               onclick="return confirm('Thay đổi trạng thái hoạt động của {{ org.name }}?')">
-                                {% if org.is_verified %}
-                                    <i class="fas fa-lock"></i> 
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-orgs" class="form-check-input"></th>
+                            <th width="8%">Logo</th>
+                            <th width="30%">Tổ chức / Quản lý</th>
+                            <th width="25%">Ngân hàng</th>
+                            <th width="12%" class="text-center">Trạng thái</th>
+                            <th width="15%" class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for org in orgs %}
+                        <tr class="{% if not org.is_verified %}bg-light opacity-75{% endif %}">
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-org form-check-input" name="selected_ids" value="{{ org.id }}"></td>
+                            <td class="text-center">
+                                {% if org.logo_url %}
+                                    <img src="/media/{{ org.logo_url }}" onerror="this.src='{{ org.logo_url }}'" class="rounded border shadow-sm" style="height: 48px; width: 48px; object-fit: cover;">
                                 {% else %}
-                                    <i class="fas fa-unlock"></i> 
+                                    <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted small fw-bold" style="height: 48px; width: 48px; font-size: 10px;">NO IMG</div>
                                 {% endif %}
-                            </a>
-
-                            <a href="{% url 'admin_panel:xoa_tochuc' org.id %}" 
-                               class="btn btn-sm btn-danger"
-                               title="Xóa vĩnh viễn"
-                               onclick="return confirm('CẢNH BÁO: Xóa tổ chức sẽ xóa luôn các chương trình liên quan! Bạn có chắc không?')">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="admin-empty">Không tìm thấy tổ chức nào.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ org.name }}</div>
+                                {% if org.manager %}
+                                    <span class="badge bg-primary-100 text-primary border border-primary-200 mt-1 mb-1">
+                                        <i class="fas fa-user-shield me-1"></i> {{ org.manager.username }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning mt-1 mb-1">Chưa có quản lý</span>
+                                {% endif %}
+                                <div class="text-xs text-muted"><i class="fas fa-phone me-1"></i> {{ org.contact_phone|default:"Chưa cập nhật" }}</div>
+                            </td>
+                            <td>
+                                <div class="small">
+                                    <div class="fw-600 text-dark">{{ org.bank_name|default:"—" }}</div>
+                                    <div class="text-muted"><i class="fas fa-money-check me-1"></i>{{ org.bank_account_number|default:"—" }}</div>
+                                    <div class="text-xs text-muted mt-1">{{ org.bank_account_name|default:"—" }}</div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                {% if org.is_verified %}
+                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1 radius-pill small"><i class="fas fa-check-circle me-1"></i> Hoạt động</span>
+                                {% else %}
+                                    <span class="badge bg-secondary px-2 py-1 radius-pill small"><i class="fas fa-lock me-1"></i> Đang khóa</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group shadow-sm radius-md overflow-hidden">
+                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa thông tin" data-bs-toggle="modal" data-bs-target="#editModal" onclick="fillEditForm('{{ org.id }}', '{{ org.name|escapejs }}', '{{ org.contact_phone|default_if_none:'' }}', '{{ org.bank_name|default_if_none:''|escapejs }}', '{{ org.bank_account_number|default_if_none:'' }}', '{{ org.bank_account_name|default_if_none:''|escapejs }}', '{{ org.description|default_if_none:''|escapejs }}', '{{ org.wallet_address|default_if_none:'' }}', '{{ org.payos_client_id|default_if_none:'' }}', '{{ org.payos_api_key|default_if_none:'' }}', '{{ org.payos_checksum_key|default_if_none:'' }}')">
+                                        <i class="fas fa-pen-to-square text-primary"></i>
+                                    </button>
+                                    <a href="{% url 'admin_panel:khoa_tochuc' org.id %}" class="btn btn-sm btn-white border-end" title="{% if org.is_verified %}Khóa tổ chức này{% else %}Kích hoạt lại{% endif %}" onclick="return confirm('Thay đổi trạng thái hoạt động của {{ org.name }}?')">
+                                        {% if org.is_verified %}<i class="fas fa-lock text-warning"></i>{% else %}<i class="fas fa-unlock text-success"></i>{% endif %}
+                                    </a>
+                                    <a href="{% url 'admin_panel:xoa_tochuc' org.id %}" class="btn btn-sm btn-white" title="Xóa vĩnh viễn" onclick="return confirm('CẢNH BÁO: Xóa tổ chức sẽ xóa luôn các chương trình liên quan! Bạn có chắc không?')">
+                                        <i class="fas fa-trash-can text-danger"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="admin-empty py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Không tìm thấy tổ chức nào.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            </form>
-        </div>
+        </form>
     </div>
 </div>
 
 <div class="modal fade" id="addModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content border-0 radius-lg shadow-lg">
             <form action="{% url 'admin_panel:them_tochuc' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-header admin-modal-header">
-                    <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Tổ chức & Cấp tài khoản</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-primary text-white border-0 py-3 px-4">
+                    <h5 class="modal-title fw-800"><i class="fas fa-plus-circle me-2"></i> Thêm Tổ chức & Cấp tài khoản</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4 bg-light">
                     
-                    <div class="card admin-subcard border-0 mb-3">
-                        <div class="card-body">
-                            <h6 class="text-primary fw-bold mb-2"><i class="fas fa-user-lock"></i> Cấp tài khoản quản trị (Cho Tổ chức tự đăng nhập)</h6>
-                            <div class="row">
-                                <div class="col-md-6 mb-2">
-                                    <label class="fw-bold">Tên đăng nhập (Username) *</label>
-                                    <input type="text" name="org_username" class="form-control" placeholder="VD: quytrongheo" required autocomplete="off">
-                                </div>
-                                <div class="col-md-6 mb-2">
-                                    <label class="fw-bold">Mật khẩu *</label>
-                                    <input type="text" name="org_password" class="form-control" placeholder="VD: 123456" required autocomplete="off">
-                                </div>
-                                <div class="col-md-12">
-                                    <small class="text-muted fst-italic">Tài khoản này sẽ được tự động tạo và gán quyền quản lý tổ chức.</small>
-                                </div>
+                    <div class="bg-white p-4 radius-md border shadow-sm mb-4 border-start border-4 border-info">
+                        <h6 class="text-primary fw-800 mb-3 text-uppercase small"><i class="fas fa-user-lock me-2"></i> Cấp tài khoản quản trị</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Tên đăng nhập (Username) *</label>
+                                <input type="text" name="org_username" class="form-control" placeholder="VD: quytrongheo" required autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Mật khẩu *</label>
+                                <input type="text" name="org_password" class="form-control" placeholder="VD: 123456" required autocomplete="off">
+                            </div>
+                            <div class="col-12 text-xs text-muted">
+                                <i class="fas fa-info-circle me-1"></i> Tài khoản này sẽ được tự động tạo và gán quyền quản lý tổ chức.
                             </div>
                         </div>
                     </div>
 
-                    <h6 class="admin-section-title text-success">Thông tin Tổ chức</h6>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label>Tên Tổ chức *</label>
-                            <input type="text" name="name" class="form-control" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Hotline (SĐT)</label>
-                            <input type="text" name="phone" class="form-control">
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label>Logo</label>
-                            <input type="file" name="logo" class="form-control">
-                        </div>
-                        
-                        <div class="col-md-12 mb-3">
-                            <label>Thông tin Ngân hàng (Để tạo QR)</label>
-                            <div class="input-group">
-                                <input type="text" name="bank_name" class="form-control" placeholder="Tên NH (VD: MBBank)" required>
-                                <input type="text" name="bank_account" class="form-control" placeholder="Số TK" required>
-                                <input type="text" name="account_holder" class="form-control" placeholder="Tên chủ TK" required>
+                    <div class="bg-white p-4 radius-md border shadow-sm mb-4">
+                        <h6 class="text-success fw-800 mb-3 text-uppercase small"><i class="fas fa-building me-2"></i> Thông tin Tổ chức</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Tên Tổ chức *</label>
+                                <input type="text" name="name" class="form-control" required>
                             </div>
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label>Địa chỉ ví Crypto (MetaMask) *</label>
-                            <input type="text" name="wallet_address" class="form-control" placeholder="0x..." required>
-                        </div>
-
-                        <div class="col-md-12 mb-3">
-                            <h6 class="admin-section-title text-warning">Cấu hình PayOS (Dành cho Giải ngân)</h6>
-                            <div class="row">
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS Client ID</label>
-                                    <input type="text" name="payos_client_id" class="form-control" placeholder="Client ID">
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS API Key</label>
-                                    <input type="password" name="payos_api_key" class="form-control" placeholder="API Key">
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS Checksum Key</label>
-                                    <input type="password" name="payos_checksum_key" class="form-control" placeholder="Checksum Key">
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Hotline (SĐT)</label>
+                                <input type="text" name="phone" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="fw-bold small text-muted">Logo</label>
+                                <input type="file" name="logo" class="form-control">
+                            </div>
+                            
+                            <div class="col-12 mt-4">
+                                <label class="fw-bold small text-muted">Thông tin Ngân hàng (Nhận quyên góp)</label>
+                                <div class="input-group">
+                                    <input type="text" name="bank_name" class="form-control" placeholder="Tên NH (VD: MBBank)" required>
+                                    <input type="text" name="bank_account" class="form-control" placeholder="Số TK" required>
+                                    <input type="text" name="account_holder" class="form-control" placeholder="Tên chủ TK" required>
                                 </div>
                             </div>
-                        </div>
+                            <div class="col-12">
+                                <label class="fw-bold small text-muted">Địa chỉ ví Crypto (MetaMask) *</label>
+                                <input type="text" name="wallet_address" class="form-control" placeholder="0x..." required>
+                            </div>
 
-                        <div class="col-md-12">
-                            <label>Mô tả / Giới thiệu</label>
-                            <textarea name="description" class="form-control" rows="3"></textarea>
+                            <div class="col-12 mt-4">
+                                <h6 class="text-warning fw-800 mb-3 text-uppercase small"><i class="fas fa-cogs me-2"></i> Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <input type="text" name="payos_client_id" class="form-control" placeholder="Client ID">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="password" name="payos_api_key" class="form-control" placeholder="API Key">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="password" name="payos_checksum_key" class="form-control" placeholder="Checksum Key">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <label class="fw-bold small text-muted">Mô tả / Giới thiệu</label>
+                                <textarea name="description" class="form-control" rows="3"></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-primary">Lưu & Tạo User</button>
+                <div class="modal-footer bg-light border-0 py-3 px-4">
+                    <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary fw-bold radius-pill px-4"><i class="fas fa-save me-1"></i> Lưu Tổ chức</button>
                 </div>
             </form>
         </div>
@@ -297,75 +257,64 @@
 
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content border-0 radius-lg shadow-lg">
             <form id="editForm" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-header admin-modal-header">
-                    <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Thông tin</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-primary text-white border-0 py-3 px-4">
+                    <h5 class="modal-title fw-800"><i class="fas fa-edit me-2"></i> Cập nhật Thông tin Tổ chức</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="alert alert-info py-2">
-                        <small><i class="fas fa-info-circle"></i> Lưu ý: Không thể thay đổi tài khoản quản lý tại đây. Vui lòng vào mục Quản lý Người dùng nếu cần.</small>
+                <div class="modal-body p-4 bg-light">
+                    <div class="alert bg-info-subtle border-info text-info py-2 px-3 radius-md small fw-600 mb-4">
+                        <i class="fas fa-info-circle me-1"></i> Không thể thay đổi tài khoản quản lý tại đây. Vui lòng vào mục Quản lý Người dùng nếu cần.
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label>Tên Tổ chức *</label>
-                            <input type="text" name="name" id="e_name" class="form-control" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Hotline (SĐT)</label>
-                            <input type="text" name="phone" id="e_phone" class="form-control">
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label>Logo Mới (Bỏ qua nếu không đổi)</label>
-                            <input type="file" name="logo" class="form-control">
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <label>Ngân hàng</label>
-                            <input type="text" name="bank_name" id="e_bank_name" class="form-control" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Số Tài khoản</label>
-                            <input type="text" name="bank_account" id="e_bank_account" class="form-control" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Chủ Tài khoản</label>
-                            <input type="text" name="account_holder" id="e_account_holder" class="form-control" required>
-                        </div>
+                    <div class="bg-white p-4 radius-md border shadow-sm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Tên Tổ chức *</label>
+                                <input type="text" name="name" id="e_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold small text-muted">Hotline (SĐT)</label>
+                                <input type="text" name="phone" id="e_phone" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="fw-bold small text-muted">Logo Mới (Bỏ qua nếu không đổi)</label>
+                                <input type="file" name="logo" class="form-control">
+                            </div>
+                            
+                            <div class="col-12 mt-4">
+                                <label class="fw-bold small text-muted">Thông tin Ngân hàng</label>
+                                <div class="row g-2">
+                                    <div class="col-md-4"><input type="text" name="bank_name" id="e_bank_name" class="form-control" placeholder="Tên NH" required></div>
+                                    <div class="col-md-4"><input type="text" name="bank_account" id="e_bank_account" class="form-control" placeholder="Số TK" required></div>
+                                    <div class="col-md-4"><input type="text" name="account_holder" id="e_account_holder" class="form-control" placeholder="Chủ TK" required></div>
+                                </div>
+                            </div>
+                            <div class="col-12 mt-4">
+                                <label class="fw-bold small text-muted">Địa chỉ ví Crypto (MetaMask) *</label>
+                                <input type="text" name="wallet_address" id="e_wallet_address" class="form-control" required>
+                            </div>
 
-                        <div class="col-md-12">
-                            <label>Mô tả</label>
-                            <textarea name="description" id="e_description" class="form-control" rows="3"></textarea>
-                        </div>
-                        <div class="col-md-12 mt-3">
-                            <label>Địa chỉ ví Crypto (MetaMask) *</label>
-                            <input type="text" name="wallet_address" id="e_wallet_address" class="form-control" required>
-                        </div>
+                            <div class="col-12 mt-4">
+                                <h6 class="text-warning fw-800 mb-3 text-uppercase small"><i class="fas fa-cogs me-2"></i> Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4"><input type="text" name="payos_client_id" id="e_payos_client_id" class="form-control" placeholder="Client ID"></div>
+                                    <div class="col-md-4"><input type="password" name="payos_api_key" id="e_payos_api_key" class="form-control" placeholder="API Key"></div>
+                                    <div class="col-md-4"><input type="password" name="payos_checksum_key" id="e_payos_checksum_key" class="form-control" placeholder="Checksum Key"></div>
+                                </div>
+                            </div>
 
-                        <div class="col-md-12 mb-3">
-                            <h6 class="admin-section-title text-warning">Cấu hình PayOS (Dành cho Giải ngân)</h6>
-                            <div class="row">
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS Client ID</label>
-                                    <input type="text" name="payos_client_id" id="e_payos_client_id" class="form-control" placeholder="Client ID">
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS API Key</label>
-                                    <input type="password" name="payos_api_key" id="e_payos_api_key" class="form-control" placeholder="API Key">
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <label>PayOS Checksum Key</label>
-                                    <input type="password" name="payos_checksum_key" id="e_payos_checksum_key" class="form-control" placeholder="Checksum Key">
-                                </div>
+                            <div class="col-12 mt-4">
+                                <label class="fw-bold small text-muted">Mô tả chi tiết</label>
+                                <textarea name="description" id="e_description" class="form-control" rows="4"></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                <div class="modal-footer bg-light border-0 py-3 px-4">
+                    <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary fw-bold radius-pill px-4"><i class="fas fa-save me-1"></i> Lưu thay đổi</button>
                 </div>
             </form>
         </div>
@@ -393,4 +342,10 @@
         });
     });
 </script>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+    .opacity-20 { opacity: 0.2; }
+</style>
 {% endblock %}

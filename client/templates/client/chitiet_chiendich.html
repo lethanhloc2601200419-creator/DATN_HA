@@ -4,59 +4,59 @@
 {% block content %}
 
 <div class="container py-4">
-    <div class="row">
+    <div class="row g-4">
         <div class="col-lg-8">
-           <div class="rounded-4 overflow-hidden shadow-sm mb-4 position-relative">
-    <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
-         class="w-100 object-fit-cover" 
-         style="height: 400px;" 
-         alt="{{ campaign.title }}"
-         onerror="this.src='https://placehold.co/800x400?text=Chiến+dịch';">
-    
-    <div class="position-absolute top-0 start-0 m-3">
-        <span class="badge bg-primary fs-6 shadow">
-            <i class="bi bi-tag-fill me-1"></i> {{ campaign.category.name|default:"Chung" }}
-        </span>
-    </div>
-</div>
-
-            <h1 class="fw-bold mb-3 text-dark">{{ campaign.title }}</h1>
-            
-            <div class="d-flex align-items-center mb-4 text-muted">
-                <i class="bi bi-calendar-event me-2"></i>
-                <span>Ngày tạo: {{ campaign.created_at|date:"d/m/Y" }}</span>
-                <span class="mx-3">|</span>
-                <i class="bi bi-building me-2"></i>
-                <span>Tổ chức: <strong>{{ campaign.organization.name }}</strong></span>
+            <div class="card-charity overflow-hidden mb-4 position-relative">
+                <img src="{{ campaign.cover_image_url|default:campaign.avatar_image_url }}" 
+                     class="w-100 object-fit-cover" 
+                     style="height: 440px;" 
+                     alt="{{ campaign.title }}"
+                     onerror="this.src='https://placehold.co/800x450?text=Chiến+dịch';">
+                
+                <div class="position-absolute top-0 start-0 m-3">
+                    <span class="badge bg-primary fs-6 shadow-sm px-3 py-2 rounded-pill">
+                        <i class="fas fa-tag me-1"></i> {{ campaign.category.name|default:"Chung" }}
+                    </span>
+                </div>
             </div>
 
-            <hr>
+            <h1 class="fw-800 mb-3 text-neutral-900">{{ campaign.title }}</h1>
+            
+            <div class="d-flex align-items-center mb-4 text-muted gap-3 flex-wrap">
+                <span class="small"><i class="fas fa-calendar-alt me-2 text-primary"></i>Ngày tạo: <strong>{{ campaign.created_at|date:"d/m/Y" }}</strong></span>
+                <span class="vr d-none d-md-block" style="height: 15px;"></span>
+                <span class="small"><i class="fas fa-building me-2 text-primary"></i>Tổ chức: <strong class="text-trust">{{ campaign.organization.name }}</strong></span>
+            </div>
 
-            <div class="campaign-content mt-4 lh-lg">
-                <h4 class="fw-bold mb-3">Câu chuyện</h4>
-                <p class="text-secondary">{{ campaign.full_description|linebreaks }}</p>
+            <hr class="opacity-10 mb-4">
+
+            <div class="campaign-content mt-4 lh-lg text-justify text-neutral-700">
+                <h4 class="fw-bold mb-3 text-dark border-start border-4 border-primary ps-3">Câu chuyện</h4>
+                <div class="ps-1">
+                    {{ campaign.full_description|linebreaks }}
+                </div>
             </div>
 
             {% if active_proposals %}
-            <div class="mt-5 p-4 rounded-4 border" style="background: linear-gradient(135deg, var(--primary-50) 0%, var(--white) 100%);">
+            <div class="mt-5 p-4 radius-lg border border-primary-100" style="background: linear-gradient(135deg, var(--primary-50) 0%, var(--white) 100%);">
                 <h4 class="fw-bold mb-4 border-start border-4 border-primary ps-3">
                     🗳️ Bỏ phiếu giải ngân
                 </h4>
 
                 {% if user_can_vote %}
-                <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius: 12px;">
-                    <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+                <div class="alert bg-primary-100 border-primary-200 d-flex align-items-start mb-4 p-3 radius-md">
+                    <i class="fas fa-circle-info me-3 fs-4 text-primary mt-1"></i>
                     <div>
-                        <strong>Quyền bỏ phiếu của bạn:</strong> Trọng số {{ user_voting_power|intcomma }}đ 
-                        ({{ user_voting_pct|floatformat:1 }}% tổng quyền biểu quyết)
-                        <br><small class="text-muted">Trọng số được tính dựa trên số tiền bạn đã ủng hộ (giới hạn tối đa 30% tổng quỹ)</small>
+                        <strong class="text-primary d-block mb-1">Quyền bỏ phiếu của bạn</strong>
+                        <span class="small">Trọng số <strong>{{ user_voting_power|intcomma }}đ</strong> (~{{ user_voting_pct|floatformat:1 }}% tổng quyền biểu quyết).</span>
+                        <br><small class="text-muted">Được tính dựa trên số tiền bạn đã ủng hộ (giới hạn tối đa 30% tổng quỹ).</small>
                     </div>
                 </div>
                 {% endif %}
 
                 {% for item in active_proposals %}
-                <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; overflow: hidden;">
-                    <div class="card-header border-0 py-3" style="background: linear-gradient(90deg, var(--primary-700) 0%, var(--primary-900) 100%);">
+                <div class="card-charity border-0 mb-4 overflow-hidden">
+                    <div class="card-header border-0 py-3 px-4" style="background: linear-gradient(90deg, var(--primary-800) 0%, var(--primary-950) 100%);">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-white">
                                 <h5 class="mb-0 fw-bold">{{ item.proposal.title }}</h5>
@@ -65,7 +65,7 @@
                                 {% endif %}
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-white text-danger fs-6 fw-bold px-3 py-2" style="border-radius: 20px;">
+                                <span class="badge bg-white text-accent-600 fs-6 fw-800 px-3 py-2 rounded-pill shadow-sm" style="color: var(--accent-600);">
                                     {{ item.proposal.amount_requested|intcomma }}đ
                                 </span>
                             </div>
@@ -73,60 +73,47 @@
                     </div>
 
                     <div class="card-body p-4">
-                        <div class="row mb-3">
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 {% if item.proposal.recipient_name %}
-                                <p class="mb-2"><i class="bi bi-person-fill text-primary me-2"></i><strong>Đơn vị thụ hưởng:</strong> {{ item.proposal.recipient_name }}</p>
+                                <p class="mb-2 small"><i class="fas fa-user-check text-primary me-2"></i><strong>Đơn vị thụ hưởng:</strong> {{ item.proposal.recipient_name }}</p>
                                 {% endif %}
-                                <p class="mb-2"><i class="bi bi-person-badge text-muted me-2"></i><strong>Người đề xuất:</strong> {{ item.proposal.created_by.get_full_name|default:item.proposal.created_by.username }}</p>
+                                <p class="mb-0 small"><i class="fas fa-id-badge text-muted me-2"></i><strong>Người đề xuất:</strong> {{ item.proposal.created_by.get_full_name|default:item.proposal.created_by.username }}</p>
                             </div>
                             <div class="col-md-6">
-                                <p class="mb-2"><i class="bi bi-clock text-warning me-2"></i><strong>Hạn bỏ phiếu:</strong> {{ item.proposal.end_date|date:"d/m/Y H:i" }}</p>
-                                <p class="mb-2"><i class="bi bi-people-fill text-info me-2"></i><strong>Đã bỏ phiếu:</strong> {{ item.votes_count }}/{{ item.total_donors }} người</p>
+                                <p class="mb-2 small"><i class="fas fa-hourglass-half text-warning me-2"></i><strong>Hạn bỏ phiếu:</strong> {{ item.proposal.end_date|date:"d/m/Y H:i" }}</p>
+                                <p class="mb-0 small"><i class="fas fa-users text-info me-2"></i><strong>Đã bỏ phiếu:</strong> {{ item.votes_count }}/{{ item.total_donors }} người</p>
                             </div>
                         </div>
 
                         {% if item.proposal.description %}
-                        <div class="bg-light p-3 rounded-3 mb-3">
-                            <small class="text-muted fw-bold">Mô tả chi tiết:</small>
-                            <p class="mb-0 mt-1">{{ item.proposal.description|truncatechars:300 }}</p>
+                        <div class="bg-light p-3 radius-md mb-4 border">
+                            <small class="text-muted fw-bold text-uppercase" style="font-size: 10px; letter-spacing: 0.5px;">Mô tả chi tiết</small>
+                            <p class="mb-0 mt-1 small">{{ item.proposal.description|truncatechars:400 }}</p>
                         </div>
                         {% endif %}
 
-                        {% if item.proposal.proof_images %}
-                        <div class="mb-3">
-                            <small class="text-muted fw-bold">Minh chứng:</small>
-                            <div class="d-flex gap-2 mt-1 flex-wrap">
-                                {% for img in item.proposal.proof_images %}
-                                <a href="{{ img }}" target="_blank">
-                                    <img src="{{ img }}" style="height: 60px; border-radius: 8px;" class="border shadow-sm">
-                                </a>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="fw-bold text-success"><i class="bi bi-hand-thumbs-up-fill"></i> Đồng ý: {{ item.yes_pct|floatformat:1 }}%</span>
-                                <span class="fw-bold text-danger"><i class="bi bi-hand-thumbs-down-fill"></i> Từ chối: {{ item.no_pct|floatformat:1 }}%</span>
+                                <span class="fw-bold text-success small"><i class="fas fa-thumbs-up me-1"></i> ĐỒNG Ý: {{ item.yes_pct|floatformat:1 }}%</span>
+                                <span class="fw-bold text-danger small"><i class="fas fa-thumbs-down me-1"></i> TỪ CHỐI: {{ item.no_pct|floatformat:1 }}%</span>
                             </div>
-                            <div class="progress" style="height: 12px; border-radius: 20px; background: var(--primary-200);">
+                            <div class="progress shadow-sm" style="height: 14px; border-radius: 20px; background: var(--neutral-100);">
                                 {% if item.total_voted > 0 %}
                                 <div class="progress-bar bg-success" role="progressbar" style="width: {{ item.yes_pct }}%; border-radius: 20px 0 0 20px;" title="Đồng ý"></div>
                                 <div class="progress-bar bg-danger" role="progressbar" style="width: {{ item.no_pct }}%;" title="Từ chối"></div>
                                 {% endif %}
                             </div>
-                            <div class="d-flex justify-content-between mt-1">
-                                <small class="text-muted">{{ item.yes_power|intcomma }}đ đồng ý</small>
-                                <small class="text-muted">{{ item.no_power|intcomma }}đ từ chối</small>
+                            <div class="d-flex justify-content-between mt-2">
+                                <small class="text-xs text-muted fw-bold">{{ item.yes_power|intcomma }}đ</small>
+                                <small class="text-xs text-muted fw-bold">{{ item.no_power|intcomma }}đ</small>
                             </div>
                         </div>
 
                         {% if item.proposal.end_date %}
-                        <div class="text-center mb-3">
-                            <span class="badge bg-light text-dark border px-3 py-2" style="font-size: 0.85rem;">
-                                <i class="bi bi-hourglass-split text-warning"></i>
+                        <div class="text-center mb-4">
+                            <span class="badge bg-light text-dark border px-4 py-2 radius-md shadow-sm">
+                                <i class="fas fa-clock-rotate-left text-warning me-2"></i>
                                 Còn lại: <strong class="countdown" data-end="{{ item.proposal.end_date|date:'c' }}">đang tính...</strong>
                             </span>
                         </div>
@@ -135,42 +122,46 @@
                         {% if user.is_authenticated %}
                             {% if item.user_voted is not None %}
                                 <div class="text-center">
-                                    <div class="alert {% if item.user_voted %}alert-success{% else %}alert-danger{% endif %} d-inline-block" style="border-radius: 12px;">
+                                    <div class="badge {% if item.user_voted %}bg-success-subtle border-success{% else %}bg-danger-subtle border-danger{% endif %} border px-4 py-3 radius-md w-100 fs-6">
                                         {% if item.user_voted %}
-                                            <i class="bi bi-check-circle-fill me-2"></i> Bạn đã bỏ phiếu <strong>ĐỒNG Ý</strong>
+                                            <i class="fas fa-check-circle me-2"></i> Bạn đã bỏ phiếu <strong>ĐỒNG Ý</strong>
                                         {% else %}
-                                            <i class="bi bi-x-circle-fill me-2"></i> Bạn đã bỏ phiếu <strong>TỪ CHỐI</strong>
+                                            <i class="fas fa-times-circle me-2"></i> Bạn đã bỏ phiếu <strong>TỪ CHỐI</strong>
                                         {% endif %}
                                     </div>
                                 </div>
                             {% elif user_can_vote %}
-                                <div class="d-flex gap-3 justify-content-center">
-                                    <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="d-inline">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="vote" value="yes">
-                                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm" style="border-radius: 12px;"
-                                                onclick="return confirm('Bạn xác nhận ĐỒNG Ý giải ngân {{ item.proposal.amount_requested|intcomma }}đ?')">
-                                            <i class="bi bi-hand-thumbs-up-fill me-2"></i> Đồng ý
-                                        </button>
-                                    </form>
-                                    <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="d-inline">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="vote" value="no">
-                                        <button type="submit" class="btn btn-outline-danger btn-lg px-4" style="border-radius: 12px;"
-                                                onclick="return confirm('Bạn xác nhận TỪ CHỐI giải ngân này?')">
-                                            <i class="bi bi-hand-thumbs-down-fill me-2"></i> Từ chối
-                                        </button>
-                                    </form>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="w-100">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="vote" value="yes">
+                                            <button type="submit" class="btn btn-success w-100 py-2 shadow-sm radius-md fw-bold"
+                                                    onclick="return confirm('Bạn xác nhận ĐỒNG Ý giải ngân {{ item.proposal.amount_requested|intcomma }}đ?')">
+                                                <i class="fas fa-check me-2"></i> Đồng ý
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="col-6">
+                                        <form method="POST" action="{% url 'client:vote_proposal' campaign.id item.proposal.id %}" class="w-100">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="vote" value="no">
+                                            <button type="submit" class="btn btn-outline-danger w-100 py-2 radius-md fw-bold"
+                                                    onclick="return confirm('Bạn xác nhận TỪ CHỐI giải ngân này?')">
+                                                <i class="fas fa-xmark me-2"></i> Từ chối
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             {% else %}
-                                <div class="text-center">
-                                    <p class="text-muted mb-0"><i class="bi bi-lock-fill"></i> Bạn cần ủng hộ chiến dịch này để có quyền bỏ phiếu.</p>
+                                <div class="text-center bg-light p-3 radius-md border border-dashed">
+                                    <p class="text-muted mb-0 small"><i class="fas fa-lock me-2"></i> Bạn cần ủng hộ chiến dịch này để có quyền bỏ phiếu.</p>
                                 </div>
                             {% endif %}
                         {% else %}
                             <div class="text-center">
-                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary">
-                                    <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để bỏ phiếu
+                                <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary px-5 radius-pill fw-bold">
+                                    <i class="fas fa-sign-in-alt me-2"></i> Đăng nhập để bỏ phiếu
                                 </a>
                             </div>
                         {% endif %}
@@ -181,44 +172,39 @@
             {% endif %}
 
             {% if completed_proposals %}
-            <div class="mt-5 p-4 bg-light rounded-4 border">
+            <div class="mt-5 p-4 bg-light radius-lg border">
                 <h4 class="fw-bold mb-4 border-start border-4 border-success ps-3">
                     📊 Lịch sử giải ngân
                 </h4>
 
                 {% for item in completed_proposals %}
-                <div class="card border-0 shadow-sm mb-3" style="border-radius: 12px;">
+                <div class="card border-0 shadow-sm mb-3 radius-md overflow-hidden">
                     <div class="card-body py-3">
-                        <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div>
-                                <h6 class="mb-1 fw-bold">{{ item.proposal.title }}</h6>
-                                <small class="text-muted">
-                                    {{ item.proposal.executed_at|date:"d/m/Y"|default:item.proposal.created_at|date:"d/m/Y" }}
-                                    &bull; {{ item.votes_count }} phiếu
-                                    &bull; {{ item.yes_pct|floatformat:0 }}% đồng ý
-                                </small>
+                                <h6 class="mb-1 fw-bold text-dark">{{ item.proposal.title }}</h6>
+                                <div class="text-xs text-muted">
+                                    <i class="fas fa-calendar-check me-1"></i> {{ item.proposal.executed_at|date:"d/m/Y"|default:item.proposal.created_at|date:"d/m/Y" }}
+                                    <span class="mx-2">|</span>
+                                    <i class="fas fa-users me-1"></i> {{ item.votes_count }} phiếu ({{ item.yes_pct|floatformat:0 }}% thuận)
+                                </div>
                             </div>
                             <div class="text-end">
-                                <span class="fw-bold {% if item.proposal.status == 'executed' %}text-success{% else %}text-danger{% endif %} fs-5">
-                                    {% if item.proposal.status == 'executed' %}
-                                        -{{ item.proposal.amount_requested|intcomma }}đ
-                                    {% else %}
-                                        {{ item.proposal.amount_requested|intcomma }}đ
-                                    {% endif %}
-                                </span>
-                                <br>
+                                <div class="fw-800 {% if item.proposal.status == 'executed' %}text-success{% else %}text-danger{% endif %} fs-5">
+                                    {% if item.proposal.status == 'executed' %}-{% endif %}{{ item.proposal.amount_requested|intcomma }}đ
+                                </div>
                                 {% if item.proposal.status == 'executed' %}
-                                    <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-circle"></i> Đã giải ngân</span>
-                                {% elif item.proposal.status == 'rejected' %}
-                                    <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-x-circle"></i> Bị từ chối</span>
+                                    <span class="badge bg-success-subtle text-success border border-success radius-pill px-2">Đã giải ngân</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger radius-pill px-2">Bị từ chối</span>
                                 {% endif %}
                             </div>
                         </div>
                         {% if item.proposal.disbursement_eth_tx_hash %}
-                        <div class="mt-2">
+                        <div class="mt-2 pt-2 border-top">
                             <a href="https://sepolia.etherscan.io/tx/{{ item.proposal.disbursement_eth_tx_hash }}" target="_blank"
-                               class="badge bg-success-subtle text-success border border-success text-decoration-none">
-                                <i class="bi bi-shield-check"></i> Verified on Blockchain
+                               class="badge bg-primary-100 text-primary border border-primary-200 text-decoration-none py-2 px-3 radius-pill hover-up">
+                                <i class="fas fa-shield-check me-2"></i> Verified on Blockchain
                             </a>
                         </div>
                         {% endif %}
@@ -228,19 +214,19 @@
             </div>
             {% endif %}
 
-            <div class="mt-5 p-4 bg-light rounded-4 border">
+            <div class="mt-5 p-4 bg-primary-50 radius-lg border border-primary-100">
                 <h4 class="fw-bold mb-4 border-start border-4 border-primary ps-3">
                     🚀 Nhà hảo tâm vừa đóng góp
                 </h4>
 
                 <div class="table-responsive">
-                    <table class="table table-borderless align-middle">
+                    <table class="table table-borderless align-middle mb-0">
                         <tbody>
                             {% for donate in donations %}
-                            <tr class="border-bottom">
+                            <tr class="border-bottom border-primary-100">
                                 <td style="width: 50px;">
-                                    <div class="bg-white border rounded-circle d-flex align-items-center justify-content-center text-primary fw-bold" 
-                                         style="width: 40px; height: 40px;">
+                                    <div class="bg-white border border-primary-200 rounded-circle d-flex align-items-center justify-content-center text-primary fw-bold shadow-sm" 
+                                         style="width: 42px; height: 42px;">
                                         {{ donate.donor_name|slice:":1"|upper }}
                                     </div>
                                 </td>
@@ -248,26 +234,28 @@
                                     <div class="fw-bold text-dark">
                                         {% if donate.is_anonymous %}Mạnh thường quân{% else %}{{ donate.donor_name }}{% endif %}
                                     </div>
-                                    <div class="small text-muted">{{ donate.created_at|timesince }} trước</div>
+                                    <div class="text-xs text-muted"><i class="far fa-clock me-1"></i>{{ donate.created_at|timesince }} trước</div>
                                 </td>
                                 <td class="text-end">
-                                    <div class="fw-bold text-success">+{{ donate.amount|intcomma }}đ</div>
+                                    <div class="fw-800 text-success">+{{ donate.amount|intcomma }}đ</div>
                                     {% if donate.gas_fee_vnd %}
-                                    <div class="small text-warning">⛽ -{{ donate.gas_fee_vnd|intcomma }}đ gas</div>
-                                    <div class="small text-muted fw-bold">→ {{ donate.net_amount|intcomma }}đ</div>
+                                    <div class="text-xs text-warning"><i class="fas fa-gas-pump me-1"></i>-{{ donate.gas_fee_vnd|intcomma }}đ</div>
                                     {% endif %}
                                     {% if donate.eth_tx_hash %}
                                     <a href="https://sepolia.etherscan.io/tx/{{ donate.eth_tx_hash }}" target="_blank" 
-                                       class="badge bg-success-subtle text-success border border-success text-decoration-none"
+                                       class="badge bg-success-subtle text-success border border-success text-decoration-none mt-1 py-1 px-2"
                                        title="Xem chứng thực trên Blockchain">
-                                        <i class="bi bi-shield-check"></i> Verified
+                                        <i class="fas fa-shield-halved me-1"></i> Verified
                                     </a>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="3" class="text-center text-muted py-3">Chưa có lượt ủng hộ nào. Hãy là người đầu tiên!</td>
+                                <td colspan="3" class="text-center text-muted py-4">
+                                    <i class="fas fa-heart-pulse fa-2x mb-2 opacity-20 d-block"></i>
+                                    Chưa có lượt ủng hộ nào. Hãy là người đầu tiên!
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -277,152 +265,62 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm rounded-4 p-4 sticky-top" style="top: 20px; z-index: 10;">
-                <h5 class="fw-bold text-secondary mb-3">Tiến độ quyên góp</h5>
+            <div class="card-charity p-4 sticky-top" style="top: 100px;">
+                <h5 class="fw-bold text-neutral-500 mb-3 text-uppercase small" style="letter-spacing: 1px;">Tiến độ quyên góp</h5>
                 
-                <h2 class="fw-bold text-primary mb-1">{{ campaign.current_amount|intcomma }} đ</h2>
+                <h2 class="fw-800 text-primary mb-1">{{ campaign.current_amount|intcomma }} đ</h2>
                 <div class="text-muted small mb-3">
-                    mục tiêu <strong>{{ campaign.target_amount|intcomma }} đ</strong>
+                    mục tiêu <strong class="text-dark">{{ campaign.target_amount|intcomma }} đ</strong>
                 </div>
 
-                <div class="progress mb-4" style="height: 10px;">
-                    <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" 
+                <div class="progress shadow-sm mb-4" style="height: 12px; border-radius: 10px; background: var(--primary-50);">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
                          role="progressbar" 
-                         style="width: {% widthratio campaign.current_amount campaign.target_amount 100 %}%;" 
+                         style="width: {% widthratio campaign.current_amount campaign.target_amount 100 %}%; background-color: var(--primary-800);" 
                          aria-valuenow="{{ campaign.current_amount }}" 
                          aria-valuemin="0" 
                          aria-valuemax="{{ campaign.target_amount }}">
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between text-muted small mb-4">
-                    <span><i class="bi bi-people-fill"></i> <strong>{{ donations.count }}</strong> lượt ủng hộ</span>
-                    <span><i class="bi bi-clock-history"></i> Còn <strong>{{ campaign.end_date|timeuntil }}</strong></span>
+                <div class="d-flex justify-content-between text-muted small mb-4 bg-light p-2 radius-md">
+                    <span><i class="fas fa-users text-primary me-1"></i> <strong>{{ donations.count }}</strong> lượt</span>
+                    <span><i class="fas fa-clock-rotate-left text-primary me-1"></i> Còn <strong>{{ campaign.end_date|timeuntil }}</strong></span>
                 </div>
 
-                {% if total_gas_vnd or campaign.disbursed_amount > 0 or campaign.locked_amount > 0 %}
-                <div class="border-top pt-3 mb-3">
-                    <small class="fw-bold text-uppercase text-muted d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">
-                        ⛽ Minh bạch tài chính
-                    </small>
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Tổng ủng hộ:</span>
-                        <span class="fw-bold text-dark">
-                            {{ onchain_total_fund_vnd|intcomma }}đ
-                            <span class="text-muted small" title="On-chain: lấy từ smart contract (totalFund).">On-chain</span>
-                        </span>
-                    </div>
-                    {% if total_gas_vnd %}
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Tổng phí Gas:</span>
-                        <span class="fw-bold text-warning">-{{ total_gas_vnd|intcomma }}đ</span>
-                    </div>
-                    <div class="ps-3 border-start border-2 border-warning mb-2">
-                        {% if gas_subsidized_vnd %}
-                        <div class="d-flex justify-content-between small mb-1"
-                             title="Tổng gas admin đã chi on-chain (ghi sao kê NH + nạp ETH thay user + ghi gas cost). Lấy từ smart contract totalGasCost.">
-                            <span class="text-muted">① Gas admin đã chi (on-chain):</span>
-                            <span class="text-warning">-{{ gas_subsidized_vnd|intcomma }}đ</span>
-                        </div>
-                        {% if gas_bank_record_vnd or gas_donate_onbehalf_vnd %}
-                        <div class="ps-3 small text-muted" style="font-size: 11px;">
-                            • Ghi sao kê NH: {{ gas_bank_record_vnd|intcomma }}đ<br>
-                            • Nạp ETH thay user: {{ gas_donate_onbehalf_vnd|intcomma }}đ
-                        </div>
-                        {% endif %}
-                        {% endif %}
-                        {% if gas_disbursement_vnd %}
-                        <div class="d-flex justify-content-between small mb-1"
-                             title="Gas các lần executeDisbursement đã thực thi.">
-                            <span class="text-muted">② Gas giải ngân (đã thực thi):</span>
-                            <span class="text-warning">-{{ gas_disbursement_vnd|intcomma }}đ</span>
-                        </div>
-                        {% endif %}
-                        {% if est_disbursement_gas_vnd %}
-                        <div class="d-flex justify-content-between small mb-1"
-                             title="Gas dự trù cho 1 lần giải ngân tiếp theo (ước tính từ gas thực tế × 2).">
-                            <span class="text-muted">③ Gas dự trù giải ngân kế:</span>
-                            <span class="text-warning">-{{ est_disbursement_gas_vnd|intcomma }}đ</span>
-                        </div>
-                        {% endif %}
-                        {% if gas_admin_sendeth_vnd %}
-                        <div class="d-flex justify-content-between small mb-1"
-                             title="Gas của donation cũ (legacy - trước khi chuyển sang luồng v2).">
-                            <span class="text-muted">Legacy (cấp ETH cũ):</span>
-                            <span class="text-warning">-{{ gas_admin_sendeth_vnd|intcomma }}đ</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% if gas_recovered_vnd %}
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Admin đã thu hồi:</span>
-                        <span class="fw-bold text-info">+{{ gas_recovered_vnd|intcomma }}đ</span>
-                    </div>
-                    {% endif %}
-                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed var(--primary-200);">
-                        <span class="text-muted fw-bold">Thực nhận (tổ chức):</span>
-                        <span class="fw-bold text-success">{{ net_receivable|intcomma }}đ</span>
-                    </div>
-                    {% endif %}
-                    {% if campaign.disbursed_amount > 0 %}
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Đã giải ngân:</span>
-                        <span class="fw-bold text-danger">
-                            -{{ onchain_total_disbursed_vnd|intcomma }}đ
-                            <span class="text-muted small" title="On-chain: lấy từ smart contract (totalDisbursed).">On-chain</span>
-                        </span>
-                    </div>
-                    {% endif %}
-                    {% if campaign.locked_amount > 0 %}
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-muted">Đang chờ vote:</span>
-                        <span class="fw-bold text-warning">
-                            {{ campaign.locked_amount|intcomma }}đ
-                            <span class="text-muted small" title="Off-chain: số tiền bị khóa trong hệ thống khi đang vote.">Off-chain</span>
-                        </span>
-                    </div>
-                    {% endif %}
-                    {% if onchain_available_vnd %}
-                    <div class="d-flex justify-content-between small mb-1 pt-1" style="border-top: 1px dashed var(--primary-200);">
-                        <span class="text-muted fw-bold">Khả dụng (on-chain):</span>
-                        <span class="fw-bold text-success">{{ onchain_available_vnd|intcomma }}đ</span>
-                    </div>
-                    {% endif %}
-                    <div class="small text-muted mt-2" title="Khả dụng on-chain = totalFund - totalGasCost - totalDisbursed - totalAdminRecovered - est_disbursement_gas.">
-                        Công thức on-chain minh bạch theo smart contract.
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="d-grid gap-2">
+                <div class="d-grid gap-3">
                     {% if user.is_authenticated %}
-                    <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent btn-lg fw-bold rounded-pill shadow-sm">
-                        <i class="bi bi-heart-fill me-2"></i> ỦNG HỘ NGAY
+                    <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent btn-lg fw-bold rounded-pill py-3 shadow-accent animate__animated animate__pulse animate__infinite">
+                        <i class="fas fa-heart me-2"></i> ỦNG HỘ NGAY
                     </a>
                     {% else %}
-                    <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary btn-lg fw-bold rounded-pill shadow-sm">
-                        <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập để ủng hộ
+                    <a href="{% url 'admin_panel:dangnhap' %}" class="btn btn-outline-primary btn-lg fw-bold rounded-pill py-3">
+                        <i class="fas fa-sign-in-alt me-2"></i> Đăng nhập để ủng hộ
                     </a>
                     {% endif %}
-                    <button class="btn btn-outline-secondary rounded-pill">
-                        <i class="bi bi-share-fill me-2"></i> Chia sẻ
+                    <button class="btn btn-light rounded-pill border py-2 small fw-600">
+                        <i class="fas fa-share-nodes me-2"></i> Chia sẻ chiến dịch
                     </button>
                 </div>
                 
-                <div class="mt-4 pt-3 border-top">
-                    <div class="d-flex gap-3 mb-2">
-                        <i class="bi bi-shield-lock text-success fs-4"></i>
+                <div class="mt-4 pt-4 border-top">
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="bg-success-100 text-success rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background: var(--success-100);">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
                         <div>
-                            <small class="fw-bold d-block">Minh bạch Blockchain</small>
-                            <small class="text-muted" style="font-size: 12px;">Mọi khoản đóng góp được ghi nhận vĩnh viễn trên mạng lưới Blockchain.</small>
+                            <small class="fw-bold d-block text-dark">Minh bạch Blockchain</small>
+                            <small class="text-muted" style="font-size: 11px;">Mọi khoản đóng góp được ghi nhận vĩnh viễn, công khai.</small>
                         </div>
                     </div>
                     {% if active_proposals %}
                     <div class="d-flex gap-3 mb-2">
-                        <i class="bi bi-people-fill text-primary fs-4"></i>
+                        <div class="bg-primary-100 text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background: var(--primary-100);">
+                            <i class="fas fa-vote-yea"></i>
+                        </div>
                         <div>
-                            <small class="fw-bold d-block">Bỏ phiếu giải ngân</small>
-                            <small class="text-muted" style="font-size: 12px;">Nhà hảo tâm có quyền quyết định việc chi tiêu qua hệ thống bỏ phiếu minh bạch.</small>
+                            <small class="fw-bold d-block text-dark">Quyền quyết định</small>
+                            <small class="text-muted" style="font-size: 11px;">Nhà hảo tâm trực tiếp bỏ phiếu cho các đề xuất chi tiêu.</small>
                         </div>
                     </div>
                     {% endif %}
@@ -434,10 +332,43 @@
 </div>
 
 <style>
-    .bg-success-subtle { background-color: var(--success-100) !important; }
-    .bg-danger-subtle { background-color: var(--danger-100) !important; }
-    .object-fit-cover { object-fit: cover; }
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+    .opacity-20 { opacity: 0.2; }
+    .hover-up { transition: 0.3s; }
+    .hover-up:hover { transform: translateY(-3px); }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateCountdowns() {
+        document.querySelectorAll('.countdown').forEach(function(el) {
+            var endStr = el.getAttribute('data-end');
+            if (!endStr) return;
+            var end = new Date(endStr);
+            var now = new Date();
+            var diff = end - now;
+            if (diff <= 0) {
+                el.textContent = 'Hết hạn';
+                el.classList.add('text-danger');
+                return;
+            }
+            var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            var parts = [];
+            if (days > 0) parts.push(days + ' ngày');
+            if (hours > 0) parts.push(hours + ' giờ');
+            parts.push(minutes + ' phút');
+            el.textContent = parts.join(' ');
+        });
+    }
+    updateCountdowns();
+    setInterval(updateCountdowns, 60000);
+});
+</script>
+
+{% endblock %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

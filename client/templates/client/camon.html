@@ -6,109 +6,89 @@
 
 {% block extra_css %}
 <style>
-:root {
-            --primary-950: #0a1628;
-            --primary-900: #0f2044;
-            --primary-800: #1e3a8a;
-            --primary-700: #2a4fa3;
-            --primary-600: #3b6ac7;
-            --primary-500: #4f84e0;
-            --primary-300: #a8c5f8;
-            --primary-200: #d0e2fd;
-            --primary-100: #e8f1fe;
-            --primary-50: #f3f7ff;
-            --neutral-900: #111827;
-            --neutral-700: #374151;
-            --neutral-500: #6b7280;
-            --neutral-300: #d1d5db;
-            --neutral-100: #f9fafb;
-            --white: #ffffff;
-            --success-600: #16a34a;
-        }
-        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: var(--primary-50); }
-        .card-receipt { border: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; }
-        .receipt-header { background: var(--primary-800); color: white; padding: 40px 20px; text-align: center; position: relative; }
-        .receipt-header::after {
-            content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
-            background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
-        }
-        .hash-box { background: var(--neutral-100); border: 1px dashed var(--neutral-300); padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; word-break: break-all; color: var(--neutral-700); }
-        .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: var(--neutral-500); }
+    .card-receipt { border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; background: var(--white); }
+    .receipt-header { background: linear-gradient(135deg, var(--primary-800) 0%, var(--primary-700) 100%); color: var(--white); padding: 48px 24px; text-align: center; position: relative; }
+    .receipt-header::after {
+        content: ""; position: absolute; bottom: -10px; left: 0; width: 100%; height: 20px;
+        background: radial-gradient(circle, transparent 10px, var(--white) 11px); background-size: 20px 20px;
+    }
+    .hash-box { background: var(--neutral-100); border: 1.5px dashed var(--primary-100); padding: 16px; border-radius: var(--radius-md); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; word-break: break-all; color: var(--primary-700); }
+    .label-hash { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 800; color: var(--neutral-500); margin-bottom: 6px; display: block; }
+    .bounce-in { animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+    @keyframes bounceIn { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card card-receipt">
-                    <div class="receipt-header">
-                        <div class="mb-3">
-                            <i class="fas fa-check-circle fa-4x text-white"></i>
-                        </div>
-                        <h4 class="fw-bold mb-1">Cảm ơn bạn đã ủng hộ!</h4>
-                        <p class="opacity-75 m-0 small">Giao dịch đã được ghi nhận vào hệ thống.</p>
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card card-receipt">
+                <div class="receipt-header">
+                    <div class="mb-3 bounce-in">
+                        <i class="fas fa-circle-check fa-5x text-white shadow-sm rounded-circle"></i>
+                    </div>
+                    <h2 class="fw-800 mb-1">Cảm ơn bạn!</h2>
+                    <p class="opacity-75 m-0 small fw-600">Tấm lòng của bạn đã được ghi nhận vào hệ thống.</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5 pt-5">
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-5 text-muted small fw-bold text-uppercase">Người ủng hộ:</div>
+                        <div class="col-7 fw-800 text-end text-dark">{{ donation.donor_name|default:"Nhà hảo tâm ẩn danh" }}</div>
+                    </div>
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-5 text-muted small fw-bold text-uppercase">Chiến dịch:</div>
+                        <div class="col-7 fw-800 text-end text-primary small">{{ donation.campaign.title|truncatechars:45 }}</div>
+                    </div>
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-5 text-muted small fw-bold text-uppercase">Số tiền:</div>
+                        <div class="col-7 fw-800 text-end text-accent-600 fs-4" style="color: var(--accent-600);">{{ donation.amount|intcomma }} đ</div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-5 text-muted small fw-bold text-uppercase">Thời gian:</div>
+                        <div class="col-7 text-end small text-neutral-500">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
                     </div>
 
-                    <div class="card-body p-4 pt-5">
-                        {% if donation.payment_method == 'bank_transfer' %}
-                        <div class="text-center mb-4">
-                            <p class="fw-bold text-danger mb-2">QUÉT MÃ ĐỂ HOÀN TẤT CHUYỂN KHOẢN</p>
-                            <img src="https://img.vietqr.io/image/MB-0000000000-compact2.png?amount={{ donation.amount|stringformat:'d' }}&addInfo=UH {{ donation.campaign.id }}&accountName=QUY NHAN AI" 
-                                 class="img-fluid border p-2 rounded" style="width: 200px;">
-                            <p class="small text-muted mt-2">Nội dung CK: <strong>UH {{ donation.campaign.id }}</strong></p>
+                    <div class="bg-primary-50 p-4 radius-lg border border-primary-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-link text-success me-2"></i>
+                            <strong class="small text-uppercase fw-800 text-primary">Chứng thực Blockchain</strong>
                         </div>
-                        <hr class="opacity-25 my-4">
-                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label class="label-hash">Mã Hash Hiện tại (Seal)</label>
+                            <div class="hash-box">{{ donation.hash }}</div>
+                        </div>
+                        
+                        <div>
+                            <label class="label-hash">Mã Hash Liên kết (Chain)</label>
+                            <div class="hash-box" style="opacity: 0.7; font-size: 0.75rem;">{{ donation.previous_hash }}</div>
+                        </div>
+                        
+                        <div class="text-center mt-3 pt-2 border-top border-primary-200">
+                            <small class="text-success fw-bold" style="font-size: 11px;">
+                                <i class="fas fa-shield-halved me-1"></i> Dữ liệu giao dịch này đã được niêm phong vĩnh viễn.
+                            </small>
+                        </div>
+                    </div>
 
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Người ủng hộ:</div>
-                            <div class="col-7 fw-bold text-end">{{ donation.donor_name|default:"Nhà hảo tâm ẩn danh" }}</div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Chiến dịch:</div>
-                            <div class="col-7 fw-bold text-end text-primary">{{ donation.campaign.title|truncatechars:30 }}</div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-5 text-muted small">Số tiền:</div>
-                            <div class="col-7 fw-bold text-end text-danger fs-5">{{ donation.amount|intcomma }} đ</div>
-                        </div>
-                        <div class="row mb-4">
-                            <div class="col-5 text-muted small">Thời gian:</div>
-                            <div class="col-7 text-end small">{{ donation.created_at|date:"d/m/Y H:i" }}</div>
-                        </div>
-
-                        <div class="alert alert-light border">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="fas fa-link text-success me-2"></i>
-                                <strong class="small text-uppercase">Chứng thực Blockchain</strong>
-                            </div>
-                            
-                            <div class="mb-2">
-                                <div class="label-hash">Mã Hash Giao dịch này (Current Hash)</div>
-                                <div class="hash-box text-primary">{{ donation.hash }}</div>
-                            </div>
-                            
-                            <div>
-                                <div class="label-hash">Mã Hash Giao dịch trước (Previous Hash)</div>
-                                <div class="hash-box text-muted">{{ donation.previous_hash }}</div>
-                            </div>
-                            
-                            <div class="text-center mt-2">
-                                <small class="text-success fst-italic" style="font-size: 11px;">
-                                    <i class="fas fa-shield-alt"></i> Dữ liệu đã được niêm phong vĩnh viễn.
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 mt-4">
-                            <a href="{% url 'client:trangchu' %}" class="btn btn-outline-primary fw-bold">
-                                <i class="fas fa-home me-2"></i> Về trang chủ
-                            </a>
-                        </div>
+                    <div class="d-grid gap-3 mt-5">
+                        <a href="{% url 'client:trangchu' %}" class="btn btn-primary py-3 fw-800 radius-pill shadow-btn">
+                            <i class="fas fa-house me-2"></i> VỀ TRANG CHỦ
+                        </a>
+                        <button class="btn btn-light border py-2 small fw-600 radius-pill">
+                            <i class="fas fa-share-nodes me-2"></i> Chia sẻ đóng góp
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+</style>
 {% endblock %}

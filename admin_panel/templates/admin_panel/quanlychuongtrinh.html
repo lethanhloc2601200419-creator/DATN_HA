@@ -13,63 +13,71 @@
         width: 256px !important;
         height: 256px !important;
     }
-    /* Đảm bảo bản đồ nằm đúng lớp */
     #map_add, #map_edit {
         z-index: 1; 
-        border: 1px solid var(--neutral-300);
-        border-radius: 0.25rem;
+        border: 1.5px solid var(--primary-100);
+        border-radius: var(--radius-md);
+        height: 300px; width: 100%;
     }
 </style>
 
-<div class="container-fluid px-4">
-    <h2 class="page-title">Quản lý Chương trình Mục tiêu</h2>
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Chương trình</li>
+        </ol>
+    </nav>
 
-    <div class="row g-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Quản lý Chương trình Mục tiêu</h2>
+        <button type="button" class="btn btn-primary px-4 radius-pill shadow-btn" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus-circle me-2"></i> Tạo Chương trình mới
+        </button>
+    </div>
+
+    <div class="row g-4 mb-4">
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-primary">{{ stats.total }}</div>
-                    <div class="metric-label">Tổng chương trình</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng chương trình</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-success">{{ stats.active }}</div>
-                    <div class="metric-label">Đang hiển thị</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang hiển thị</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.active }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-warning">{{ stats.inactive }}</div>
-                    <div class="metric-label">Đang ẩn</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang tạm ẩn</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.inactive }}</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card admin-stat-card">
-                <div class="card-body">
-                    <div class="metric-value text-info">{{ stats.total_target|intcomma }}đ</div>
-                    <div class="metric-label">Tổng mục tiêu</div>
-                </div>
+            <div class="card-charity p-3 border-start border-4 border-info shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng mục tiêu</div>
+                <div class="h3 fw-800 m-0 text-info">{{ stats.total_target|intcomma }}đ</div>
             </div>
         </div>
     </div>
     
-    <div class="card admin-toolbar">
-        <div class="card-body">
-            <form method="GET" class="row g-3 align-items-center">
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc danh sách</h6>
+        </div>
+        <div class="card-body p-4">
+            <form method="GET" class="row g-3">
                 <div class="col-md-4">
-                    <input type="text" name="q" class="form-control"
-                           placeholder="Tìm tên chương trình, tổ chức, địa chỉ..."
-                           value="{{ query }}">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm tên chương trình, tổ chức..." value="{{ query }}">
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <select name="org" class="form-select">
-                        <option value="">Tất cả tổ chức</option>
+                        <option value="">— Mọi tổ chức —</option>
                         {% for org in all_orgs %}
                         <option value="{{ org.id }}" {% if selected_org == org.id|stringformat:'s' %}selected{% endif %}>{{ org.name }}</option>
                         {% endfor %}
@@ -77,150 +85,108 @@
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">Tất cả trạng thái</option>
+                        <option value="">— Mọi trạng thái —</option>
                         <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Đang hiển thị</option>
                         <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Đang ẩn</option>
                         <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Đã duyệt</option>
-                        <option value="unverified" {% if selected_status == 'unverified' %}selected{% endif %}>Chưa duyệt</option>
                     </select>
                 </div>
                 <div class="col-md-2 text-end">
-                    <div class="admin-actions justify-content-end">
-                        <a href="{{ export_csv_url }}" class="btn btn-outline-primary">CSV</a>
-                        <a href="{{ export_excel_url }}" class="btn btn-outline-success">Excel</a>
-                        <a href="{% url 'admin_panel:quanlychuongtrinh' %}" class="btn btn-outline-primary">Xóa lọc</a>
-                        <button type="submit" class="btn btn-primary">Lọc</button>
-                    </div>
-                </div>
-                <div class="col-md-12 text-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
-                        <i class="fas fa-plus-circle"></i> Tạo Chương trình mới
-                    </button>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC DỮ LIỆU</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card admin-shell-card">
-        <div class="card-header">
-            <i class="fas fa-list me-1"></i> Danh sách Chương trình
-        </div>
-        <div class="card-body p-0">
-            <form method="post">
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
+        <form method="post">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ current_url }}">
-            <div class="p-3 border-bottom bg-light">
-                <div class="row g-2 align-items-center">
-                    <div class="col-md-4">
-                        <select name="bulk_action" class="form-select">
-                            <option value="">-- Bulk action --</option>
-                            <option value="verify">Duyệt nhiều dòng</option>
-                            <option value="activate">Hiện nhiều dòng</option>
-                            <option value="deactivate">Ẩn nhiều dòng</option>
-                            <option value="delete">Xóa nhiều dòng</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Áp dụng thao tác cho các chương trình đã chọn?')">Áp dụng</button>
-                    </div>
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        <option value="verify">Duyệt nhiều dòng</option>
+                        <option value="activate">Hiện nhiều dòng</option>
+                        <option value="deactivate">Ẩn nhiều dòng</option>
+                        <option value="delete">Xóa vĩnh viễn</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Xác nhận thực hiện hành động?')">Áp dụng</button>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ export_csv_url }}" class="btn btn-sm btn-outline-secondary px-3">CSV</a>
+                    <a href="{{ export_excel_url }}" class="btn btn-sm btn-outline-secondary px-3">Excel</a>
                 </div>
             </div>
+
             <div class="table-responsive">
-            <table class="table admin-table">
-                <thead>
-                    <tr>
-                        <th width="4%"><input type="checkbox" id="select-all-programs"></th>
-                        <th width="5%">ID</th>
-                        <th width="10%">Ảnh</th>
-                        <th width="25%">Tên Chương trình</th>
-                        <th width="20%">Thuộc Tổ chức</th>
-                        <th width="15%">Mục tiêu (VNĐ)</th>
-                        <th width="10%">Trạng thái</th>
-                        <th width="15%">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in programs %}
-                    <tr class="{% if not p.is_active %}table-secondary{% endif %}">
-                        <td><input type="checkbox" class="row-checkbox-program" name="selected_ids" value="{{ p.id }}"></td>
-                        <td>{{ p.id }}</td>
-                        <td class="text-center">
-                            {% if p.image %}
-                            <img src="{{ p.image.url }}" class="rounded border" style="height: 50px; width: 80px; object-fit: cover;">
-                            {% else %}
-                            <span class="badge bg-secondary">No img</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong>{{ p.name }}</strong><br>
-                            {% if p.beneficiary_address %}
-                            <small class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ p.beneficiary_address|truncatechars:30 }}</small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge bg-info text-dark">{{ p.organization.name }}</span>
-                        </td>
-                        <td class="text-end fw-bold text-success">
-                            {{ p.total_target_amount|intcomma }} đ
-                        </td>
-                        <td class="text-center">
-                            {% if p.is_active %}
-                            <span class="badge bg-success">Hoạt động</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Tạm ẩn</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="admin-actions">
-                            <button type="button" class="btn btn-sm btn-primary"
-                                title="Chỉnh sửa"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#editModal"
-                                onclick="fillEditForm(
-                                    '{{ p.id }}', 
-                                    '{{ p.organization.id }}', 
-                                    '{{ p.name|escapejs }}', 
-                                    '{{ p.total_target_amount|default_if_none:0 }}', 
-                                    '{{ p.beneficiary_address|default_if_none:''|escapejs }}',
-                                    '{{ p.beneficiary_lat|default_if_none:'' }}',
-                                    '{{ p.beneficiary_lng|default_if_none:'' }}',
-                                    '{{ p.description|default_if_none:''|escapejs }}'
-                                )">
-                                <i class="fas fa-edit"></i>
-                            </button>
-
-                            <a href="{% url 'admin_panel:khoa_chuongtrinh' p.id %}" 
-                               class="btn btn-sm {% if p.is_active %}btn-warning{% else %}btn-success{% endif %}"
-                               title="{% if p.is_active %}Tạm ẩn{% else %}Kích hoạt{% endif %}"
-                               onclick="return confirm('Bạn có muốn thay đổi trạng thái hiển thị của chương trình này?')">
-                                {% if p.is_active %}
-                                    <i class="fas fa-eye-slash"></i>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-primary text-white">
+                        <tr>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-programs" class="form-check-input"></th>
+                            <th width="8%">Ảnh</th>
+                            <th width="30%">Tên Chương trình</th>
+                            <th width="20%">Tổ chức phụ trách</th>
+                            <th width="15%">Mục tiêu</th>
+                            <th width="10%" class="text-center">Trạng thái</th>
+                            <th width="13%" class="text-end pe-4">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in programs %}
+                        <tr class="{% if not p.is_active %}bg-light opacity-75{% endif %}">
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-program form-check-input" name="selected_ids" value="{{ p.id }}"></td>
+                            <td>
+                                {% if p.image %}
+                                <img src="{{ p.image.url }}" class="rounded shadow-sm border" style="height: 48px; width: 72px; object-fit: cover;">
                                 {% else %}
-                                    <i class="fas fa-eye"></i>
+                                <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted small fw-bold" style="height: 48px; width: 72px; font-size: 10px;">NO IMG</div>
                                 {% endif %}
-                            </a>
-
-                            <a href="{% url 'admin_panel:xoa_chuongtrinh' p.id %}" 
-                               class="btn btn-sm btn-danger"
-                               title="Xóa vĩnh viễn"
-                               onclick="return confirm('CẢNH BÁO: Xóa chương trình này sẽ xóa luôn TẤT CẢ các chiến dịch con! Bạn chắc chắn chứ?')">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="admin-empty">Chưa có chương trình nào.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ p.name }}</div>
+                                {% if p.beneficiary_address %}
+                                <div class="text-xs text-muted text-truncate" style="max-width: 250px;"><i class="fas fa-map-location-dot me-1"></i> {{ p.beneficiary_address }}</div>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-primary-100 text-primary border border-primary-200 fw-bold">{{ p.organization.name }}</span></td>
+                            <td><div class="fw-800 text-success small">{{ p.total_target_amount|intcomma }}đ</div></td>
+                            <td class="text-center">
+                                {% if p.is_active %}
+                                <span class="badge bg-success-subtle text-success border border-success px-3 py-2 radius-pill">Hoạt động</span>
+                                {% else %}
+                                <span class="badge bg-light text-muted border px-3 py-2 radius-pill">Tạm ẩn</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group shadow-sm radius-md overflow-hidden">
+                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa" data-bs-toggle="modal" data-bs-target="#editModal" onclick="fillEditForm('{{ p.id }}', '{{ p.organization.id }}', '{{ p.name|escapejs }}', '{{ p.total_target_amount|default_if_none:0 }}', '{{ p.beneficiary_address|default_if_none:''|escapejs }}', '{{ p.beneficiary_lat|default_if_none:'' }}', '{{ p.beneficiary_lng|default_if_none:'' }}', '{{ p.description|default_if_none:''|escapejs }}')">
+                                        <i class="fas fa-pen-to-square text-primary"></i>
+                                    </button>
+                                    <a href="{% url 'admin_panel:khoa_chuongtrinh' p.id %}" class="btn btn-sm btn-white border-end" title="Hiện/Ẩn">
+                                        {% if p.is_active %}<i class="fas fa-eye-slash text-warning"></i>{% else %}<i class="fas fa-eye text-success"></i>{% endif %}
+                                    </a>
+                                    <a href="{% url 'admin_panel:xoa_chuongtrinh' p.id %}" class="btn btn-sm btn-white" title="Xóa" onclick="return confirm('CẢNH BÁO: Xóa chương trình sẽ xóa luôn TẤT CẢ chiến dịch con! Bạn chắc chắn chứ?')">
+                                        <i class="fas fa-trash-can text-danger"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="admin-empty py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Chưa có chương trình nào được tạo.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            </form>
-        </div>
+        </form>
     </div>
 </div>
+{% endblock %}
 
 <div class="modal fade" id="addModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
