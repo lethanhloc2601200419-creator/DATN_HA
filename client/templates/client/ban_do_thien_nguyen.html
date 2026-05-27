@@ -19,48 +19,39 @@
         max-width: 1400px;
     }
 
-    /* ---------- Hero stats ---------- */
+    /* ---------- Hero stats (Light Theme) ---------- */
     .map-hero {
-        background: linear-gradient(135deg, var(--primary-950) 0%, var(--primary-900) 50%, var(--primary-800) 100%);
+        background: var(--white);
         border-radius: var(--radius-lg);
         padding: 40px 32px;
-        color: var(--white);
+        color: var(--primary-900);
         position: relative;
         overflow: hidden;
         margin-bottom: 24px;
-        box-shadow: var(--shadow-lg);
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    .map-hero::before {
-        content: ''; position: absolute; top: -50%; right: -10%; width: 400px; height: 400px;
-        background: radial-gradient(circle, rgba(59,106,199,0.15) 0%, transparent 70%);
-        z-index: 0;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--primary-100);
     }
     .map-hero h1 {
-        color: var(--white);
+        color: var(--primary-950);
         font-size: 32px;
         font-weight: 800;
         margin: 0 0 10px 0;
-        position: relative; z-index: 1;
         letter-spacing: -0.5px;
     }
     .map-hero .hero-sub {
-        color: var(--primary-200);
+        color: var(--neutral-500);
         font-size: 16px;
         margin: 0 0 32px 0;
-        position: relative; z-index: 1;
-        opacity: 0.9;
+        font-weight: 500;
     }
     .hero-stats {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 20px;
-        position: relative; z-index: 1;
     }
     .hero-stat {
-        background: rgba(255,255,255,0.05);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.1);
+        background: var(--primary-50);
+        border: 1px solid var(--primary-100);
         border-radius: var(--radius-md);
         padding: 20px;
         display: flex;
@@ -70,30 +61,31 @@
     }
     .hero-stat:hover {
         transform: translateY(-5px);
-        background: rgba(255,255,255,0.1);
+        background: var(--white);
         border-color: var(--primary-400);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        box-shadow: var(--shadow-md);
     }
     .hero-stat-icon {
         width: 52px; height: 52px;
         border-radius: 12px;
-        background: linear-gradient(135deg, var(--primary-600), var(--primary-400));
-        color: var(--white);
+        background: var(--white);
+        color: var(--primary-600);
         display: flex; align-items: center; justify-content: center;
         font-size: 20px;
-        box-shadow: 0 4px 12px rgba(59,106,199,0.3);
+        box-shadow: 0 4px 10px rgba(30,58,138,0.08);
+        border: 1px solid var(--primary-100);
     }
     .hero-stat-value {
         font-size: 26px;
         font-weight: 800;
-        color: var(--white);
+        color: var(--primary-900);
         line-height: 1.1;
         margin-bottom: 2px;
     }
     .hero-stat-label {
         font-size: 13px;
-        color: var(--primary-200);
-        font-weight: 500;
+        color: var(--neutral-500);
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
