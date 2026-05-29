@@ -74,6 +74,7 @@ INSTALLED_APPS = [
 	'django.contrib.postgres',
     'admin_panel',
     'client',
+    'cloudinary_storage',
     'cloudinary',
 ]
 
@@ -340,6 +341,13 @@ LOGGING = {
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
+    },
+}
+
+# Ép Django trả đúng định dạng JS, chống lỗi MIME text/plain trên Arch Linux
+import mimetypes
+mimetypes.add_type("application/javascript", ".js", True)
+ 'level': 'INFO',
     },
 }
 

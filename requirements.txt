@@ -10,6 +10,7 @@ cffi==2.0.0
 charset-normalizer==3.4.4
 ckzg==2.1.6
 cloudinary==1.44.1
+django-cloudinary-storage
 cryptography==46.0.5
 cytoolz==1.1.0
 defusedxml==0.7.1
