@@ -375,6 +375,8 @@ def trangchu(request):
         'total_programs': total_programs,
         'total_donations_amount': total_donations_amount,
         'total_pending_disbursements': total_pending_disbursements,
+        'orgs_count': Organization.objects.count() if role == 'admin' else 0,
+        'recent_activities': ActivityLog.objects.order_by('-created_at')[:6] if role in ['admin', 'supervisor'] else ActivityLog.objects.filter(campaign__organization__manager=user).order_by('-created_at')[:6]
     }
     return render(request, 'admin_panel/trangchu.html', context)
 

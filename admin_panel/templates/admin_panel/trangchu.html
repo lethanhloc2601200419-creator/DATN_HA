@@ -375,10 +375,32 @@
 
     <div class="row">
         <div class="col-12">
-            <div class="card-charity bg-white p-5 text-center">
-                <i class="fas fa-chart-line fa-4x text-primary opacity-10 mb-4"></i>
-                <h5 class="text-muted fw-800">Hoạt động gần đây</h5>
-                <p class="text-muted small">Hệ thống đang thu thập dữ liệu thống kê chi tiết của bạn.</p>
+            <div class="card-charity border-0 shadow-sm overflow-hidden">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-history me-2"></i> Hoạt động gần đây</h6>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_activities %}
+                    <ul class="list-group list-group-flush">
+                        {% for log in recent_activities %}
+                        <li class="list-group-item px-4 py-3 d-flex align-items-center gap-3 hover-bg-light transition-200">
+                            <div class="bg-primary-50 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; flex-shrink: 0;">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark fs-14">{{ log.description|default:log.type }}</div>
+                                <div class="text-xs text-muted mt-1"><i class="far fa-clock me-1"></i> {{ log.created_at|timesince }} trước</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="p-5 text-center">
+                        <i class="fas fa-chart-line fa-3x text-primary opacity-25 mb-3"></i>
+                        <p class="text-muted small m-0">Chưa có dữ liệu hoạt động nào được ghi nhận.</p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
