@@ -203,7 +203,7 @@ window.addEventListener("load", async function () {
 
     var authAdapter = new AuthAdapterClass({
       adapterSettings: {
-        uxMode: "popup",
+        uxMode: "redirect",
         redirectUrl: window.location.origin,
       },
     });
