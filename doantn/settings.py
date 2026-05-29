@@ -347,10 +347,3 @@ LOGGING = {
 # Ép Django trả đúng định dạng JS, chống lỗi MIME text/plain trên Arch Linux
 import mimetypes
 mimetypes.add_type("application/javascript", ".js", True)
- 'level': 'INFO',
-    },
-}
-
-# Ép Django trả đúng định dạng JS, chống lỗi MIME text/plain trên Arch Linux
-import mimetypes
-mimetypes.add_type("application/javascript", ".js", True)
