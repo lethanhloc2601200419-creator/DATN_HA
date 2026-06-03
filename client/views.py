@@ -912,10 +912,13 @@ def export_donation_pdf(request, donation_id):
 
     organization = donation.campaign.organization
     
+    font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+    
     context = {
         'donation': donation,
         'organization': organization,
         'now': timezone.now(),
+        'font_path': font_path,
     }
     
     # Render template HTML
