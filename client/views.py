@@ -617,18 +617,33 @@ def ungho(request, pk):
             donation.user_agent = request.META.get('HTTP_USER_AGENT', '')[:1000]
 
             # 3. Xử lý User (Đăng nhập hay vãng lai)
+            is_anonymous_req = request.POST.get('is_anonymous') == 'on'
+            
             if request.user.is_authenticated:
                 donation.donor = request.user
+                
+                # Lấy địa chỉ ví để làm định danh ẩn danh
+                wallet_address = None
                 if hasattr(request.user, 'profile'):
-                    donation.donor_name = request.user.profile.display_name
-                    donation.donor_wallet_address = (
+                    wallet_address = (
                         request.user.profile.smart_account_address
                         or request.user.profile.wallet_address
-                        or None
                     )
+                
+                if is_anonymous_req:
+                    donation.is_anonymous = True
+                    donation.donor_name = "Mạnh thường quân"
+                    # Tạo email ẩn danh dựa trên ví hoặc ID để gửi sang PayOS
+                    mask_id = wallet_address or f"user_{request.user.id}"
+                    donation.donor_email = f"{mask_id}@anonymous.fund"
+                    donation.donor_wallet_address = wallet_address
                 else:
-                    donation.donor_name = request.user.username
-                donation.donor_email = request.user.email
+                    if hasattr(request.user, 'profile'):
+                        donation.donor_name = request.user.profile.display_name or request.user.username
+                        donation.donor_wallet_address = wallet_address
+                    else:
+                        donation.donor_name = request.user.username
+                    donation.donor_email = request.user.email
             else:
                 donation.donor_name = request.POST.get('donor_name')
                 donation.donor_email = request.POST.get('donor_email')

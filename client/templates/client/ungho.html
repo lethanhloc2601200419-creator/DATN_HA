@@ -55,6 +55,18 @@
                         {% endif %}
 
                         <div class="mb-4">
+                            <div class="form-check form-switch p-0 d-flex align-items-center justify-content-between bg-light p-3 radius-md border border-dashed">
+                                <label class="form-check-label fw-800 text-dark m-0 cursor-pointer" for="is_anonymous_toggle">
+                                    <i class="fas fa-user-secret text-primary me-2"></i> Ủng hộ ẩn danh
+                                    <small class="d-block text-muted fw-normal mt-1" style="font-size: 0.75rem;">
+                                        Danh tính của bạn sẽ được bảo mật trên PayOS và trang sao kê.
+                                    </small>
+                                </label>
+                                <input class="form-check-input ms-0" type="checkbox" name="is_anonymous" id="is_anonymous_toggle" style="width: 45px; height: 22px; cursor: pointer;">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
                             <label class="small fw-800 text-muted text-uppercase mb-2">Lời nhắn yêu thương</label>
                             <textarea name="message" class="form-control radius-md" rows="3" placeholder="Gửi lời chúc tốt đẹp nhất đến hoàn cảnh này..."></textarea>
                         </div>

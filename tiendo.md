@@ -90,6 +90,16 @@
 
 ---
 
+## 🚀 PHASE 5: NÂNG CẤP TRẢI NGHIỆM & RIÊNG TƯ
+
+- [x] **[14] Thiết kế & Tài liệu:** Tạo file `andanh.md` và lên kế hoạch xử lý Masking dữ liệu. ✅
+- [x] **[15] Cập nhật UI Ungho:** Thêm nút gạt "Ủng hộ ẩn danh" vào `ungho.html`. ✅
+- [x] **[16] Xử lý Logic Backend:** Refactor hàm `ungho` để nhận diện flag ẩn danh và thực hiện Masking (Name/Email). ✅
+- [x] **[17] Tích hợp PayOS:** Cập nhật hàm tạo link thanh toán để gửi thông tin ẩn danh sang PayOS. ✅
+- [x] **[18] Kiểm thử & Hoàn thiện:** Test luồng đăng nhập + ẩn danh, kiểm tra hiển thị tại PayOS và Sao kê. ✅
+
+---
+
 ## 📊 LUỒNG TỔNG QUAN (ĐÃ TRIỂN KHAI XONG)
 
 ```
