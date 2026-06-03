@@ -832,6 +832,59 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.utils import timezone
+from django.contrib.staticfiles import finders
+
+
+def _pdf_link_callback(uri, rel):
+    """
+    Resolver cho xhtml2pdf:
+      - Map STATIC_URL / MEDIA_URL về đường dẫn filesystem tuyệt đối.
+      - Hỗ trợ font tiếng Việt (DejaVuSans*) trong static/fonts/.
+      - Cho phép URL HTTP/HTTPS đi qua (xhtml2pdf tự fetch).
+      - Đường dẫn tuyệt đối (đã là filesystem) thì trả về nguyên.
+    Mục tiêu: đảm bảo @font-face load được file .ttf để render tiếng Việt
+    có dấu trong PDF (báo cáo tổng hợp + chứng nhận).
+    """
+    if not uri:
+        return uri
+
+    # URL HTTP/HTTPS — để xhtml2pdf tự fetch.
+    if uri.startswith(('http://', 'https://')):
+        return uri
+
+    # Đường dẫn filesystem tuyệt đối — trả về nếu file tồn tại.
+    if os.path.isabs(uri) and os.path.exists(uri):
+        return uri
+
+    static_url = getattr(settings, 'STATIC_URL', '/static/') or '/static/'
+    media_url = getattr(settings, 'MEDIA_URL', '/media/') or '/media/'
+    static_root = getattr(settings, 'STATIC_ROOT', None)
+    media_root = getattr(settings, 'MEDIA_ROOT', None)
+
+    path = None
+    if uri.startswith(static_url):
+        relative = uri[len(static_url):]
+        # Ưu tiên STATIC_ROOT (sau collectstatic), fallback dùng staticfiles finders.
+        if static_root:
+            candidate = os.path.join(static_root, relative)
+            if os.path.exists(candidate):
+                path = candidate
+        if not path:
+            path = finders.find(relative)
+    elif uri.startswith(media_url) and media_root:
+        path = os.path.join(media_root, uri[len(media_url):])
+    else:
+        # Đường dẫn tương đối hoặc đường dẫn không có scheme — thử ghép
+        # với BASE_DIR (cho trường hợp template truyền absolute path từ
+        # settings.BASE_DIR như font_path).
+        candidate = os.path.join(getattr(settings, 'BASE_DIR', ''), uri.lstrip('/'))
+        if os.path.exists(candidate):
+            path = candidate
+
+    if path and os.path.exists(path):
+        return path
+    return uri
+
 
 @login_required(login_url='admin_panel:dangnhap')
 def lichsu_quyen_gop(request):
@@ -879,7 +932,9 @@ def export_donation_report(request):
         donations = donations.filter(created_at__date__lte=end_date)
         
     total_amount = donations.aggregate(Sum('amount'))['amount__sum'] or 0
-    
+
+    font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+
     context = {
         'donations': donations,
         'user': request.user,
@@ -887,6 +942,7 @@ def export_donation_report(request):
         'end_date': end_date,
         'total_amount': total_amount,
         'now': timezone.now(),
+        'font_path': font_path,
     }
     
     template = get_template('client/donation_report_pdf.html')
@@ -896,7 +952,12 @@ def export_donation_report(request):
     filename = f"Bao_Cao_Quyen_Gop_{request.user.username}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    pisa_status = pisa.CreatePDF(html, dest=response, encoding='utf-8')
+    pisa_status = pisa.CreatePDF(
+        html,
+        dest=response,
+        encoding='utf-8',
+        link_callback=_pdf_link_callback,
+    )
     if pisa_status.err:
         return HttpResponse('Lỗi tạo báo cáo PDF', status=500)
     return response
@@ -931,7 +992,12 @@ def export_donation_pdf(request, donation_id):
     response['Content-Disposition'] = f'attachment; filename="Chung_Nhan_Quyen_Gop_{donation.id}.pdf"'
     
     # Chuyển HTML thành PDF
-    pisa_status = pisa.CreatePDF(html, dest=response, encoding='utf-8')
+    pisa_status = pisa.CreatePDF(
+        html,
+        dest=response,
+        encoding='utf-8',
+        link_callback=_pdf_link_callback,
+    )
     
     if pisa_status.err:
         return HttpResponse('Đã có lỗi xảy ra khi tạo file PDF.', status=500)
