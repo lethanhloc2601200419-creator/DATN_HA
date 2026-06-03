@@ -840,6 +840,10 @@ def lichsu_quyen_gop(request):
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
     
+    # Xử lý trường hợp giá trị là chuỗi "None" hoặc rỗng
+    if start_date in [None, '', 'None']: start_date = None
+    if end_date in [None, '', 'None']: end_date = None
+    
     donations = Donation.objects.filter(donor=request.user, status='completed').select_related('campaign').order_by('-created_at')
     
     if start_date:
@@ -861,6 +865,10 @@ def export_donation_report(request):
     """
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
+    
+    # Xử lý trường hợp giá trị là chuỗi "None" hoặc rỗng
+    if start_date in [None, '', 'None']: start_date = None
+    if end_date in [None, '', 'None']: end_date = None
     
     donations = Donation.objects.filter(donor=request.user, status='completed').select_related('campaign').order_by('created_at')
     
@@ -887,7 +895,7 @@ def export_donation_report(request):
     filename = f"Bao_Cao_Quyen_Gop_{request.user.username}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    pisa_status = pisa.CreatePDF(html, dest=response)
+    pisa_status = pisa.CreatePDF(html, dest=response, encoding='utf-8')
     if pisa_status.err:
         return HttpResponse('Lỗi tạo báo cáo PDF', status=500)
     return response
@@ -919,7 +927,7 @@ def export_donation_pdf(request, donation_id):
     response['Content-Disposition'] = f'attachment; filename="Chung_Nhan_Quyen_Gop_{donation.id}.pdf"'
     
     # Chuyển HTML thành PDF
-    pisa_status = pisa.CreatePDF(html, dest=response)
+    pisa_status = pisa.CreatePDF(html, dest=response, encoding='utf-8')
     
     if pisa_status.err:
         return HttpResponse('Đã có lỗi xảy ra khi tạo file PDF.', status=500)

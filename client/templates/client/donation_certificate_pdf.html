@@ -5,73 +5,63 @@
     <style>
         @page {
             size: a4 portrait;
-            margin: 2cm;
+            margin: 1.5cm;
         }
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
+            font-family: 'DejaVu Sans', sans-serif;
+            line-height: 1.5;
             color: #333;
         }
         .certificate-border {
-            border: 10px double #004d99;
-            padding: 20px;
-            height: 100%;
+            border: 5px solid #004d99;
+            padding: 30px;
+            height: 90%;
         }
         .header {
             text-align: center;
-            margin-bottom: 30px;
-        }
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
         }
         .org-name {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             color: #004d99;
             text-transform: uppercase;
         }
         .title {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
             color: #cc0000;
             margin: 20px 0;
             text-align: center;
         }
         .content {
-            font-size: 18px;
-            margin: 40px 0;
-        }
-        .content p {
-            margin-bottom: 15px;
+            font-size: 14px;
+            margin: 30px 0;
         }
         .highlight {
             font-weight: bold;
             color: #000;
         }
         .blockchain-box {
-            background-color: #f9f9f9;
-            border: 1px dashed #999;
-            padding: 15px;
-            margin-top: 30px;
-            font-size: 14px;
+            background-color: #f0f7ff;
+            border: 1px dashed #004d99;
+            padding: 10px;
+            margin-top: 20px;
+            font-size: 11px;
         }
         .footer {
-            margin-top: 50px;
+            margin-top: 30px;
             text-align: right;
         }
-        .signature {
-            margin-top: 10px;
+        .signature-box {
+            display: block;
+            width: 200px;
+            margin-left: auto;
             text-align: center;
-            float: right;
-            width: 250px;
         }
         .stamp {
-            width: 120px;
-            opacity: 0.8;
-            margin-top: -60px;
-            margin-right: 40px;
+            width: 100px;
+            margin-top: -30px;
         }
     </style>
 </head>
@@ -79,8 +69,7 @@
     <div class="certificate-border">
         <div class="header">
             <div class="org-name">{{ organization.name }}</div>
-            <div style="font-size: 14px;">Mã số thuế: {{ organization.tax_id|default:"0101234567-999" }}</div>
-            <div style="font-size: 12px;">Địa chỉ: {{ organization.address|default:"Số 1, Đường Đại Học, TP. Hồ Chí Minh" }}</div>
+            <div style="font-size: 12px;">Mã số thuế: {{ organization.tax_id|default:"0101234567-999" }}</div>
         </div>
 
         <div class="title">GIẤY CHỨNG NHẬN QUYÊN GÓP</div>
@@ -94,27 +83,26 @@
                     {{ donation.donor_name }}
                 {% endif %}
             </span></p>
-            <p>Đã ủng hộ số tiền: <span class="highlight" style="font-size: 22px; color: #cc0000;">{{ donation.amount }} VNĐ</span></p>
+            <p>Đã ủng hộ số tiền: <span class="highlight" style="font-size: 18px; color: #cc0000;">{{ donation.amount }} VNĐ</span></p>
             <p>Cho chiến dịch: <span class="highlight">{{ donation.campaign.title }}</span></p>
-            <p>Thời gian giao dịch: <span class="highlight">{{ donation.created_at|date:"d/m/Y H:i" }}</span></p>
-            <p style="font-style: italic;">Hành động của bạn đã góp phần mang lại hy vọng và sự hỗ trợ kịp thời cho những hoàn cảnh khó khăn.</p>
+            <p>Thời gian giao dịch: {{ donation.created_at|date:"d/m/Y H:i" }}</p>
+            <p style="font-style: italic; margin-top: 20px;">Hành động của bạn đã góp phần mang lại hy vọng và sự hỗ trợ kịp thời cho những hoàn cảnh khó khăn.</p>
         </div>
 
         <div class="blockchain-box">
-            <strong>BẰNG CHỨNG XÁC THỰC BLOCKCHAIN (ETHEREUM SEPOLIA)</strong><br>
-            Mã giao dịch (TxHash): <span style="font-family: monospace;">{{ donation.eth_tx_hash|default:"N/A" }}</span><br>
-            Mã định danh nội bộ: {{ donation.hash|truncatechars:20 }}...<br>
-            <small>* Giấy chứng nhận này có giá trị xác nhận điện tử, được lưu trữ vĩnh viễn trên mạng lưới Blockchain.</small>
+            <strong>BẰNG CHỨNG XÁC THỰC BLOCKCHAIN</strong><br/>
+            TxHash: {{ donation.eth_tx_hash|default:"N/A" }}<br/>
+            Định danh nội bộ: {{ donation.hash|truncatechars:30 }}...<br/>
+            <small>* Chứng nhận điện tử này được lưu trữ vĩnh viễn trên mạng lưới Blockchain Sepolia.</small>
         </div>
 
         <div class="footer">
             <p>Ngày {{ now|date:"d" }} tháng {{ now|date:"m" }} năm {{ now|date:"Y" }}</p>
-            <div class="signature">
-                <strong>ĐẠI DIỆN TỔ CHỨC</strong><br>
-                <div style="height: 60px;"></div>
-                <p>(Đã ký và đóng dấu)</p>
-                <!-- Con dấu giả định cho đồ án -->
+            <div class="signature-box">
+                <strong>ĐẠI DIỆN TỔ CHỨC</strong><br/>
+                <div style="height: 50px;"></div>
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Vietnamese_Seal.svg/120px-Vietnamese_Seal.svg.png" class="stamp">
+                <br/>(Đã ký và đóng dấu)
             </div>
         </div>
     </div>
