@@ -48,7 +48,7 @@
                                 <i class="fas fa-user-circle fa-2x text-primary me-3"></i>
                                 <div>
                                     <div class="text-xs text-muted fw-bold text-uppercase">Tài khoản ủng hộ</div>
-                                    <strong class="text-primary">{{ user.username }}</strong>
+                                    <strong class="text-primary" id="donorDisplayName">{{ user.username }}</strong>
                                 </div>
                             </div>
                         </div>
@@ -62,7 +62,8 @@
                                         Danh tính của bạn sẽ được bảo mật trên PayOS và trang sao kê.
                                     </small>
                                 </label>
-                                <input class="form-check-input ms-0" type="checkbox" name="is_anonymous" id="is_anonymous_toggle" style="width: 45px; height: 22px; cursor: pointer;">
+                                <input class="form-check-input ms-0" type="checkbox" name="is_anonymous" id="is_anonymous_toggle" style="width: 45px; height: 22px; cursor: pointer;"
+                                       onchange="toggleAnonymousUI(this)">
                             </div>
                         </div>
 
@@ -180,5 +181,30 @@
             console.warn('FingerprintJS init failed:', error);
         }
     })();
+
+    // Xử lý chuyển đổi tên hiển thị khi bật ẩn danh
+    const originalName = "{{ user.username }}";
+    const walletAddress = "{{ user.profile.smart_account_address|default:user.profile.wallet_address|default:'' }}";
+    
+    function maskAddress(addr) {
+        if (!addr || addr.length < 10) return "0x...anonymous";
+        return addr.substring(0, 6) + "..." + addr.substring(addr.length - 4);
+    }
+
+    function toggleAnonymousUI(checkbox) {
+        const nameDisplay = document.getElementById('donorDisplayName');
+        if (!nameDisplay) return;
+
+        if (checkbox.checked) {
+            // Khi bật ẩn danh: Hiện địa chỉ ví đã ẩn hoặc hash
+            const masked = walletAddress ? maskAddress(walletAddress) : "Mạnh thường quân (Ẩn danh)";
+            nameDisplay.innerText = masked;
+            nameDisplay.classList.add('text-muted');
+        } else {
+            // Khi tắt ẩn danh: Hiện lại username
+            nameDisplay.innerText = originalName;
+            nameDisplay.classList.remove('text-muted');
+        }
+    }
 </script>
 {% endblock %}
