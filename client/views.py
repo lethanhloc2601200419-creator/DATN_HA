@@ -827,6 +827,106 @@ def api_wallet_sync(request):
     })
     
 
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from django.utils import timezone
+
+@login_required(login_url='admin_panel:dangnhap')
+def lichsu_quyen_gop(request):
+    """
+    Trang hiển thị lịch sử quyên góp của cá nhân người dùng với bộ lọc thời gian.
+    """
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    donations = Donation.objects.filter(donor=request.user, status='completed').select_related('campaign').order_by('-created_at')
+    
+    if start_date:
+        donations = donations.filter(created_at__date__gte=start_date)
+    if end_date:
+        donations = donations.filter(created_at__date__lte=end_date)
+        
+    context = {
+        'donations': donations,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'client/lichsu_quyen_gop.html', context)
+
+@login_required(login_url='admin_panel:dangnhap')
+def export_donation_report(request):
+    """
+    Xuất báo cáo tổng hợp quyên góp (PDF) cho một khoảng thời gian.
+    """
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    donations = Donation.objects.filter(donor=request.user, status='completed').select_related('campaign').order_by('created_at')
+    
+    if start_date:
+        donations = donations.filter(created_at__date__gte=start_date)
+    if end_date:
+        donations = donations.filter(created_at__date__lte=end_date)
+        
+    total_amount = donations.aggregate(Sum('amount'))['amount__sum'] or 0
+    
+    context = {
+        'donations': donations,
+        'user': request.user,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_amount': total_amount,
+        'now': timezone.now(),
+    }
+    
+    template = get_template('client/donation_report_pdf.html')
+    html = template.render(context)
+    
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"Bao_Cao_Quyen_Gop_{request.user.username}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Lỗi tạo báo cáo PDF', status=500)
+    return response
+
+def export_donation_pdf(request, donation_id):
+    """
+    Xuất file PDF chứng nhận quyên góp cho một giao dịch cụ thể.
+    """
+    donation = get_object_or_404(Donation, id=donation_id)
+    
+    # Kiểm tra bảo mật: Chỉ donor hoặc staff mới được tải
+    if donation.donor != request.user and not request.user.is_staff:
+        return HttpResponse("Bạn không có quyền tải chứng nhận này.", status=403)
+
+    organization = donation.campaign.organization
+    
+    context = {
+        'donation': donation,
+        'organization': organization,
+        'now': timezone.now(),
+    }
+    
+    # Render template HTML
+    template = get_template('client/donation_certificate_pdf.html')
+    html = template.render(context)
+
+    # Tạo file PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Chung_Nhan_Quyen_Gop_{donation.id}.pdf"'
+    
+    # Chuyển HTML thành PDF
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    
+    if pisa_status.err:
+        return HttpResponse('Đã có lỗi xảy ra khi tạo file PDF.', status=500)
+    
+    return response
+
+
 # client/views.py
 
 def chitiet_chiendich(request, pk):

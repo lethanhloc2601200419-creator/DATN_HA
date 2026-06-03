@@ -239,6 +239,9 @@
                     <li class="nav-item"><a class="nav-link {% if '/saoke/' in request.path %}active{% endif %}" href="{% url 'client:saoke' %}">Sao kê minh bạch</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/biendong-sodu/' in request.path %}active{% endif %}" href="{% url 'client:biendong_sodu' %}">Biến động số dư</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/map/' in request.path %}active{% endif %}" href="{% url 'client:ban_do_thien_nguyen' %}">Bản đồ</a></li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item"><a class="nav-link {% if '/lich-su-quyen-gop/' in request.path %}active{% endif %}" href="{% url 'client:lichsu_quyen_gop' %}">Lịch sử của tôi</a></li>
+                    {% endif %}
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     {% if user.is_authenticated %}

@@ -105,6 +105,7 @@ class Organization(models.Model):
     bank_branch = models.CharField(max_length=255, blank=True, null=True)
     qr_code_url = models.TextField(blank=True, null=True)
     wallet_address = models.CharField(max_length=42, blank=True, null=True)
+    tax_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="Mã số thuế")
 
     # Thông tin pháp lý & Xác minh (Admin duyệt)
     license_document_url = models.TextField(blank=True, null=True) # Ảnh giấy phép

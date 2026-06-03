@@ -192,6 +192,16 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- NÚT TẢI CHỨNG NHẬN (Hiện khi đã confirm blockchain) -->
+                    <div id="certificateBox" class="mt-4" style="display: none;">
+                        <a href="{% url 'client:export_donation_pdf' donation.id %}" class="btn btn-success w-100 py-3 fw-800 shadow-sm radius-pill">
+                            <i class="fas fa-file-pdf me-2"></i> TẢI CHỨNG NHẬN QUYÊN GÓP (PDF)
+                        </a>
+                        <p class="text-center text-muted small mt-2">
+                            <i class="fas fa-info-circle me-1"></i> File PDF này có giá trị xác nhận ủng hộ để quyết toán thuế.
+                        </p>
+                    </div>
                     {% else %}
                     <div class="bg-light rounded-4 p-4 small text-muted">
                         <div class="d-flex align-items-center mb-2">
@@ -324,6 +334,10 @@
                 gasSummary.style.display = 'block';
                 totalGasVndEl.textContent = fmt(data.total_admin_gas_vnd) + 'đ';
             }
+
+            // HIỆN NÚT TẢI CHỨNG NHẬN
+            const certBox = document.getElementById('certificateBox');
+            if (certBox) certBox.style.display = 'block';
 
             stopPolling();
         } else if (status === 'failed') {

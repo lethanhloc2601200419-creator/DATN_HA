@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .certificate-border {
+            border: 10px double #004d99;
+            padding: 20px;
+            height: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 10px;
+        }
+        .org-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #004d99;
+            text-transform: uppercase;
+        }
+        .title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #cc0000;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .content {
+            font-size: 18px;
+            margin: 40px 0;
+        }
+        .content p {
+            margin-bottom: 15px;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #000;
+        }
+        .blockchain-box {
+            background-color: #f9f9f9;
+            border: 1px dashed #999;
+            padding: 15px;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: right;
+        }
+        .signature {
+            margin-top: 10px;
+            text-align: center;
+            float: right;
+            width: 250px;
+        }
+        .stamp {
+            width: 120px;
+            opacity: 0.8;
+            margin-top: -60px;
+            margin-right: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate-border">
+        <div class="header">
+            <div class="org-name">{{ organization.name }}</div>
+            <div style="font-size: 14px;">Mã số thuế: {{ organization.tax_id|default:"0101234567-999" }}</div>
+            <div style="font-size: 12px;">Địa chỉ: {{ organization.address|default:"Số 1, Đường Đại Học, TP. Hồ Chí Minh" }}</div>
+        </div>
+
+        <div class="title">GIẤY CHỨNG NHẬN QUYÊN GÓP</div>
+
+        <div class="content">
+            <p>Ban Quản trị Quỹ Nhân Ái chân thành cảm ơn sự đóng góp của:</p>
+            <p>Ông/Bà: <span class="highlight">
+                {% if donation.is_anonymous %}
+                    Mạnh thường quân (Ví: {{ donation.donor_wallet_address|truncatechars:10 }})
+                {% else %}
+                    {{ donation.donor_name }}
+                {% endif %}
+            </span></p>
+            <p>Đã ủng hộ số tiền: <span class="highlight" style="font-size: 22px; color: #cc0000;">{{ donation.amount }} VNĐ</span></p>
+            <p>Cho chiến dịch: <span class="highlight">{{ donation.campaign.title }}</span></p>
+            <p>Thời gian giao dịch: <span class="highlight">{{ donation.created_at|date:"d/m/Y H:i" }}</span></p>
+            <p style="font-style: italic;">Hành động của bạn đã góp phần mang lại hy vọng và sự hỗ trợ kịp thời cho những hoàn cảnh khó khăn.</p>
+        </div>
+
+        <div class="blockchain-box">
+            <strong>BẰNG CHỨNG XÁC THỰC BLOCKCHAIN (ETHEREUM SEPOLIA)</strong><br>
+            Mã giao dịch (TxHash): <span style="font-family: monospace;">{{ donation.eth_tx_hash|default:"N/A" }}</span><br>
+            Mã định danh nội bộ: {{ donation.hash|truncatechars:20 }}...<br>
+            <small>* Giấy chứng nhận này có giá trị xác nhận điện tử, được lưu trữ vĩnh viễn trên mạng lưới Blockchain.</small>
+        </div>
+
+        <div class="footer">
+            <p>Ngày {{ now|date:"d" }} tháng {{ now|date:"m" }} năm {{ now|date:"Y" }}</p>
+            <div class="signature">
+                <strong>ĐẠI DIỆN TỔ CHỨC</strong><br>
+                <div style="height: 60px;"></div>
+                <p>(Đã ký và đóng dấu)</p>
+                <!-- Con dấu giả định cho đồ án -->
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Vietnamese_Seal.svg/120px-Vietnamese_Seal.svg.png" class="stamp">
+            </div>
+        </div>
+    </div>
+</body>
+</html>
