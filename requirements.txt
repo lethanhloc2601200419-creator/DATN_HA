@@ -60,3 +60,5 @@ web3==7.14.1
 websockets==15.0.1
 xhtml2pdf==0.2.16
 reportlab==4.4.4
+svglib==1.6.0
+rlpycairo==0.4.0
