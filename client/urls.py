@@ -34,6 +34,7 @@ urlpatterns = [
     path('export-donation-pdf/<int:donation_id>/', client.export_donation_pdf, name='export_donation_pdf'),
     path('lich-su-quyen-gop/', client.lichsu_quyen_gop, name='lichsu_quyen_gop'),
     path('export-donation-report/', client.export_donation_report, name='export_donation_report'),
+    path('ho-so/', client.profile_view, name='profile'),
 ]
 
 

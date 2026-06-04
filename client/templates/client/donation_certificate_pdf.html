@@ -84,13 +84,11 @@
 
         <div class="content">
             <p>Ban Quản trị Quỹ Nhân Ái chân thành cảm ơn sự đóng góp của:</p>
-            <p>Ông/Bà: <span class="highlight">
-                {% if donation.is_anonymous %}
-                    Nhà hảo tâm ẩn danh
-                {% else %}
-                    {{ donation.donor_name }}
-                {% endif %}
-            </span></p>
+            <p>Ông/Bà: <span class="highlight">{{ donor_display_name }}</span></p>
+            {% if donor_email %}<p>Email: <span class="highlight">{{ donor_email }}</span></p>{% endif %}
+            {% if donor_phone %}<p>Số điện thoại: <span class="highlight">{{ donor_phone }}</span></p>{% endif %}
+            {% if donor_address %}<p>Địa chỉ: <span class="highlight">{{ donor_address }}</span></p>{% endif %}
+            {% if donation.is_anonymous %}<p style="font-size: 11px; color: #666; font-style: italic;">(*) Khoản đóng góp này được công bố ở chế độ ẩn danh trên hệ thống. Giấy chứng nhận này dùng cho mục đích khai thuế cá nhân của người đóng góp.</p>{% endif %}
             <p>Đã ủng hộ số tiền: <span class="highlight" style="font-size: 18px; color: #cc0000;">{{ donation.amount }} VNĐ</span></p>
             <p>Cho chiến dịch: <span class="highlight">{{ donation.campaign.title }}</span></p>
             <p>Thời gian giao dịch: {{ donation.created_at|date:"d/m/Y H:i" }}</p>

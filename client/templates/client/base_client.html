@@ -241,6 +241,7 @@
                     <li class="nav-item"><a class="nav-link {% if '/map/' in request.path %}active{% endif %}" href="{% url 'client:ban_do_thien_nguyen' %}">Bản đồ</a></li>
                     {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link {% if '/lich-su-quyen-gop/' in request.path %}active{% endif %}" href="{% url 'client:lichsu_quyen_gop' %}">Lịch sử của tôi</a></li>
+                    <li class="nav-item"><a class="nav-link {% if '/ho-so/' in request.path %}active{% endif %}" href="{% url 'client:profile' %}"><i class="fas fa-user-circle me-1"></i>Hồ sơ</a></li>
                     {% endif %}
                 </ul>
                 <div class="d-flex align-items-center gap-3">

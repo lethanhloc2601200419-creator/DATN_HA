@@ -35,6 +35,7 @@ from web3 import Web3
 # Import Service Blockchain đã viết
 from .blockchain import BlockchainService, get_eth_vnd_rate
 from .blockchain_processor import start_blockchain_thread
+from .forms import UserProfileForm
 
 WEI_IN_ETH = Decimal('1000000000000000000')
 SYBIL_DONATION_WINDOW = timedelta(hours=1)
@@ -887,6 +888,53 @@ def _pdf_link_callback(uri, rel):
 
 
 @login_required(login_url='admin_panel:dangnhap')
+def profile_view(request):
+    """
+    Trang hoữ sơ cá nhân của user.
+
+    - GET: hiển thị form với thông tin hiện tại + thống kê đóng góp.
+    - POST: lưu thông tin cơ bản (display_name, phone, address, province, bio, avatar)
+      đồng thời update first_name/last_name/email trên auth.User.
+
+    Không cho phép đổi phần on-chain (wallet/eoa/smart_account) qua form này
+    — các field đó do flow Web3Auth/wallet-sync đảm nhiệm.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=profile, user=request.user)
+        if form.is_valid():
+            form.save()
+            ActivityLog.objects.create(
+                user=request.user,
+                type='profile_updated',
+                description=f'User {request.user.username} cập nhật thông tin profile.',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
+            )
+            messages.success(request, 'Cập nhật thông tin thành công!')
+            return redirect('client:profile')
+        messages.error(request, 'Vui lòng kiểm tra lại các trường đã nhập.')
+    else:
+        form = UserProfileForm(instance=profile, user=request.user)
+
+    # Thống kê nhỏ cho user xem.
+    completed_donations = Donation.objects.filter(donor=request.user, status='completed')
+    total_donated = completed_donations.aggregate(total=Sum('amount'))['total'] or 0
+    donation_count = completed_donations.count()
+    campaigns_supported = completed_donations.values('campaign').distinct().count()
+
+    context = {
+        'form': form,
+        'profile': profile,
+        'total_donated': total_donated,
+        'donation_count': donation_count,
+        'campaigns_supported': campaigns_supported,
+    }
+    return render(request, 'client/profile.html', context)
+
+
+@login_required(login_url='admin_panel:dangnhap')
 def lichsu_quyen_gop(request):
     """
     Trang hiển thị lịch sử quyên góp của cá nhân người dùng với bộ lọc thời gian.
@@ -965,22 +1013,65 @@ def export_donation_report(request):
 def export_donation_pdf(request, donation_id):
     """
     Xuất file PDF chứng nhận quyên góp cho một giao dịch cụ thể.
+
+    Lưu ý quan trọng (khai thuế cá nhân):
+      - Mặc dù donation có thể được công bố ở chế độ ẨN DANH trên trang sao kê
+        công khai, giấy chứng nhận PDF (do chính donor tự xuất) BẮT BUỘC phải
+        hiển thị tên thật + thông tin liên hệ để cơ quan thuế đối chiếu.
+      - Tên ưu tiên: profile.display_name → user.get_full_name() → user.first_name
+        → user.username → donation.donor_name (fallback cho donation cũ trước khi
+        có user account).
     """
     donation = get_object_or_404(Donation, id=donation_id)
-    
+
     # Kiểm tra bảo mật: Chỉ donor hoặc staff mới được tải
     if donation.donor != request.user and not request.user.is_staff:
         return HttpResponse("Bạn không có quyền tải chứng nhận này.", status=403)
 
     organization = donation.campaign.organization
-    
+
     font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts')
-    
+
+    # Lấy tên thật của donor để in lên cert (phục vụ khai thuế).
+    donor_user = donation.donor
+    donor_profile = getattr(donor_user, 'profile', None) if donor_user else None
+
+    donor_display_name = ''
+    if donor_profile and donor_profile.display_name:
+        donor_display_name = donor_profile.display_name
+    elif donor_user:
+        full_name = donor_user.get_full_name().strip()
+        donor_display_name = full_name or donor_user.first_name or donor_user.username
+    if not donor_display_name:
+        # Donation vãng lai (không có user account) — fallback về donor_name từ form.
+        donor_display_name = donation.donor_name or 'Nhà hảo tâm'
+
+    donor_email = (donor_user.email if donor_user else '') or ''
+    # Bỏ email ẩn danh dạng <wallet>@anonymous.fund (nếu có).
+    if donor_email.endswith('@anonymous.fund'):
+        donor_email = ''
+    if not donor_email and donation.donor_email and not donation.donor_email.endswith('@anonymous.fund'):
+        donor_email = donation.donor_email
+
+    donor_phone = ''
+    donor_address = ''
+    if donor_profile:
+        donor_phone = donor_profile.phone or ''
+        # Ghép address + province nếu có.
+        addr_parts = [donor_profile.address, donor_profile.province]
+        donor_address = ', '.join([p for p in addr_parts if p])
+    if not donor_phone:
+        donor_phone = donation.donor_phone or ''
+
     context = {
         'donation': donation,
         'organization': organization,
         'now': timezone.now(),
         'font_path': font_path,
+        'donor_display_name': donor_display_name,
+        'donor_email': donor_email,
+        'donor_phone': donor_phone,
+        'donor_address': donor_address,
     }
     
     # Render template HTML
