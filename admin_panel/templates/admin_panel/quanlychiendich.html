@@ -218,7 +218,7 @@
 
 {% if role == 'admin' %}
 <div class="modal fade" id="depositPoolModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <form action="{% url 'admin_panel:nap_pool' %}" method="POST">
                 {% csrf_token %}
@@ -244,7 +244,7 @@
 {% endif %}
 
 <div class="modal fade" id="addModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <form action="{% url 'admin_panel:them_chiendich' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -381,7 +381,7 @@
 </div>
 
 <div class="modal fade" id="editModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <form id="editForm" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}

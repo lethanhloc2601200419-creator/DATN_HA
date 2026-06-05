@@ -315,6 +315,44 @@
     @keyframes spinReverse {
         to { transform: rotate(-360deg); }
     }
+
+    /* --- Centered Modals & Scrollbars --- */
+    .modal-dialog-centered.modal-dialog-scrollable {
+        display: flex;
+        align-items: center;
+        min-height: calc(100% - var(--bs-modal-margin) * 2);
+    }
+    .modal-content {
+        border-radius: var(--radius-lg);
+        border: none;
+        box-shadow: var(--shadow-lg);
+    }
+    .modal-body {
+        padding: 1.5rem;
+    }
+    
+    /* Custom Scrollbar for Modal Body & Any long content */
+    .modal-body::-webkit-scrollbar, 
+    .admin-sidebar::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+        width: 8px;
+    }
+    .modal-body::-webkit-scrollbar-track,
+    .admin-sidebar::-webkit-scrollbar-track,
+    body::-webkit-scrollbar-track {
+        background: var(--neutral-100);
+    }
+    .modal-body::-webkit-scrollbar-thumb,
+    .admin-sidebar::-webkit-scrollbar-thumb,
+    body::-webkit-scrollbar-thumb {
+        background: var(--primary-200);
+        border-radius: 10px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover,
+    .admin-sidebar::-webkit-scrollbar-thumb:hover,
+    body::-webkit-scrollbar-thumb:hover {
+        background: var(--primary-400);
+    }
   </style>
 </head>
 

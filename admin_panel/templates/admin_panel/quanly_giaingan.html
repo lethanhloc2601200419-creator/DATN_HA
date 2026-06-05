@@ -325,7 +325,7 @@
                         {# DETAIL MODAL — gồm V3 audit trail                                #}
                         {# =============================================================== #}
                         <div class="modal fade" id="detailModal{{ item.obj.id }}" tabindex="-1">
-                            <div class="modal-dialog modal-lg">
+                            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                                 <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
                                     <div class="modal-header bg-primary text-white border-0 py-4">
                                         <h5 class="modal-title fw-800"><i class="fas fa-info-circle me-2"></i> Chi tiết đề xuất #{{ item.obj.id }}</h5>
@@ -521,7 +521,7 @@
 {# CREATE MODAL — V3 off-chain: upload IPFS → lưu DB. KHÔNG còn on-chain propose. #}
 {# ============================================================ #}
 <div class="modal fade" id="createModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <form id="disbursementProposalForm" action="{% url 'admin_panel:tao_yeucau_giaingan' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
