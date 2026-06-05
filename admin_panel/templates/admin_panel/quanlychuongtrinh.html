@@ -189,138 +189,134 @@
 
 <div class="modal fade" id="addModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <form action="{% url 'admin_panel:them_chuongtrinh' %}" method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="modal-header admin-modal-header">
-                    <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Chương trình Mục tiêu</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
-                            <label class="fw-bold">Thuộc Tổ chức nào? <span class="text-danger">*</span></label>
-                            <select name="organization_id" class="form-select" required>
-                                <option value="">-- Chọn Tổ chức --</option>
-                                {% for org in all_orgs %}
-                                <option value="{{ org.id }}">{{ org.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+        <form class="modal-content border-0 radius-lg shadow-lg" action="{% url 'admin_panel:them_chuongtrinh' %}" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header admin-modal-header">
+                <h5 class="modal-title fw-800"><i class="fas fa-plus-circle me-2"></i> Thêm Chương trình Mục tiêu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label class="fw-bold small text-muted">Thuộc Tổ chức nào? <span class="text-danger">*</span></label>
+                        <select name="organization_id" class="form-select" required>
+                            <option value="">-- Chọn Tổ chức --</option>
+                            {% for org in all_orgs %}
+                            <option value="{{ org.id }}">{{ org.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                        <div class="col-md-8 mb-3">
-                            <label>Tên Chương trình <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control" required placeholder="VD: Góp Cơm Có Thịt">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Tổng tiền mục tiêu (VNĐ)</label>
-                            <input type="number" name="total_target_amount" class="form-control" value="0" min="0">
-                        </div>
-                        
-                        <div class="col-md-12 mb-3">
-                            <label>Ảnh bìa / Banner</label>
-                            <input type="file" name="image" class="form-control">
-                        </div>
+                    <div class="col-md-8 mb-3">
+                        <label class="fw-bold small text-muted">Tên Chương trình <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control" required placeholder="VD: Góp Cơm Có Thịt">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small text-muted">Tổng tiền mục tiêu (VNĐ)</label>
+                        <input type="number" name="total_target_amount" class="form-control" value="0" min="0">
+                    </div>
+                    
+                    <div class="col-md-12 mb-3">
+                        <label class="fw-bold small text-muted">Ảnh bìa / Banner</label>
+                        <input type="file" name="image" class="form-control">
+                    </div>
 
-                        <h6 class="admin-section-title">Thông tin Địa điểm (GIS)</h6>
-                        <div class="col-md-12 mb-2">
-                            <label>Địa chỉ hiển thị (Text)</label>
-                            <input type="text" name="beneficiary_address" class="form-control" placeholder="VD: Trường tiểu học bản X...">
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label>Vĩ độ (Latitude)</label>
-                            <input type="number" step="any" name="beneficiary_lat" id="add_lat" class="form-control" placeholder="VD: 21.xxxxxx">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Kinh độ (Longitude)</label>
-                            <input type="number" step="any" name="beneficiary_lng" id="add_lng" class="form-control" placeholder="VD: 105.xxxxxx">
-                        </div>
+                    <h6 class="sidebar-section-title px-0 mt-3 mb-2">Thông tin Địa điểm (GIS)</h6>
+                    <div class="col-md-12 mb-2">
+                        <label class="fw-bold small text-muted">Địa chỉ hiển thị (Text)</label>
+                        <input type="text" name="beneficiary_address" class="form-control" placeholder="VD: Trường tiểu học bản X...">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small text-muted">Vĩ độ (Latitude)</label>
+                        <input type="number" step="any" name="beneficiary_lat" id="add_lat" class="form-control" placeholder="VD: 21.xxxxxx">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small text-muted">Kinh độ (Longitude)</label>
+                        <input type="number" step="any" name="beneficiary_lng" id="add_lng" class="form-control" placeholder="VD: 105.xxxxxx">
+                    </div>
 
-                        <div class="col-md-12 mb-3">
-                            <label class="text-muted small"><em>Click trên bản đồ để chọn vị trí tự động:</em></label>
-                            <div id="map_add" style="height: 300px; width: 100%;"></div>
-                        </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="text-muted small"><em>Click trên bản đồ để chọn vị trí tự động:</em></label>
+                        <div id="map_add" style="height: 300px; width: 100%; border-radius: 12px; border: 1px solid var(--primary-100);"></div>
+                    </div>
 
-                        <div class="col-md-12">
-                            <label>Mô tả chi tiết</label>
-                            <textarea name="description" class="form-control" rows="4"></textarea>
-                        </div>
+                    <div class="col-md-12">
+                        <label class="fw-bold small text-muted">Mô tả chi tiết</label>
+                        <textarea name="description" class="form-control" rows="4"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-primary">Lưu dữ liệu</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary px-4 fw-bold radius-pill" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary px-4 fw-bold radius-pill shadow-btn">Lưu dữ liệu</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <form id="editForm" method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="modal-header admin-modal-header">
-                    <h5 class="modal-title"><i class="fas fa-edit"></i> Cập nhật Chương trình</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
-                            <label class="fw-bold">Thuộc Tổ chức</label>
-                            <select name="organization_id" id="e_org_id" class="form-select" required>
-                                {% for org in all_orgs %}
-                                <option value="{{ org.id }}">{{ org.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+        <form class="modal-content border-0 radius-lg shadow-lg" id="editForm" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header admin-modal-header">
+                <h5 class="modal-title fw-800"><i class="fas fa-edit me-2"></i> Cập nhật Chương trình</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label class="fw-bold small text-muted">Thuộc Tổ chức</label>
+                        <select name="organization_id" id="e_org_id" class="form-select" required>
+                            {% for org in all_orgs %}
+                            <option value="{{ org.id }}">{{ org.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                        <div class="col-md-8 mb-3">
-                            <label>Tên Chương trình</label>
-                            <input type="text" name="name" id="e_name" class="form-control" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Tổng tiền mục tiêu (VNĐ)</label>
-                            <input type="number" name="total_target_amount" id="e_amount" class="form-control" min="0">
-                        </div>
+                    <div class="col-md-8 mb-3">
+                        <label class="fw-bold small text-muted">Tên Chương trình</label>
+                        <input type="text" name="name" id="e_name" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="fw-bold small text-muted">Tổng tiền mục tiêu (VNĐ)</label>
+                        <input type="number" name="total_target_amount" id="e_amount" class="form-control" min="0">
+                    </div>
 
-                        <div class="col-md-12 mb-3">
-                            <label>Ảnh bìa (Chọn nếu muốn đổi)</label>
-                            <input type="file" name="image" class="form-control">
-                        </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="fw-bold small text-muted">Ảnh bìa (Chọn nếu muốn đổi)</label>
+                        <input type="file" name="image" class="form-control">
+                    </div>
 
-                        <h6 class="admin-section-title">Thông tin GIS</h6>
-                        <div class="col-md-12 mb-2">
-                            <label>Địa chỉ</label>
-                            <input type="text" name="beneficiary_address" id="e_address" class="form-control">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Vĩ độ (Lat)</label>
-                            <input type="number" step="any" name="beneficiary_lat" id="e_lat" class="form-control">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Kinh độ (Lng)</label>
-                            <input type="number" step="any" name="beneficiary_lng" id="e_lng" class="form-control">
-                        </div>
+                    <h6 class="sidebar-section-title px-0 mt-3 mb-2">Thông tin GIS</h6>
+                    <div class="col-md-12 mb-2">
+                        <label class="fw-bold small text-muted">Địa chỉ</label>
+                        <input type="text" name="beneficiary_address" id="e_address" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small text-muted">Vĩ độ (Lat)</label>
+                        <input type="number" step="any" name="beneficiary_lat" id="e_lat" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold small text-muted">Kinh độ (Lng)</label>
+                        <input type="number" step="any" name="beneficiary_lng" id="e_lng" class="form-control">
+                    </div>
 
-                        <div class="col-md-12 mb-3">
-                            <div id="map_edit" style="height: 300px; width: 100%;"></div>
-                        </div>
+                    <div class="col-md-12 mb-3">
+                        <div id="map_edit" style="height: 300px; width: 100%; border-radius: 12px; border: 1px solid var(--primary-100);"></div>
+                    </div>
 
-                        <div class="col-md-12">
-                            <label>Mô tả</label>
-                            <textarea name="description" id="e_desc" class="form-control" rows="4"></textarea>
-                        </div>
+                    <div class="col-md-12">
+                        <label class="fw-bold small text-muted">Mô tả</label>
+                        <textarea name="description" id="e_desc" class="form-control" rows="4"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary px-4 fw-bold radius-pill" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary px-4 fw-bold radius-pill shadow-btn">Lưu thay đổi</button>
+            </div>
+        </form>
     </div>
 </div>
 

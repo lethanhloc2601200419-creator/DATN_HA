@@ -319,12 +319,24 @@
     /* --- Centered Modals & Scrollbars --- */
     /* Ensure modal body is scrollable and has a visible scrollbar */
     .modal-dialog-scrollable .modal-content {
-        max-height: 90vh;
+        max-height: 85vh;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden;
+    }
+    
+    /* Support for forms as direct children of modal-content */
+    .modal-dialog-scrollable .modal-content form {
         display: flex;
         flex-direction: column;
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
     }
+
     .modal-dialog-scrollable .modal-body {
         overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
         scroll-behavior: smooth;
         flex: 1 1 auto;
         /* Firefox support */
