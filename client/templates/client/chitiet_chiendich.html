@@ -28,6 +28,10 @@
                 <span class="small"><i class="fas fa-building me-2 text-primary"></i>Tổ chức: <strong class="text-trust">{{ campaign.organization.name }}</strong></span>
             </div>
 
+            {% if campaign.short_description %}
+            <p class="lead text-neutral-700 mb-4">{{ campaign.short_description }}</p>
+            {% endif %}
+
             <hr class="opacity-10 mb-4">
 
             <div class="campaign-content mt-4 lh-lg text-justify text-neutral-700">
@@ -36,6 +40,26 @@
                     {{ campaign.full_description|linebreaks }}
                 </div>
             </div>
+
+            {% if campaign.documents_urls %}
+            <div class="mt-5 p-4 bg-light radius-lg border">
+                <h4 class="fw-bold mb-4 border-start border-4 border-info ps-3">
+                    📄 Tài liệu minh chứng
+                </h4>
+                <ul class="list-group list-group-flush">
+                    {% for doc_url in campaign.documents_urls %}
+                    <li class="list-group-item d-flex align-items-center justify-content-between px-0 bg-transparent">
+                        <a href="{{ doc_url }}" target="_blank" class="text-primary fw-bold text-decoration-none d-flex align-items-center">
+                            <i class="fas fa-file-alt me-2"></i> {{ doc_url|truncatechars:70 }}
+                        </a>
+                        <a href="{{ doc_url }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill">
+                            <i class="fas fa-download me-1"></i> Tải về
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
 
             {% if campaign.detail %}
             <div class="beneficiary-detail mt-5">
@@ -357,6 +381,12 @@
                     <span><i class="fas fa-clock-rotate-left text-primary me-1"></i> Còn <strong>{{ campaign.end_date|timeuntil }}</strong></span>
                 </div>
 
+                <div class="d-flex justify-content-between text-muted small mb-4 bg-light p-2 radius-md">
+                    <span><i class="fas fa-eye text-primary me-1"></i> <strong>{{ campaign.view_count|intcomma }}</strong> lượt xem</span>
+                    <span><i class="fas fa-hand-holding-heart text-primary me-1"></i> <strong>{{ campaign.support_count|intcomma }}</strong> người ủng hộ</span>
+                </div>
+
+
                 <div class="d-grid gap-3">
                     {% if user.is_authenticated %}
                     <a href="{% url 'client:ungho' campaign.id %}" class="btn btn-accent btn-lg fw-bold rounded-pill py-3 shadow-accent animate__animated animate__pulse animate__infinite">
@@ -390,6 +420,20 @@
                         <div>
                             <small class="fw-bold d-block text-dark">Quyền quyết định</small>
                             <small class="text-muted" style="font-size: 11px;">Nhà hảo tâm trực tiếp bỏ phiếu cho các đề xuất chi tiêu.</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if campaign.is_onchain %}
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="bg-primary-100 text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px; background: var(--primary-100);">
+                            <i class="fas fa-link"></i>
+                        </div>
+                        <div>
+                            <small class="fw-bold d-block text-dark">Đồng bộ Blockchain</small>
+                            <small class="text-muted" style="font-size: 11px;">Chiến dịch đã được tạo trên blockchain vào {{ campaign.blockchain_synced_at|date:"d/m/Y H:i" }}.</small>
+                            <a href="https://sepolia.etherscan.io/tx/{{ campaign.blockchain_tx_hash }}" target="_blank" class="badge bg-primary-subtle text-primary border border-primary text-decoration-none mt-1 py-1 px-2" title="Xem giao dịch trên Etherscan">
+                                <i class="fas fa-up-right-from-square me-1"></i> Xem giao dịch
+                            </a>
                         </div>
                     </div>
                     {% endif %}
