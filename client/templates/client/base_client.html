@@ -439,7 +439,11 @@
                     {% if user.is_authenticated %}
                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                             <a href="{% url 'client:profile' %}" class="d-flex align-items-center gap-2 text-decoration-none hover-primary transition-all p-1 rounded-pill pe-3 bg-light border border-primary-100 shadow-sm" style="color: inherit;">
-                                <img src="{{ user.profile.avatar_url|default:'https://ui-avatars.com/api/?background=e8f1fe&color=1e3a8a&name='|add:user.username }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
+                                {% if user.profile.avatar_url %}
+                                    <img src="{{ user.profile.avatar_url }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
+                                {% else %}
+                                    <img src="https://ui-avatars.com/api/?background=e8f1fe&color=1e3a8a&name={{ user.username }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
+                                {% endif %}
                                 <div class="d-flex flex-column leading-tight">
                                     <span class="small fw-bold text-neutral-900" style="font-size: 11px;">{{ user.username }}</span>
                                     <span class="text-primary fw-black" id="walletAddressBadge" style="font-size: 10px;" data-wallet-address="{{ web3auth_public_config.walletAddress }}">
