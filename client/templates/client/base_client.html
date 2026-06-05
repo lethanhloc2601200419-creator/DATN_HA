@@ -351,27 +351,23 @@
                     <li class="nav-item"><a class="nav-link {% if '/gioithieu/' in request.path %}active{% endif %}" href="{% url 'client:gioithieu' %}">Giới thiệu</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/saoke/' in request.path %}active{% endif %}" href="{% url 'client:saoke' %}">Sao kê minh bạch</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/biendong-sodu/' in request.path %}active{% endif %}" href="{% url 'client:biendong_sodu' %}">Biến động số dư</a></li>
-                    <li class="nav-item"><a class="nav-link {% if '/map/' in request.path %}active{% endif %}" href="{% url 'client:ban_do_thien_nguyen' %}">Bản đồ</a></li>
-                    {% if user.is_authenticated %}
-                    <li class="nav-item"><a class="nav-link {% if '/lich-su-quyen-gop/' in request.path %}active{% endif %}" href="{% url 'client:lichsu_quyen_gop' %}">Lịch sử của tôi</a></li>
-                    <li class="nav-item"><a class="nav-link {% if '/ho-so/' in request.path %}active{% endif %}" href="{% url 'client:profile' %}"><i class="fas fa-user-circle me-1"></i>Hồ sơ</a></li>
-                    {% endif %}
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     {% if user.is_authenticated %}
                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                            <span class="small d-none d-xl-inline">Xin chào, <b>{{ user.username }}</b></span>
-                            <span
-                                class="badge rounded-pill text-bg-light border small"
-                                id="walletAddressBadge"
-                                data-wallet-address="{{ web3auth_public_config.walletAddress }}"
-                            >
-                                {% if web3auth_public_config.walletAddress %}
-                                    {{ web3auth_public_config.walletAddress|slice:":6" }}...{{ web3auth_public_config.walletAddress|slice:"-4:" }}
-                                {% else %}
-                                    Chưa có ví
-                                {% endif %}
-                            </span>
+                            <a href="{% url 'client:profile' %}" class="d-flex align-items-center gap-2 text-decoration-none hover-primary transition-all p-1 rounded-pill pe-3 bg-light border border-primary-100 shadow-sm" style="color: inherit;">
+                                <img src="{{ user.profile.avatar_url|default:'https://ui-avatars.com/api/?background=e8f1fe&color=1e3a8a&name='|add:user.username }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
+                                <div class="d-flex flex-column leading-tight">
+                                    <span class="small fw-bold text-neutral-900" style="font-size: 11px;">{{ user.username }}</span>
+                                    <span class="text-primary fw-black" id="walletAddressBadge" style="font-size: 10px;" data-wallet-address="{{ web3auth_public_config.walletAddress }}">
+                                        {% if web3auth_public_config.walletAddress %}
+                                            {{ web3auth_public_config.walletAddress|slice:":6" }}...{{ web3auth_public_config.walletAddress|slice:"-4:" }}
+                                        {% else %}
+                                            Chưa có ví
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </a>
                             <button
                                 type="button"
                                 class="btn btn-sm btn-primary rounded-pill px-3"
