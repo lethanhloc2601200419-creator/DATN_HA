@@ -756,6 +756,41 @@
     // ============================================================
     // 6. RENDER
     // ============================================================
+    const MERGED_PROVINCES = {
+        'tuyen quang': ['tuyen quang', 'ha giang'],
+        'lao cai': ['lao cai', 'yen bai'],
+        'thai nguyen': ['thai nguyen', 'bac kan'],
+        'phu tho': ['phu tho', 'vinh phuc'],
+        'bac ninh': ['bac ninh', 'bac giang'],
+        'hung yen': ['hung yen', 'thai binh'],
+        'hai phong': ['hai phong', 'hai duong'],
+        'ninh binh': ['ninh binh', 'ha nam', 'nam dinh'],
+        'quang tri': ['quang tri', 'quang binh'],
+        'da nang': ['da nang', 'quang nam'],
+        'quang ngai': ['quang ngai', 'binh dinh'],
+        'gia lai': ['gia lai', 'kon tum'],
+        'khanh hoa': ['khanh hoa', 'ninh thuan', 'phu yen'],
+        'lam dong': ['lam dong', 'binh thuan'],
+        'dak lak': ['dak lak', 'dak nong'],
+        'ho chi minh': ['ho chi minh', 'ba ria', 'vung tau'],
+        'tp.hcm': ['ho chi minh', 'ba ria', 'vung tau'],
+        'dong nai': ['dong nai', 'binh duong', 'binh phuoc'],
+        'tay ninh': ['tay ninh', 'long an'],
+        'can tho': ['can tho', 'hau giang'],
+        'vinh long': ['vinh long', 'tra vinh', 'ben tre'],
+        'dong thap': ['dong thap', 'tien giang'],
+        'ca mau': ['ca mau', 'bac lieu'],
+        'an giang': ['an giang', 'soc trang', 'kien giang']
+    };
+
+    function getMergedProvinceList(provinceName) {
+        var baseName = normalize(provinceName).replace(/tinh |thanh pho |tp /g, '').trim();
+        if (MERGED_PROVINCES[baseName]) {
+            return MERGED_PROVINCES[baseName];
+        }
+        return [baseName];
+    }
+
     function renderMarkers(list) {
         clusterGroup.clearLayers();
         protectedPolygons.clearLayers();
@@ -767,13 +802,15 @@
             
             // Nếu bảo vệ người thụ hưởng VÀ có dữ liệu GeoJSON
             if (c.is_protected_beneficiary && geojsonData && c.province) {
-                var searchProv = normalize(c.province).replace(/tinh |thanh pho |tp /g, '').trim();
-                var feature = geojsonData.features.find(function(f) {
-                    return normalize(f.properties.name || '').indexOf(searchProv) !== -1;
+                var searchProvList = getMergedProvinceList(c.province);
+                
+                var matchedFeatures = geojsonData.features.filter(function(f) {
+                    var fName = normalize(f.properties.name || '');
+                    return searchProvList.some(function(sp) { return fName.indexOf(sp) !== -1; });
                 });
                 
-                if (feature) {
-                    var poly = L.geoJSON(feature, {
+                if (matchedFeatures.length > 0) {
+                    var poly = L.geoJSON(matchedFeatures, {
                         style: {
                             color: color,
                             weight: 2,
@@ -783,7 +820,6 @@
                         }
                     });
                     poly.bindPopup(popupHtml, { maxWidth: 280, minWidth: 280, autoPanPadding: [50, 50] });
-                    // Thêm class đặc biệt để style nếu cần
                     poly.getLayers().forEach(function(l) { l.campaignId = c.id; });
                     protectedPolygons.addLayer(poly);
                     markersById[c.id] = poly;
