@@ -538,7 +538,14 @@
     const ADMIN_COMMUNES_URL_TEMPLATE = "{% url 'admin_panel:api_vietnam_communes' 'PROVINCE_CODE' %}";
     const ADMIN_REVERSE_GEOCODE_URL = "{% url 'admin_panel:api_openmap_reverse_geocode' %}";
     let vietnamProvincesCache = null;
+    let adminGeojsonData = null;
     const locationPickers = {};
+
+    // Load GeoJSON for boundaries
+    fetch('/static/client/js/vietnam.geojson')
+        .then(r => r.json())
+        .then(data => adminGeojsonData = data)
+        .catch(e => console.error("GeoJSON error:", e));
 
     function getCommunesUrl(provinceCode) {
         return ADMIN_COMMUNES_URL_TEMPLATE.replace('PROVINCE_CODE', encodeURIComponent(provinceCode));
@@ -687,14 +694,45 @@
         setStatus(picker, 'Có thể chọn thủ công hoặc click trên bản đồ.', false);
     }
 
-    function setMarker(state, lat, lng) {
-        if (!state.map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        if (!state.marker) {
-            state.marker = L.marker([lat, lng], {draggable: false}).addTo(state.map);
-        } else {
-            state.marker.setLatLng([lat, lng]);
+    function isPickerProtected(picker) {
+        const prefix = picker.dataset.prefix;
+        const toggle = document.getElementById(`${prefix}_is_protected_beneficiary`);
+        return toggle && toggle.checked;
+    }
+
+    function drawProvincePolygon(state, provinceName) {
+        if (state.polygon) {
+            state.map.removeLayer(state.polygon);
+            state.polygon = null;
         }
-        state.map.setView([lat, lng], Math.max(state.map.getZoom(), 14));
+        if (!adminGeojsonData || !provinceName) return;
+
+        const searchProv = normalizeUnitName(provinceName);
+        const feature = adminGeojsonData.features.find(f => normalizeUnitName(f.properties.name || '').includes(searchProv));
+
+        if (feature) {
+            state.polygon = L.geoJSON(feature, {
+                style: { color: '#1e3a8a', weight: 2, opacity: 0.8, fillOpacity: 0.15, dashArray: '5, 5' }
+            }).addTo(state.map);
+            state.map.fitBounds(state.polygon.getBounds(), { padding: [20, 20] });
+        }
+    }
+
+    function setMarker(picker, state, lat, lng, provinceName) {
+        if (!state.map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        
+        const isProtected = isPickerProtected(picker);
+
+        // Xóa cả marker lẫn polygon cũ
+        if (state.marker) { state.map.removeLayer(state.marker); state.marker = null; }
+        if (state.polygon) { state.map.removeLayer(state.polygon); state.polygon = null; }
+
+        if (isProtected) {
+            if (provinceName) drawProvincePolygon(state, provinceName);
+        } else {
+            state.marker = L.marker([lat, lng], {draggable: false}).addTo(state.map);
+            state.map.setView([lat, lng], Math.max(state.map.getZoom(), 14));
+        }
     }
 
     async function applyReverseGeocode(picker, state, lat, lng) {
@@ -703,10 +741,11 @@
         const addressInput = picker.querySelector('.js-address-input');
         const latInput = picker.querySelector('.js-lat-input');
         const lngInput = picker.querySelector('.js-lng-input');
+        const isProtected = isPickerProtected(picker);
 
         latInput.value = lat.toFixed(8);
         lngInput.value = lng.toFixed(8);
-        setMarker(state, lat, lng);
+        
         setStatus(picker, 'Đang lấy địa chỉ từ OpenMap...', false);
 
         try {
@@ -715,17 +754,28 @@
             const provinces = await loadProvinces();
             fillSelect(provinceSelect, provinces, '-- Chọn tỉnh/thành --');
             const selectedProvince = selectByValue(provinceSelect, data.province || '');
-            await loadWardsForPicker(picker, data.ward || '');
-            if (!wardSelect.value) {
-                const sourceText = `${data.address || ''}, ${data.formatted_address || ''}`;
-                const inferredWard = inferWardFromText(wardSelect, sourceText) || extractWardLikeText(sourceText);
-                if (inferredWard) ensureSelectOption(wardSelect, inferredWard);
+            
+            // Cập nhật marker hoặc polygon dựa trên province mới
+            setMarker(picker, state, lat, lng, selectedProvince || data.province);
+
+            if (!isProtected) {
+                await loadWardsForPicker(picker, data.ward || '');
+                if (!wardSelect.value) {
+                    const sourceText = `${data.address || ''}, ${data.formatted_address || ''}`;
+                    const inferredWard = inferWardFromText(wardSelect, sourceText) || extractWardLikeText(sourceText);
+                    if (inferredWard) ensureSelectOption(wardSelect, inferredWard);
+                }
+                addressInput.value = cleanupDetailedAddress(
+                    data.address || data.formatted_address || '',
+                    wardSelect.value,
+                    selectedProvince || provinceSelect.value
+                );
+            } else {
+                // Nếu đang bật bảo vệ, clear chi tiết
+                wardSelect.value = '';
+                addressInput.value = '';
             }
-            addressInput.value = cleanupDetailedAddress(
-                data.address || data.formatted_address || '',
-                wardSelect.value,
-                selectedProvince || provinceSelect.value
-            );
+
             setStatus(picker, data.warning || data.formatted_address || 'Đã lấy địa chỉ từ vị trí trên bản đồ.', Boolean(data.warning));
         } catch (error) {
             setStatus(picker, error.message, true);
@@ -752,7 +802,7 @@
         const lat = parseFloat(data.lat);
         const lng = parseFloat(data.lng);
         if (Number.isFinite(lat) && Number.isFinite(lng)) {
-            setMarker(state, lat, lng);
+            setMarker(picker, state, lat, lng, data.province);
         } else if (state.marker) {
             state.map.removeLayer(state.marker);
             state.marker = null;
@@ -777,7 +827,7 @@
             map.on('click', event => applyReverseGeocode(picker, locationPickers[prefix], event.latlng.lat, event.latlng.lng));
         }
 
-        locationPickers[prefix] = {picker, map, marker: null};
+        locationPickers[prefix] = {picker, map, marker: null, polygon: null};
 
         try {
             const provinces = await loadProvinces();
@@ -787,9 +837,24 @@
         }
 
         provinceSelect.addEventListener('change', () => {
+            const isProtected = isPickerProtected(picker);
             latInput.value = '';
             lngInput.value = '';
-            loadWardsForPicker(picker, '').catch(error => setStatus(picker, error.message, true));
+            
+            if (map && locationPickers[prefix].marker) {
+                map.removeLayer(locationPickers[prefix].marker);
+                locationPickers[prefix].marker = null;
+            }
+            if (map && locationPickers[prefix].polygon) {
+                map.removeLayer(locationPickers[prefix].polygon);
+                locationPickers[prefix].polygon = null;
+            }
+
+            if (isProtected) {
+                drawProvincePolygon(locationPickers[prefix], provinceSelect.value);
+            } else {
+                loadWardsForPicker(picker, '').catch(error => setStatus(picker, error.message, true));
+            }
         });
 
         wardSelect.addEventListener('change', () => {

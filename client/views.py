@@ -1408,6 +1408,7 @@ def ban_do_page(request):
             'support_count': int(c.support_count or 0),
             'days_left': days_left,
             'end_date': c.end_date.isoformat() if c.end_date else '',
+            'is_protected_beneficiary': c.is_protected_beneficiary,
         })
 
     # Chỉ hiển thị danh mục có chiến dịch đang show — cho dropdown gọn.

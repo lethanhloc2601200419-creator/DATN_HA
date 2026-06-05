@@ -600,6 +600,17 @@
         maxZoom: 19,
     }).addTo(map);
 
+    var geojsonData = null;
+    var protectedPolygons = L.layerGroup().addTo(map);
+
+    fetch('{% static "client/js/vietnam.geojson" %}')
+        .then(response => response.json())
+        .then(data => {
+            geojsonData = data;
+            if(ALL.length > 0) refresh();
+        })
+        .catch(err => console.error("Lỗi tải GeoJSON:", err));
+
     function buildIcon(status) {
         var color = status === 'active' ? '#f97316'
                   : status === 'completed' ? '#16a34a'
@@ -747,14 +758,46 @@
     // ============================================================
     function renderMarkers(list) {
         clusterGroup.clearLayers();
+        protectedPolygons.clearLayers();
         markersById = {};
+        
         list.forEach(function(c) {
+            var color = c.status === 'active' ? '#f97316' : (c.status === 'completed' ? '#16a34a' : '#6b7280');
+            var popupHtml = buildPopup(c);
+            
+            // Nếu bảo vệ người thụ hưởng VÀ có dữ liệu GeoJSON
+            if (c.is_protected_beneficiary && geojsonData && c.province) {
+                var searchProv = normalize(c.province).replace(/tinh |thanh pho |tp /g, '').trim();
+                var feature = geojsonData.features.find(function(f) {
+                    return normalize(f.properties.name || '').indexOf(searchProv) !== -1;
+                });
+                
+                if (feature) {
+                    var poly = L.geoJSON(feature, {
+                        style: {
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.15,
+                            dashArray: '5, 5'
+                        }
+                    });
+                    poly.bindPopup(popupHtml, { maxWidth: 280, minWidth: 280, autoPanPadding: [50, 50] });
+                    // Thêm class đặc biệt để style nếu cần
+                    poly.getLayers().forEach(function(l) { l.campaignId = c.id; });
+                    protectedPolygons.addLayer(poly);
+                    markersById[c.id] = poly;
+                    return; // Đã vẽ polygon, bỏ qua marker
+                }
+            }
+
+            // Fallback: vẽ marker bình thường
             var marker = L.marker([c.lat, c.lng], { 
                 icon: buildIcon(c.status),
                 riseOnHover: true,
                 alt: c.title
             });
-            marker.bindPopup(buildPopup(c), { 
+            marker.bindPopup(popupHtml, { 
                 maxWidth: 280, 
                 minWidth: 280,
                 autoPanPadding: [50, 50]
@@ -765,41 +808,33 @@
         });
     }
 
-    function renderSidebar(list) {
-        var elList = document.getElementById('campaignList');
-        document.getElementById('visibleCount').textContent = list.length;
-        document.getElementById('totalCount').textContent = ALL.length;
-
-        var hasActiveFilter = state.q || state.status !== 'all' ||
-                              state.category !== 'all' || state.region !== 'all';
-        document.getElementById('clearFiltersBtn').classList.toggle('d-none', !hasActiveFilter);
-
-        if (list.length === 0) {
-            elList.innerHTML =
-                '<div class="sidebar-empty">' +
-                    '<i class="fas fa-search"></i>' +
-                    '<p>Không tìm thấy chiến dịch nào phù hợp với bộ lọc.</p>' +
-                    (hasActiveFilter
-                        ? '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.__resetMapFilters()">Xóa bộ lọc</button>'
-                        : '') +
-                '</div>';
-            return;
-        }
-        var html = '';
-        for (var i = 0; i < list.length; i++) html += buildSidebarCard(list[i]);
-        elList.innerHTML = html;
-    }
-
     function fitToList(list) {
         if (list.length === 0) return;
-        if (list.length === 1) {
-            map.setView([list[0].lat, list[0].lng], 12);
-            return;
+        var bounds = L.latLngBounds();
+        var hasBounds = false;
+        
+        list.forEach(function(c) {
+            var layer = markersById[c.id];
+            if (layer) {
+                if (layer.getBounds) {
+                    // Polygon
+                    bounds.extend(layer.getBounds());
+                    hasBounds = true;
+                } else if (layer.getLatLng) {
+                    // Marker
+                    bounds.extend(layer.getLatLng());
+                    hasBounds = true;
+                }
+            }
+        });
+        
+        if (hasBounds) {
+            if (list.length === 1 && markersById[list[0].id] && markersById[list[0].id].getLatLng) {
+                 map.setView(markersById[list[0].id].getLatLng(), 12);
+            } else {
+                 map.fitBounds(bounds.pad(0.15));
+            }
         }
-        var group = L.featureGroup(list.map(function(c) {
-            return L.marker([c.lat, c.lng]);
-        }));
-        map.fitBounds(group.getBounds().pad(0.15));
     }
 
     function refresh(opts) {
@@ -896,10 +931,20 @@
         document.querySelectorAll('.sb-card.active').forEach(function(el) { el.classList.remove('active'); });
         card.classList.add('active');
 
-        // Smoothly zoom to show layer (handles clusters automatically)
-        clusterGroup.zoomToShowLayer(marker, function() {
-            marker.openPopup();
-        });
+        if (marker.getBounds) {
+            // Đây là Polygon
+            map.fitBounds(marker.getBounds(), { padding: [50, 50], maxZoom: 10 });
+            // Lấy layer đầu tiên trong GeoJSON group để mở popup
+            var layers = marker.getLayers();
+            if (layers.length > 0) {
+                layers[0].openPopup();
+            }
+        } else {
+            // Đây là Marker bình thường (có thể nằm trong Cluster)
+            clusterGroup.zoomToShowLayer(marker, function() {
+                marker.openPopup();
+            });
+        }
 
         // Mobile: đóng bottom sheet để user thấy map
         if (window.innerWidth < 992) {
