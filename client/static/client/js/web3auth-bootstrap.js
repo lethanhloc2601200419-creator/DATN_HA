@@ -137,7 +137,7 @@ window.addEventListener("load", async function () {
       return;
     }
 
-    window.location.href = "/admin_panel/dangxuat/";
+    window.location.href = "/admin/dangxuat/";
   }
 
   var Web3AuthClass =

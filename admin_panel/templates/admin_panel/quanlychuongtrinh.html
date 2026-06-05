@@ -393,7 +393,7 @@
 
     // --- HÀM ĐỔ DỮ LIỆU VÀO FORM SỬA ---
     function fillEditForm(id, orgId, name, amount, address, lat, lng, desc) {
-        document.getElementById('editForm').action = "/admin_panel/chuongtrinh/sua/" + id + "/";
+        document.getElementById('editForm').action = "/admin/chuongtrinh/sua/" + id + "/";
         document.getElementById('e_name').value = name;
         document.getElementById('e_amount').value = amount;
         document.getElementById('e_address').value = address;
