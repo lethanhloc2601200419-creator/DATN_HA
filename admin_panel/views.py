@@ -741,10 +741,14 @@ def them_tochuc(request):
             org.slug = slugify(org.name) + '-' + str(int(time.time()))
             
             if 'logo' in request.FILES:
-                org.logo_url = request.FILES['logo']
+                org.logo = request.FILES['logo']
 
             org.is_verified = True
             org.save()
+            
+            if org.logo:
+                org.logo_url = org.logo.url
+                org.save(update_fields=['logo_url'])
 
             messages.success(request, f"Đã thêm '{org.name}' thành công!")
 
@@ -769,9 +773,14 @@ def sua_tochuc(request, pk):
             org.payos_checksum_key = request.POST.get('payos_checksum_key')
 
             if 'logo' in request.FILES:
-                org.logo_url = request.FILES['logo']
+                org.logo = request.FILES['logo']
                 
             org.save()
+            
+            if 'logo' in request.FILES and org.logo:
+                org.logo_url = org.logo.url
+                org.save(update_fields=['logo_url'])
+
             messages.success(request, f"Cập nhật '{org.name}' thành công!")
         except Exception as e:
             messages.error(request, f"Lỗi: {e}")
@@ -1214,16 +1223,11 @@ def them_chiendich(request):
 
             camp.creator = request.user
 
-            fs = FileSystemStorage()
             if 'avatar' in request.FILES:
-                file = request.FILES['avatar']
-                filename = fs.save(f"campaigns/{file.name}", file)
-                camp.avatar_image_url = fs.url(filename)
+                camp.avatar_image = request.FILES['avatar']
 
             if 'cover' in request.FILES:
-                file = request.FILES['cover']
-                filename = fs.save(f"campaigns/covers/{file.name}", file)
-                camp.cover_image_url = fs.url(filename)
+                camp.cover_image = request.FILES['cover']
 
             # 1️⃣ LƯU VÀO DATABASE SQL
             # Tắt auto-sync signal nếu ta tự gọi sync đồng bộ ngay bên dưới
@@ -1231,6 +1235,17 @@ def them_chiendich(request):
             if camp.status == 'active':
                 camp._skip_auto_sync = True
             camp.save()
+            
+            # Đồng bộ URL text fields
+            update_fields = []
+            if 'avatar' in request.FILES and camp.avatar_image:
+                camp.avatar_image_url = camp.avatar_image.url
+                update_fields.append('avatar_image_url')
+            if 'cover' in request.FILES and camp.cover_image:
+                camp.cover_image_url = camp.cover_image.url
+                update_fields.append('cover_image_url')
+            if update_fields:
+                camp.save(update_fields=update_fields)
 
             # 2️⃣ NẾU SUPERUSER TẠO VỚI STATUS='active' → ĐỒNG BỘ ON-CHAIN NGAY
             # (Admin Relayer pattern — backend gọi createCampaign(cid, org_addr)).
@@ -1282,18 +1297,24 @@ def sua_chiendich(request, pk):
                 org_id = request.POST.get('org_id')
                 if org_id: camp.organization_id = org_id
 
-            fs = FileSystemStorage()
             if 'avatar' in request.FILES:
-                file = request.FILES['avatar']
-                filename = fs.save(f"campaigns/{file.name}", file)
-                camp.avatar_image_url = fs.url(filename)
+                camp.avatar_image = request.FILES['avatar']
 
             if 'cover' in request.FILES:
-                file = request.FILES['cover']
-                filename = fs.save(f"campaigns/covers/{file.name}", file)
-                camp.cover_image_url = fs.url(filename)
+                camp.cover_image = request.FILES['cover']
 
             camp.save()
+            
+            update_fields = []
+            if 'avatar' in request.FILES and camp.avatar_image:
+                camp.avatar_image_url = camp.avatar_image.url
+                update_fields.append('avatar_image_url')
+            if 'cover' in request.FILES and camp.cover_image:
+                camp.cover_image_url = camp.cover_image.url
+                update_fields.append('cover_image_url')
+            if update_fields:
+                camp.save(update_fields=update_fields)
+
             messages.success(request, "Đã cập nhật chiến dịch!")
 
         except Exception as e:

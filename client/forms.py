@@ -27,14 +27,14 @@ class UserProfileForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ['display_name', 'phone', 'address', 'province', 'bio', 'avatar_url']
+        fields = ['display_name', 'phone', 'address', 'province', 'bio', 'avatar']
         labels = {
             'display_name': 'Tên hiển thị',
             'phone': 'Số điện thoại',
             'address': 'Địa chỉ',
             'province': 'Tỉnh / Thành phố',
             'bio': 'Giới thiệu bản thân',
-            'avatar_url': 'Ảnh đại diện (URL)',
+            'avatar': 'Ảnh đại diện (Tải lên)',
         }
         widgets = {
             'display_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -42,7 +42,7 @@ class UserProfileForm(forms.ModelForm):
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Số nhà, đường, phường/xã, quận/huyện'}),
             'province': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'TP. Hà Nội'}),
             'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Đôi dòng giới thiệu về bạn...'}),
-            'avatar_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://...'}),
+            'avatar': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
 
     def __init__(self, *args, **kwargs):

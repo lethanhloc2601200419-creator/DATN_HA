@@ -26,6 +26,7 @@ class UserProfile(models.Model):
     address = models.TextField(blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
     avatar_url = models.TextField(blank=True, null=True)
+    avatar = CloudinaryField('image', folder='user_avatars/', blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
     eoa_address = models.CharField(max_length=42, blank=True, null=True)
     smart_account_address = models.CharField(max_length=42, blank=True, null=True)
@@ -96,6 +97,7 @@ class Organization(models.Model):
     slug = models.SlugField(unique=True, max_length=255)
     description = models.TextField(blank=True, null=True)
     logo_url = models.TextField(blank=True, null=True)
+    logo = CloudinaryField('image', folder='organization_logos/', blank=True, null=True)
     website = models.URLField(blank=True, null=True)
     manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_organizations', verbose_name="Tài khoản quản lý")
     # Thông tin ngân hàng (Tiền donate sẽ chảy về đây)
@@ -290,7 +292,9 @@ class Campaign(models.Model):
     full_description = models.TextField(blank=True, null=True)
 
     avatar_image_url = models.TextField(blank=True, null=True) # Hoặc dùng ImageField nếu muốn upload
+    avatar_image = CloudinaryField('image', folder='campaigns/avatars/', null=True, blank=True)
     cover_image_url = models.TextField(blank=True, null=True)
+    cover_image = CloudinaryField('image', folder='campaigns/covers/', null=True, blank=True)
 
     # --- 4. TÀI CHÍNH & TIẾN ĐỘ ---
     target_amount = models.DecimalField(max_digits=15, decimal_places=0, verbose_name="Mục tiêu")

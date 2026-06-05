@@ -902,9 +902,14 @@ def profile_view(request):
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
 
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=profile, user=request.user)
+        form = UserProfileForm(request.POST, request.FILES, instance=profile, user=request.user)
         if form.is_valid():
-            form.save()
+            p = form.save()
+            # Cập nhật avatar_url text field từ CloudinaryField URL để tương thích
+            if p.avatar:
+                p.avatar_url = p.avatar.url
+                p.save(update_fields=['avatar_url'])
+            
             ActivityLog.objects.create(
                 user=request.user,
                 type='profile_updated',

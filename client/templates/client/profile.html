@@ -73,7 +73,7 @@
                         <i class="fas fa-edit me-2"></i>Chỉnh sửa thông tin
                     </h5>
 
-                    <form method="POST" novalidate>
+                    <form method="POST" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
 
                         <!-- Basic info -->
@@ -127,9 +127,9 @@
                                     {% if form.province.errors %}<div class="text-danger small mt-1">{{ form.province.errors|join:", " }}</div>{% endif %}
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">{{ form.avatar_url.label }}</label>
-                                    {{ form.avatar_url }}
-                                    {% if form.avatar_url.errors %}<div class="text-danger small mt-1">{{ form.avatar_url.errors|join:", " }}</div>{% endif %}
+                                    <label class="form-label fw-bold">{{ form.avatar.label }}</label>
+                                    {{ form.avatar }}
+                                    {% if form.avatar.errors %}<div class="text-danger small mt-1">{{ form.avatar.errors|join:", " }}</div>{% endif %}
                                 </div>
                             </div>
                         </div>
