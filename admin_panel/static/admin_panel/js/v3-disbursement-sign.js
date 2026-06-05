@@ -96,6 +96,7 @@
    * role ∈ {'organization', 'supervisor', 'admin'}.
    */
   async function signAs(proposalId, role) {
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const account = await getMetaMaskAccount();
       const payload = await fetchSignPayload(proposalId, role);
@@ -122,9 +123,12 @@
       }
       if (result.ready_to_relay) {
         setTimeout(() => window.location.reload(), 900);
+      } else {
+        if (typeof window.hideLoader === 'function') window.hideLoader();
       }
       return result;
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       console.error('[V3-sign] error', err);
       alert('❌ Ký thất bại: ' + (err.message || err));
       throw err;
@@ -134,6 +138,7 @@
   /** Admin relayer: submit 3 sigs lên smart3. */
   async function relayMultisig(proposalId) {
     if (!confirm('Bạn sẽ submit 3 chữ ký lên smart3 (ví Admin trả gas). Tiếp tục?')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/relay-multisig/`, {
         method: 'POST',
@@ -150,6 +155,7 @@
         window.location.reload();
       }
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Relay thất bại: ' + (err.message || err));
     }
   }
@@ -157,6 +163,7 @@
   /** Admin trigger PayOS payout (mock). */
   async function triggerPayout(proposalId) {
     if (!confirm('Gửi lệnh chuyển tiền PayOS? (mock hoặc real tuỳ config)')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/trigger-payout/`, {
         method: 'POST',
@@ -168,6 +175,7 @@
       alert(`✅ Đã gửi lệnh PayOS. payout_id=${data.payout_id}${data.mock ? ' (MOCK)' : ''}`);
       schedulePageRefresh(2500);
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Trigger payout thất bại: ' + (err.message || err));
     }
   }
@@ -175,6 +183,7 @@
   /** [DEV] Simulate webhook success để test pipeline burn. */
   async function simulateWebhook(proposalId) {
     if (!confirm('[DEV] Giả PayOS webhook success → sẽ trigger burn on-chain?')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/simulate-webhook/`, {
         method: 'POST',
@@ -186,6 +195,7 @@
       alert(`✅ Mock webhook OK. bank_tx_id=${data.bank_tx_id}. Đang burn on-chain ở background…`);
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Simulate webhook thất bại: ' + (err.message || err));
     }
   }

@@ -318,9 +318,18 @@
 
     /* --- Centered Modals & Scrollbars --- */
     /* Ensure modal body is scrollable and has a visible scrollbar */
+    .modal-dialog-scrollable .modal-content {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
     .modal-dialog-scrollable .modal-body {
         overflow-y: auto !important;
         scroll-behavior: smooth;
+        flex: 1 1 auto;
+        /* Firefox support */
+        scrollbar-width: thin;
+        scrollbar-color: var(--primary-500) var(--neutral-100);
     }
 
     .modal-content {
@@ -340,28 +349,27 @@
         filter: brightness(0) invert(1);
     }
     
-    /* Custom Scrollbar - High Contrast */
-    .modal-body::-webkit-scrollbar, 
-    .admin-sidebar::-webkit-scrollbar,
-    body::-webkit-scrollbar {
-        width: 10px;
+    /* Global scrollbar support for Firefox */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--primary-300) var(--neutral-100);
     }
-    .modal-body::-webkit-scrollbar-track,
-    .admin-sidebar::-webkit-scrollbar-track,
-    body::-webkit-scrollbar-track {
+
+    /* Custom Scrollbar - High Contrast (Webkit) */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-track {
         background: var(--neutral-100);
         border-radius: 10px;
     }
-    .modal-body::-webkit-scrollbar-thumb,
-    .admin-sidebar::-webkit-scrollbar-thumb,
-    body::-webkit-scrollbar-thumb {
+    ::-webkit-scrollbar-thumb {
         background: var(--primary-500); /* Darker blue for better visibility */
         border-radius: 10px;
         border: 2px solid var(--neutral-100);
     }
-    .modal-body::-webkit-scrollbar-thumb:hover,
-    .admin-sidebar::-webkit-scrollbar-thumb:hover,
-    body::-webkit-scrollbar-thumb:hover {
+    ::-webkit-scrollbar-thumb:hover {
         background: var(--primary-700);
     }
   </style>
@@ -562,19 +570,46 @@
 
   <script>
   // Global Loader Handling
-  window.addEventListener('load', function() {
-      const loader = document.getElementById('global-loader');
+  const loader = document.getElementById('global-loader');
+  let loaderTimeout = null;
+
+  window.showLoader = function() {
       if (loader) {
+          loader.style.display = 'flex';
+          // Force reflow
+          loader.offsetHeight;
+          loader.classList.remove('hidden');
+          
+          // Safety timeout: hide after 15 seconds to prevent getting stuck
+          if (loaderTimeout) clearTimeout(loaderTimeout);
+          loaderTimeout = setTimeout(() => {
+              window.hideLoader();
+          }, 15000);
+      }
+  };
+
+  window.hideLoader = function() {
+      if (loader) {
+          if (loaderTimeout) clearTimeout(loaderTimeout);
           loader.classList.add('hidden');
           setTimeout(() => {
               loader.style.display = 'none';
           }, 400);
       }
+  };
+
+  window.addEventListener('load', function() {
+      window.hideLoader();
   });
 
-  document.addEventListener('DOMContentLoaded', function() {
-      const loader = document.getElementById('global-loader');
+  // Ensure loader is hidden even if some assets fail or load event is delayed
+  setTimeout(() => {
+      if (loader && !loader.classList.contains('hidden')) {
+          window.hideLoader();
+      }
+  }, 3000); // Fail-safe: hide after 3 seconds if still showing after DOM ready
 
+  document.addEventListener('DOMContentLoaded', function() {
       // --- Show loader on internal link clicks ---
       document.addEventListener('click', function(e) {
           const link = e.target.closest('a');
@@ -591,10 +626,7 @@
               target !== '_blank' &&
               !e.ctrlKey && !e.metaKey && !e.shiftKey) {
               
-              if (loader) {
-                  loader.style.display = 'flex';
-                  loader.classList.remove('hidden');
-              }
+              window.showLoader();
           }
       });
 
@@ -602,10 +634,7 @@
       document.addEventListener('submit', function(e) {
           const form = e.target;
           if (!form.classList.contains('no-loader') && form.getAttribute('target') !== '_blank') {
-              if (loader) {
-                  loader.style.display = 'flex';
-                  loader.classList.remove('hidden');
-              }
+              window.showLoader();
           }
       });
 

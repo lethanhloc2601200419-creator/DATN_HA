@@ -119,6 +119,7 @@ window.addEventListener("load", async function () {
   async function logoutAllSessions(event) {
     if (event) event.preventDefault();
     console.log("[DCP][Web3Auth] bắt đầu logout tất cả session...");
+    if (typeof window.showLoader === "function") window.showLoader();
 
     try {
       if (web3auth && typeof web3auth.logout === "function") {
@@ -239,6 +240,7 @@ window.addEventListener("load", async function () {
             }
 
             try {
+                if (typeof window.showLoader === "function") window.showLoader();
                 showToast("Đang đồng bộ ví Web3...");
                 await postJson("/api/auth/web3-login/", {
                     wallet_address: hydratedAddress,
@@ -258,6 +260,7 @@ window.addEventListener("load", async function () {
                 showToast("Đăng nhập Web3 thành công!");
                 setTimeout(function() { window.location.reload(); }, 1000);
             } catch (err) {
+                if (typeof window.hideLoader === "function") window.hideLoader();
                 console.error("[DCP][Web3Auth] Đồng bộ session sau redirect lỗi:", err);
                 showToast("Lỗi đồng bộ dữ liệu. Vui lòng thử lại.");
             }
@@ -276,6 +279,7 @@ window.addEventListener("load", async function () {
   async function handleLoginClick(event) {
     event.preventDefault();
     console.log("[DCP][Web3Auth] 1. ĐÃ BẤM NÚT LOGIN");
+    if (typeof window.showLoader === "function") window.showLoader();
 
     try {
       console.log("[DCP][Web3Auth] 2. status trước connect =", web3auth.status);
@@ -341,6 +345,7 @@ window.addEventListener("load", async function () {
       alert("Login Successful");
       window.location.reload();
     } catch (error) {
+      if (typeof window.hideLoader === "function") window.hideLoader();
       console.error("[DCP][Web3Auth] 5. login lỗi:", error);
       showToast(error && error.message ? error.message : "Đăng nhập thất bại");
     }

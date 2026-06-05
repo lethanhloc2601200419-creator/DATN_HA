@@ -108,7 +108,10 @@
                             <td class="ps-4"><input type="checkbox" class="row-checkbox-org form-check-input" name="selected_ids" value="{{ org.id }}"></td>
                             <td class="text-center">
                                 {% if org.logo_url %}
-                                    <img src="/media/{{ org.logo_url }}" onerror="this.src='{{ org.logo_url }}'" class="rounded border shadow-sm" style="height: 48px; width: 48px; object-fit: cover;">
+                                    <img src="/media/{{ org.logo_url }}" 
+                                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?background=f3f4f6&color=1e3a8a&name={{ org.name|urlencode }}';" 
+                                         class="rounded border shadow-sm" 
+                                         style="height: 48px; width: 48px; object-fit: cover;">
                                 {% else %}
                                     <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted small fw-bold" style="height: 48px; width: 48px; font-size: 10px;">NO IMG</div>
                                 {% endif %}

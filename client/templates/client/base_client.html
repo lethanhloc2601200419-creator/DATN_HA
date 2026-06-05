@@ -650,14 +650,28 @@
 
     <script>
         // Global Loader Handling
-        window.addEventListener('load', function() {
-            const loader = document.getElementById('global-loader');
+        const loader = document.getElementById('global-loader');
+
+        window.showLoader = function() {
+            if (loader) {
+                loader.style.display = 'flex';
+                // Force reflow
+                loader.offsetHeight;
+                loader.classList.remove('hidden');
+            }
+        };
+
+        window.hideLoader = function() {
             if (loader) {
                 loader.classList.add('hidden');
                 setTimeout(() => {
                     loader.style.display = 'none';
                 }, 500); // Khớp với thời gian transition trong CSS
             }
+        };
+
+        window.addEventListener('load', function() {
+            window.hideLoader();
         });
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -665,7 +679,6 @@
             const overlay = document.getElementById('sidebarOverlay');
             const toggleBtn = document.getElementById('sidebarToggle');
             const closeBtn = document.getElementById('closeSidebar');
-            const loader = document.getElementById('global-loader');
 
             // --- Show loader on internal link clicks ---
             document.addEventListener('click', function(e) {
@@ -684,10 +697,7 @@
                     target !== '_blank' &&
                     !e.ctrlKey && !e.metaKey && !e.shiftKey) {
                     
-                    if (loader) {
-                        loader.style.display = 'flex';
-                        loader.classList.remove('hidden');
-                    }
+                    window.showLoader();
                 }
             });
 
@@ -696,10 +706,7 @@
                 // Có thể thêm điều kiện bỏ qua các form tìm kiếm hoặc form ajax nếu cần
                 const form = e.target;
                 if (!form.classList.contains('no-loader') && form.getAttribute('target') !== '_blank') {
-                    if (loader) {
-                        loader.style.display = 'flex';
-                        loader.classList.remove('hidden');
-                    }
+                    window.showLoader();
                 }
             });
 
