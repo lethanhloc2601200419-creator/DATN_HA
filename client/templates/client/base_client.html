@@ -687,6 +687,18 @@
                 }
             });
 
+            // --- Show loader on form submits ---
+            document.addEventListener('submit', function(e) {
+                // Có thể thêm điều kiện bỏ qua các form tìm kiếm hoặc form ajax nếu cần
+                const form = e.target;
+                if (!form.classList.contains('no-loader') && form.getAttribute('target') !== '_blank') {
+                    if (loader) {
+                        loader.style.display = 'flex';
+                        loader.classList.remove('hidden');
+                    }
+                }
+            });
+
             function openSidebar() {
                 sidebar.classList.add('active');
                 overlay.classList.add('active');
