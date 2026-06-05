@@ -844,6 +844,31 @@
         });
     }
 
+    function renderSidebar(list) {
+        var elList = document.getElementById('campaignList');
+        document.getElementById('visibleCount').textContent = list.length;
+        document.getElementById('totalCount').textContent = ALL.length;
+
+        var hasActiveFilter = state.q || state.status !== 'all' ||
+                              state.category !== 'all' || state.region !== 'all';
+        document.getElementById('clearFiltersBtn').classList.toggle('d-none', !hasActiveFilter);
+
+        if (list.length === 0) {
+            elList.innerHTML =
+                '<div class="sidebar-empty">' +
+                    '<i class="fas fa-search"></i>' +
+                    '<p>Không tìm thấy chiến dịch nào phù hợp với bộ lọc.</p>' +
+                    (hasActiveFilter
+                        ? '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.__resetMapFilters()">Xóa bộ lọc</button>'
+                        : '') +
+                '</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < list.length; i++) html += buildSidebarCard(list[i]);
+        elList.innerHTML = html;
+    }
+
     function fitToList(list) {
         if (list.length === 0) return;
         var bounds = L.latLngBounds();
