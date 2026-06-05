@@ -1099,7 +1099,7 @@ def export_donation_pdf(request, donation_id):
 # client/views.py
 
 def chitiet_chiendich(request, pk):
-    campaign = get_object_or_404(Campaign, pk=pk)
+    campaign = get_object_or_404(Campaign.objects.select_related('detail'), pk=pk)
     donations = Donation.objects.filter(campaign=campaign).order_by('-created_at')
 
     # Breakdown gas cho trang public (luồng v2)

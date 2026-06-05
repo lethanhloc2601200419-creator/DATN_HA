@@ -1032,6 +1032,23 @@ class UserPreference(models.Model):
     class Meta:
         db_table = 'user_preference'
 
+class CampaignDetail(models.Model):
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='detail', verbose_name="Chiến dịch")
+    beneficiary_name = models.CharField(max_length=255, verbose_name="Tên thật người thụ hưởng")
+    beneficiary_age = models.IntegerField(null=True, blank=True, verbose_name="Tuổi/Năm sinh")
+    story = models.TextField(verbose_name="Câu chuyện chi tiết")
+    images_urls = ArrayField(models.URLField(), blank=True, default=list, verbose_name="Danh sách link ảnh hoàn cảnh")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Chi tiết hoàn cảnh: {self.campaign.title}"
+
+    class Meta:
+        db_table = 'campaign_detail'
+        verbose_name = "Chi tiết hoàn cảnh"
+        verbose_name_plural = "Chi tiết hoàn cảnh"
+
 class SystemConfig(models.Model):
     key = models.CharField(max_length=100, unique=True)
     value = models.TextField(blank=True, null=True)

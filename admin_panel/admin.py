@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db.models import Sum
 from django.utils import timezone
-from .models import BankStatement, CampaignDisbursement, Campaign, Donation, Organization
+from .models import BankStatement, CampaignDisbursement, Campaign, Donation, Organization, CampaignDetail
 
 
 @admin.action(description='Chuyển KYC sang đang thẩm định')
@@ -222,12 +222,19 @@ class BankStatementAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
 
+class CampaignDetailInline(admin.StackedInline):
+    model = CampaignDetail
+    can_delete = False
+    verbose_name_plural = 'Chi tiết hoàn cảnh người thụ hưởng'
+
+
 @admin.register(Campaign)
 class CampaignAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'organization', 'target_amount', 'status', 'is_protected_beneficiary', 'created_at')
     list_filter = ('status', 'is_protected_beneficiary', 'category', 'created_at')
     search_fields = ('title', 'slug', 'short_description', 'organization__name')
     ordering = ('-created_at',)
+    inlines = [CampaignDetailInline]
     
     fieldsets = (
         ('Thông tin cơ bản', {
