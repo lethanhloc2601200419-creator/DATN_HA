@@ -246,6 +246,13 @@
             window.hideLoader();
         });
 
+        // Hide loader when page is restored from bfcache (browser back/forward)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.hideLoader();
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
             // --- Show loader on internal link clicks ---
             document.addEventListener('click', function(e) {

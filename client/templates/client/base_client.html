@@ -674,6 +674,13 @@
             window.hideLoader();
         });
 
+        // Hide loader when page is restored from bfcache (browser back/forward)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.hideLoader();
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('clientSidebar');
             const overlay = document.getElementById('sidebarOverlay');
