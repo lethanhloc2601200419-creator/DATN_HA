@@ -573,14 +573,17 @@
     }
     function normalize(s) {
         return (s || '').toString().toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
     function provinceToRegion(province) {
-        var p = (province || '').toLowerCase().trim();
+        var p = normalize(province);
         if (!p) return null;
         for (var key in REGION_PROVINCES) {
             for (var i = 0; i < REGION_PROVINCES[key].length; i++) {
-                if (p.indexOf(REGION_PROVINCES[key][i]) !== -1) return key;
+                if (p.includes(normalize(REGION_PROVINCES[key][i]))) return key;
             }
         }
         return null;
@@ -759,47 +762,79 @@
     const MERGED_PROVINCES = {
         'tuyen quang': ['tuyen quang', 'ha giang'],
         'ha giang': ['tuyen quang', 'ha giang'],
+        
         'lao cai': ['lao cai', 'yen bai'],
         'yen bai': ['lao cai', 'yen bai'],
+        
         'thai nguyen': ['thai nguyen', 'bac kan'],
         'bac kan': ['thai nguyen', 'bac kan'],
-        'phu tho': ['phu tho', 'vinh phuc'],
-        'vinh phuc': ['phu tho', 'vinh phuc'],
+        
+        'phu tho': ['vinh phuc', 'phu tho', 'hoa binh'],
+        'vinh phuc': ['vinh phuc', 'phu tho', 'hoa binh'],
+        'hoa binh': ['vinh phuc', 'phu tho', 'hoa binh'],
+        
         'bac ninh': ['bac ninh', 'bac giang'],
         'bac giang': ['bac ninh', 'bac giang'],
-        'hai duong': ['hai duong', 'hung yen'],
-        'hung yen': ['hai duong', 'hung yen'],
-        'ninh binh': ['ninh binh', 'ha nam', 'nam dinh'],
-        'ha nam': ['ninh binh', 'ha nam', 'nam dinh'],
-        'nam dinh': ['ninh binh', 'ha nam', 'nam dinh'],
-        'quang tri': ['quang tri', 'quang binh', 'thua thien hue'],
-        'quang binh': ['quang tri', 'quang binh', 'thua thien hue'],
-        'thua thien hue': ['quang tri', 'quang binh', 'thua thien hue'],
-        'da nang': ['da nang', 'quang nam'],
-        'quang nam': ['da nang', 'quang nam'],
-        'quang ngai': ['quang ngai', 'binh dinh'],
-        'binh dinh': ['quang ngai', 'binh dinh'],
-        'gia lai': ['gia lai', 'kon tum'],
-        'kon tum': ['gia lai', 'kon tum'],
-        'khanh hoa': ['khanh hoa', 'phu yen'],
-        'phu yen': ['khanh hoa', 'phu yen'],
-        'ninh thuan': ['ninh thuan', 'binh thuan'],
-        'binh thuan': ['ninh thuan', 'binh thuan'],
-        'dak lak': ['dak lak', 'dak nong'],
-        'dak nong': ['dak lak', 'dak nong'],
-        'binh duong': ['binh duong', 'binh phuoc'],
-        'binh phuoc': ['binh duong', 'binh phuoc'],
-        'can tho': ['can tho', 'hau giang', 'soc trang'],
-        'hau giang': ['can tho', 'hau giang', 'soc trang'],
-        'soc trang': ['can tho', 'hau giang', 'soc trang'],
-        'vinh long': ['vinh long', 'tra vinh'],
-        'tra vinh': ['vinh long', 'tra vinh'],
-        'ca mau': ['ca mau', 'bac lieu'],
-        'bac lieu': ['ca mau', 'bac lieu'],
-        'nghe an': ['nghe an', 'ha tinh'],
-        'ha tinh': ['nghe an', 'ha tinh'],
-        'cao bang': ['cao bang', 'lang son'],
-        'lang son': ['cao bang', 'lang son']
+        
+        'hung yen': ['hung yen', 'thai binh'],
+        'thai binh': ['hung yen', 'thai binh'],
+        
+        'hai phong': ['hai duong', 'hai phong'],
+        'hai duong': ['hai duong', 'hai phong'],
+        
+        'ninh binh': ['ha nam', 'ninh binh', 'nam dinh'],
+        'ha nam': ['ha nam', 'ninh binh', 'nam dinh'],
+        'nam dinh': ['ha nam', 'ninh binh', 'nam dinh'],
+        
+        'quang tri': ['quang binh', 'quang tri'],
+        'quang binh': ['quang binh', 'quang tri'],
+        
+        'da nang': ['quang nam', 'da nang'],
+        'quang nam': ['quang nam', 'da nang'],
+        
+        'quang ngai': ['kon tum', 'quang ngai'],
+        'kon tum': ['kon tum', 'quang ngai'],
+        
+        'gia lai': ['gia lai', 'binh dinh'],
+        'binh dinh': ['gia lai', 'binh dinh'],
+        
+        'khanh hoa': ['ninh thuan', 'khanh hoa'],
+        'ninh thuan': ['ninh thuan', 'khanh hoa'],
+        
+        'lam dong': ['lam dong', 'dak nong', 'binh thuan'],
+        'dak nong': ['lam dong', 'dak nong', 'binh thuan'],
+        'binh thuan': ['lam dong', 'dak nong', 'binh thuan'],
+        
+        'dak lak': ['dak lak', 'phu yen'],
+        'phu yen': ['dak lak', 'phu yen'],
+        
+        'ho chi minh': ['ba ria vung tau', 'binh duong', 'ho chi minh'],
+        'ba ria vung tau': ['ba ria vung tau', 'binh duong', 'ho chi minh'],
+        'binh duong': ['ba ria vung tau', 'binh duong', 'ho chi minh'],
+        'tp.hcm': ['ba ria vung tau', 'binh duong', 'ho chi minh'],
+        
+        'dong nai': ['dong nai', 'binh phuoc'],
+        'binh phuoc': ['dong nai', 'binh phuoc'],
+        
+        'tay ninh': ['tay ninh', 'long an'],
+        'long an': ['tay ninh', 'long an'],
+        
+        'can tho': ['can tho', 'soc trang', 'hau giang'],
+        'soc trang': ['can tho', 'soc trang', 'hau giang'],
+        'hau giang': ['can tho', 'soc trang', 'hau giang'],
+        
+        'vinh long': ['ben tre', 'vinh long', 'tra vinh'],
+        'ben tre': ['ben tre', 'vinh long', 'tra vinh'],
+        'tra vinh': ['ben tre', 'vinh long', 'tra vinh'],
+        
+        'dong thap': ['tien giang', 'dong thap'],
+        'tien giang': ['tien giang', 'dong thap'],
+        
+        'ca mau': ['bac lieu', 'ca mau'],
+        'bac lieu': ['bac lieu', 'ca mau'],
+        
+        'an giang': ['an giang', 'kien giang'],
+        'kien giang': ['an giang', 'kien giang']
     };
 
     function getMergedProvinceList(provinceName) {
