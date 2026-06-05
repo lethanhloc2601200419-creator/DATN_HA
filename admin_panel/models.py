@@ -279,6 +279,7 @@ class Campaign(models.Model):
     approval_threshold_pct = models.IntegerField(default=51) # Cần >51% đồng ý
     voting_power_cap_pct = models.IntegerField(default=30) # Cập 30% chống cá mập
     
+    is_protected_beneficiary = models.BooleanField(default=False, verbose_name="Bảo vệ người thụ hưởng")
     status = models.CharField(max_length=20, default='pending')
 
 
@@ -345,8 +346,22 @@ class Campaign(models.Model):
 
     # --- HÀM XỬ LÝ LOGIC ---
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        
+        # Nếu bật bảo vệ người thụ hưởng, xóa sạch thông tin Phường/Xã và Địa chỉ cụ thể
+        if self.is_protected_beneficiary:
+            self.beneficiary_ward = None
+            self.beneficiary_address = None
+            # Lưu ý: Tọa độ GIS vẫn có thể giữ lại ở mức Tỉnh/Thành phố hoặc xóa nếu cần
+            # Ở đây ta chỉ xóa các trường văn bản chi tiết theo yêu cầu.
+
     # 1. Tự động tạo Slug nếu chưa có
     def save(self, *args, **kwargs):
+        # Đảm bảo clean() được gọi trước khi save để xử lý dữ liệu nhạy cảm
+        self.clean()
+        
         if not self.slug:
             # Tạo slug từ title + timestamp để tránh trùng lặp tuyệt đối
             self.slug = slugify(self.title) + '-' + str(int(time.time()))

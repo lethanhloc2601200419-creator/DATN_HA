@@ -177,7 +177,18 @@
                             </td>
                             <td class="text-end pe-4">
                                 <div class="btn-group shadow-sm radius-md overflow-hidden">
-                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa" data-bs-toggle="modal" data-bs-target="#editModal" data-id="{{ c.id }}" data-avatar="{{ c.avatar_image_url|default:'' }}" data-cover="{{ c.cover_image_url|default:'' }}" data-title="{{ c.title }}" data-amount="{{ c.target_amount|stringformat:'d' }}" data-start="{{ c.start_date|date:'Y-m-d' }}" data-end="{{ c.end_date|date:'Y-m-d' }}" data-short="{{ c.short_description }}" data-full="{{ c.full_description }}" data-org="{{ c.organization.id }}" data-prog="{{ c.target_program.id|default_if_none:'' }}" data-cat="{{ c.category.id|default_if_none:'' }}" data-occ="{{ c.occasion.id|default_if_none:'' }}" data-province="{{ c.beneficiary_province|default:'' }}" data-ward="{{ c.beneficiary_ward|default:'' }}" data-address="{{ c.beneficiary_address|default:'' }}" data-lat="{{ c.beneficiary_lat|default:'' }}" data-lng="{{ c.beneficiary_lng|default:'' }}" onclick="fillDataToModal(this)">
+                                    <button type="button" class="btn btn-sm btn-white border-end" title="Sửa" data-bs-toggle="modal" data-bs-target="#editModal" 
+                                        data-id="{{ c.id }}" data-avatar="{{ c.avatar_image_url|default:'' }}" data-cover="{{ c.cover_image_url|default:'' }}" 
+                                        data-title="{{ c.title }}" data-amount="{{ c.target_amount|stringformat:'d' }}" 
+                                        data-start="{{ c.start_date|date:'Y-m-d' }}" data-end="{{ c.end_date|date:'Y-m-d' }}" 
+                                        data-short="{{ c.short_description }}" data-full="{{ c.full_description }}" 
+                                        data-org="{{ c.organization.id }}" data-prog="{{ c.target_program.id|default_if_none:'' }}" 
+                                        data-cat="{{ c.category.id|default_if_none:'' }}" data-occ="{{ c.occasion.id|default_if_none:'' }}" 
+                                        data-province="{{ c.beneficiary_province|default:'' }}" data-ward="{{ c.beneficiary_ward|default:'' }}" 
+                                        data-address="{{ c.beneficiary_address|default:'' }}" data-lat="{{ c.beneficiary_lat|default:'' }}" 
+                                        data-lng="{{ c.beneficiary_lng|default:'' }}" 
+                                        data-protected="{{ c.is_protected_beneficiary|yesno:'true,false' }}"
+                                        onclick="fillDataToModal(this)">
                                         <i class="fas fa-pen-to-square text-primary"></i>
                                     </button>
                                     
@@ -297,6 +308,16 @@
                                 <option value="{{ occ.id }}">{{ occ.name }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch p-3 bg-primary-50 rounded-xl border border-primary-100">
+                                <input class="form-check-input ms-0 me-2 js-protected-toggle" type="checkbox" name="is_protected_beneficiary" id="add_is_protected_beneficiary">
+                                <label class="form-check-label fw-bold text-primary" for="add_is_protected_beneficiary">
+                                    <i class="fas fa-user-shield me-1"></i> Bảo vệ người thụ hưởng (Ẩn địa chỉ chi tiết)
+                                </label>
+                                <div class="small text-muted mt-1">Khi bật, hệ thống sẽ ẩn và xóa Phường/Xã và Địa chỉ chi tiết để bảo vệ quyền riêng tư.</div>
+                            </div>
                         </div>
 
                         <div class="col-12">
@@ -424,6 +445,16 @@
                                 <option value="{{ occ.id }}">{{ occ.name }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch p-3 bg-primary-50 rounded-xl border border-primary-100">
+                                <input class="form-check-input ms-0 me-2 js-protected-toggle" type="checkbox" name="is_protected_beneficiary" id="edit_is_protected_beneficiary">
+                                <label class="form-check-label fw-bold text-primary" for="edit_is_protected_beneficiary">
+                                    <i class="fas fa-user-shield me-1"></i> Bảo vệ người thụ hưởng (Ẩn địa chỉ chi tiết)
+                                </label>
+                                <div class="small text-muted mt-1">Khi bật, hệ thống sẽ ẩn và xóa Phường/Xã và Địa chỉ chi tiết để bảo vệ quyền riêng tư.</div>
+                            </div>
                         </div>
 
                         <div class="col-12">
@@ -869,7 +900,52 @@
         lat: lat,
         lng: lng
     });
+
+    // 7. XỬ LÝ TOGGLE BẢO VỆ (MỚI)
+    var isProtected = (btn.getAttribute('data-protected') === 'true');
+    var protectedToggle = document.getElementById('edit_is_protected_beneficiary');
+    if (protectedToggle) {
+        protectedToggle.checked = isProtected;
+        // Kích hoạt sự kiện change để UI cập nhật theo
+        protectedToggle.dispatchEvent(new Event('change'));
+    }
 }
+
+function initProtectedToggle(prefix) {
+    const toggle = document.getElementById(`${prefix}_is_protected_beneficiary`);
+    const wardSelect = document.getElementById(`${prefix}_beneficiary_ward`);
+    const addressInput = document.getElementById(`${prefix}_beneficiary_address`);
+    const wardCol = wardSelect?.closest('.col-md-4');
+    const addressCol = addressInput?.closest('.col-md-4');
+
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function() {
+        const isProtected = this.checked;
+        if (isProtected) {
+            // Ẩn và vô hiệu hóa
+            if (wardCol) wardCol.classList.add('d-none');
+            if (addressCol) addressCol.classList.add('d-none');
+            if (wardSelect) wardSelect.disabled = true;
+            if (addressInput) addressInput.disabled = true;
+        } else {
+            // Hiện và kích hoạt (Phường/Xã chỉ kích hoạt nếu đã chọn Tỉnh)
+            if (wardCol) wardCol.classList.remove('d-none');
+            if (addressCol) addressCol.classList.remove('d-none');
+            if (addressInput) addressInput.disabled = false;
+            
+            const provinceSelect = document.getElementById(`${prefix}_beneficiary_province`);
+            if (provinceSelect && provinceSelect.value) {
+                if (wardSelect) wardSelect.disabled = false;
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initProtectedToggle('add');
+    initProtectedToggle('edit');
+});
 
 document.getElementById('select-all-campaigns')?.addEventListener('change', function() {
     document.querySelectorAll('.row-checkbox-campaign').forEach(cb => {

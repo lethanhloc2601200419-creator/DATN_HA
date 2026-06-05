@@ -1192,6 +1192,7 @@ def them_chiendich(request):
             camp.end_date = request.POST.get('end_date')
             camp.short_description = request.POST.get('short_description')
             camp.full_description = request.POST.get('full_description')
+            camp.is_protected_beneficiary = (request.POST.get('is_protected_beneficiary') == 'on')
             _apply_campaign_location(camp, request.POST)
             
             cat_id = request.POST.get('category_id')
@@ -1270,6 +1271,7 @@ def sua_chiendich(request, pk):
             camp.end_date = request.POST.get('end_date')
             camp.short_description = request.POST.get('short_description')
             camp.full_description = request.POST.get('full_description')
+            camp.is_protected_beneficiary = (request.POST.get('is_protected_beneficiary') == 'on')
             _apply_campaign_location(camp, request.POST)
 
             camp.category_id = request.POST.get('category_id') or None

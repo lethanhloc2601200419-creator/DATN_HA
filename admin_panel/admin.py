@@ -222,6 +222,47 @@ class BankStatementAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
 
+@admin.register(Campaign)
+class CampaignAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'organization', 'target_amount', 'status', 'is_protected_beneficiary', 'created_at')
+    list_filter = ('status', 'is_protected_beneficiary', 'category', 'created_at')
+    search_fields = ('title', 'slug', 'short_description', 'organization__name')
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        ('Thông tin cơ bản', {
+            'fields': (
+                'title', 'slug', 'creator', 'category', 'organization', 'target_program', 'occasion',
+                'short_description', 'full_description', 'avatar_image_url', 'cover_image_url',
+            ),
+        }),
+        ('Tài chính & Thời gian', {
+            'fields': (
+                'target_amount', 'current_amount', 'start_date', 'end_date',
+                'locked_amount', 'disbursed_amount', 'approval_threshold_pct', 'voting_power_cap_pct',
+            ),
+        }),
+        ('Thông tin người thụ hưởng', {
+            'fields': (
+                'is_protected_beneficiary',
+                'beneficiary_province',
+                'beneficiary_ward',
+                'beneficiary_address',
+                'beneficiary_lat',
+                'beneficiary_lng',
+            ),
+        }),
+        ('Quản trị & Blockchain', {
+            'fields': (
+                'status', 'charity_account_number', 'charity_account_name',
+                'is_onchain', 'blockchain_tx_hash', 'blockchain_synced_at',
+            ),
+        }),
+    )
+
+    class Media:
+        js = ('admin_panel/js/admin_campaign_toggle.js',)
+
 @admin.register(CampaignDisbursement)
 class CampaignDisbursementAdmin(admin.ModelAdmin):
     list_display = ('id', 'campaign', 'title', 'amount', 'status', 'reporter', 'created_at')
