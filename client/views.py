@@ -2079,10 +2079,9 @@ def tochuc_list(request):
     organizations_list = Organization.objects.filter(
         is_verified=True, kyc_status='approved'
     ).order_by('name')
-    pending_organizations = Organization.objects.filter(
-        is_verified=False,
-        kyc_status__in=['submitted', 'under_review'],
-    ).order_by('-kyc_submitted_at', '-created_at')
+    # PRIVACY: Hồ sơ chờ duyệt KHÔNG được public — mỗi user chỉ được xem hồ sơ
+    # của chính mình ở section #dangky-section. Quản trị viên xem tất cả
+    # ở trang admin (quanlytochuc).
 
     paginator = Paginator(organizations_list, 12)
     page = request.GET.get('page')
@@ -2101,7 +2100,6 @@ def tochuc_list(request):
 
     context = {
         'organizations': organizations,
-        'pending_organizations': pending_organizations,
         'org_form': org_form,
         'rep_form': rep_form,
         'has_form_errors': request.method == 'POST' and (org_form is not None) and (not org_form.is_valid() or not rep_form.is_valid()),
@@ -2118,6 +2116,161 @@ def tochuc_list(request):
         'user_account_source': user_account_source,
     }
     return render(request, 'client/tochuc_list.html', context)
+
+@login_required(login_url='admin_panel:dangnhap')
+def tochuc_edit_pending(request):
+    """
+    Cho phép chính chủ user (đã login bằng tài khoản web nội bộ) chỉnh sửa
+    hồ sơ tổ chức ĐANG CHỜ DUYỆT của mình.
+
+    Quy tắc gating:
+      • Phải authenticated.
+      • Tài khoản Google → từ chối (redirect về tochuc_list).
+      • Phải có Organization với `manager=user` ở status
+        ('submitted', 'under_review'). Approved/rejected → không cho sửa.
+      • Không được sửa các trường quản trị (kyc_status, is_verified, manager...) —
+        chỉ form public reuse `GuestOrganizationForm` + `GuestRepresentativeForm`.
+      • Save xong giữ nguyên kyc_status='submitted' để admin tiếp tục thẩm định.
+    """
+    user = request.user
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    if (profile.account_source or 'web') == 'google':
+        messages.error(request, 'Tài khoản Google không được phép chỉnh sửa hồ sơ tổ chức.')
+        return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
+    organization = Organization.objects.filter(
+        manager=user,
+        kyc_status__in=['submitted', 'under_review'],
+    ).order_by('-created_at').first()
+    if not organization:
+        messages.warning(request, 'Bạn không có hồ sơ tổ chức nào đang chờ duyệt để chỉnh sửa.')
+        return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
+    representative = getattr(organization, 'representative', None)
+
+    if request.method == 'POST':
+        org_form = GuestOrganizationForm(request.POST, request.FILES, instance=organization)
+        rep_form = GuestRepresentativeForm(request.POST, request.FILES, instance=representative)
+
+        # Pre-check CCCD trùng (chỉ check khi đổi sang số CCCD đã thuộc representative khác).
+        if org_form.is_valid() and rep_form.is_valid():
+            new_id_card = rep_form.cleaned_data.get('id_card_number')
+            if new_id_card:
+                conflict_qs = OrganizationRepresentative.objects.filter(id_card_number=new_id_card)
+                if representative is not None:
+                    conflict_qs = conflict_qs.exclude(pk=representative.pk)
+                if conflict_qs.exists():
+                    rep_form.add_error(
+                        'id_card_number',
+                        'Số CCCD/CMND này đã được đăng ký bởi hồ sơ khác. Vui lòng kiểm tra lại.'
+                    )
+
+        if org_form.is_valid() and rep_form.is_valid():
+            try:
+                with transaction.atomic():
+                    updated_org = org_form.save(commit=False)
+                    # Defensive: KHÔNG cho user đổi các trường quản trị qua form public.
+                    updated_org.manager = user
+                    updated_org.kyc_status = organization.kyc_status  # giữ nguyên submitted/under_review
+                    updated_org.is_verified = False
+                    updated_org.kyc_reviewed_at = None
+                    updated_org.kyc_reviewed_by = None
+                    updated_org.kyc_rejection_reason = None
+                    updated_org.save()
+
+                    updated_rep = rep_form.save(commit=False)
+                    updated_rep.organization = updated_org
+                    updated_rep.save()
+
+                    ActivityLog.objects.create(
+                        user=user,
+                        type='organization_kyc_updated',
+                        description=(
+                            f'User {user.username} cập nhật hồ sơ KYC tổ chức #{updated_org.id} - '
+                            f'{updated_org.name} (đại diện: {updated_rep.full_name}).'
+                        ),
+                        ip_address=get_client_ip(request),
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
+                    )
+
+                messages.success(request, 'Đã cập nhật hồ sơ. Quản trị viên sẽ tiếp tục thẩm định.')
+                return redirect(reverse('client:tochuc_list') + '#dangky-section')
+            except IntegrityError:
+                rep_form.add_error(
+                    'id_card_number',
+                    'Số CCCD/CMND này vừa được đăng ký bởi hồ sơ khác. Vui lòng kiểm tra lại.'
+                )
+                messages.error(request, 'Hồ sơ đã có xung đột dữ liệu, vui lòng thử lại.')
+        else:
+            messages.error(request, 'Vui lòng kiểm tra lại các trường đã nhập.')
+    else:
+        org_form = GuestOrganizationForm(instance=organization)
+        rep_form = GuestRepresentativeForm(instance=representative)
+
+    context = {
+        'org_form': org_form,
+        'rep_form': rep_form,
+        'organization': organization,
+        'representative': representative,
+        'has_form_errors': request.method == 'POST' and (not org_form.is_valid() or not rep_form.is_valid()),
+    }
+    return render(request, 'client/tochuc_edit_pending.html', context)
+
+
+@login_required(login_url='admin_panel:dangnhap')
+@require_POST
+def tochuc_cancel_pending(request):
+    """
+    Cho phép chính chủ HỦY hồ sơ tổ chức đang chờ duyệt.
+
+    Quy tắc:
+      • Chỉ chính chủ (Organization.manager == user) mới được hủy.
+      • Chỉ status `submitted` / `under_review` mới được hủy. Approved →
+        đã thành tài khoản tổ chức chính thức, không cho hủy. Rejected →
+        đã đóng, hủy thêm cũng vô nghĩa (nhưng vẫn cho phép xóa để user
+        đăng ký lại từ đầu).
+      • Hủy = xóa Organization + Representative (cascade). Vì hồ sơ chưa được
+        duyệt nên không có liên kết on-chain (Campaign chưa tạo, không có
+        donation), an toàn để xóa hoàn toàn.
+    """
+    user = request.user
+    organization = Organization.objects.filter(
+        manager=user,
+        kyc_status__in=['submitted', 'under_review', 'rejected'],
+    ).order_by('-created_at').first()
+    if not organization:
+        messages.warning(request, 'Bạn không có hồ sơ tổ chức nào để hủy.')
+        return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
+    # Defensive: chặn hủy nếu tổ chức đã có campaign on-chain (lỡ status sai).
+    if organization.is_verified or organization.campaigns.exists():
+        messages.error(
+            request,
+            'Hồ sơ này đã được duyệt hoặc đã có chiến dịch — không thể hủy.'
+            ' Vui lòng liên hệ quản trị viên.'
+        )
+        return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
+    org_id = organization.id
+    org_name = organization.name
+    with transaction.atomic():
+        organization.delete()
+        ActivityLog.objects.create(
+            user=user,
+            type='organization_kyc_cancelled',
+            description=(
+                f'User {user.username} đã hủy hồ sơ KYC tổ chức #{org_id} - {org_name}.'
+            ),
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
+        )
+
+    messages.success(
+        request,
+        f'Đã hủy hồ sơ "{org_name}". Bạn có thể gửi hồ sơ mới bất cứ lúc nào.'
+    )
+    return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
 
 def guest_register_organization(request):
     """

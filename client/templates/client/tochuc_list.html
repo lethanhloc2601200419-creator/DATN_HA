@@ -594,64 +594,9 @@
 
 <!-- ===== DANH SÁCH TỔ CHỨC ===== -->
 <section class="container py-5" id="danhsach">
-    {% if pending_organizations %}
-    <div class="pending-wrap" id="hosodangcho">
-        <div class="pending-head">
-            <div>
-                <h3><i class="fas fa-clock-rotate-left"></i> Hồ sơ đang chờ duyệt</h3>
-                <p>Các hồ sơ đã gửi KYC nhưng chưa được quản trị viên phê duyệt để hiển thị công khai.</p>
-            </div>
-            <span class="pending-count">{{ pending_organizations|length }} hồ sơ</span>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table pending-table">
-                <thead>
-                    <tr>
-                        <th>Tổ chức</th>
-                        <th>Người liên hệ</th>
-                        <th>Ngày gửi</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for org in pending_organizations %}
-                    <tr>
-                        <td data-label="Tổ chức">
-                            <div class="pending-org-name">{{ org.name }}</div>
-                            {% if org.tax_id %}
-                                <div class="text-muted small">MST: {{ org.tax_id }}</div>
-                            {% endif %}
-                        </td>
-                        <td data-label="Người liên hệ">
-                            {{ org.contact_person|default:"Chưa cập nhật" }}
-                            {% if org.contact_phone %}
-                                <div class="text-muted small">{{ org.contact_phone }}</div>
-                            {% endif %}
-                        </td>
-                        <td data-label="Ngày gửi">
-                            {{ org.kyc_submitted_at|default:org.created_at|date:"d/m/Y H:i" }}
-                        </td>
-                        <td data-label="Trạng thái">
-                            <span class="pending-status {{ org.kyc_status }}">
-                                {% if org.kyc_status == 'under_review' %}
-                                    <i class="fas fa-magnifying-glass"></i> Đang thẩm định
-                                {% else %}
-                                    <i class="fas fa-hourglass-half"></i> Chờ duyệt
-                                {% endif %}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <div class="pending-note">
-            <i class="fas fa-circle-info me-1"></i>
-            Vì lý do bảo mật, thông tin CCCD/giấy tờ đại diện không được hiển thị tại trang công khai này.
-        </div>
-    </div>
-    {% endif %}
+    {# PRIVACY: KHÔNG render danh sách hồ sơ chờ duyệt ở trang public.
+       Chính chủ sẽ thấy box riêng tại section #dangky-section bên dưới với
+       trạng thái hồ sơ + nút Sửa/Hủy. Admin xem ở /quan-tri/quan-ly-to-chuc/. #}
 
     <div class="section-title text-center">
         <p class="eyebrow">Danh sách</p>
@@ -816,7 +761,7 @@
                 </div>
             </div>
         {% elif has_pending_org %}
-            {# Có hồ sơ đang chờ duyệt → hiển thị trạng thái #}
+            {# Có hồ sơ đang chờ duyệt → hiển thị trạng thái + nút Sửa/Hủy #}
             <div class="reg-card" style="max-width: 720px;">
                 <div class="reg-card-head">
                     <div class="reg-head-icon" style="background: var(--warning-100); color: var(--warning-600);">
@@ -836,11 +781,27 @@
                         <p class="mt-2 mb-0">
                             <strong>Ngày gửi:</strong> {{ user_existing_org.kyc_submitted_at|date:"d/m/Y H:i"|default:"—" }}
                         </p>
+                        <p class="mt-1 mb-0 text-muted" style="font-size: 12px;">
+                            <i class="fas fa-circle-info me-1"></i>
+                            Bạn có thể cập nhật thông tin hồ sơ hoặc hủy yêu cầu trước khi quản trị viên hoàn tất thẩm định.
+                        </p>
                     </div>
+                </div>
+                <div class="submit-bar" style="justify-content: flex-end; gap: 10px;">
+                    <form method="post" action="{% url 'client:tochuc_cancel_pending' %}" style="margin: 0;"
+                          onsubmit="return confirm('Bạn có chắc chắn muốn hủy hồ sơ đăng ký tổ chức này? Hành động này không thể hoàn tác.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-detail" style="border-color: var(--danger-600); color: var(--danger-600);">
+                            <i class="fas fa-circle-xmark"></i> Hủy hồ sơ
+                        </button>
+                    </form>
+                    <a href="{% url 'client:tochuc_edit_pending' %}" class="btn-submit-reg" style="text-decoration:none;">
+                        <i class="fas fa-pen-to-square me-1"></i> Chỉnh sửa hồ sơ
+                    </a>
                 </div>
             </div>
         {% elif user_existing_org and user_existing_org.kyc_status == 'rejected' %}
-            {# Hồ sơ bị từ chối → hiển thị lý do, cho phép gửi lại sau khi xóa hoặc hỗ trợ liên hệ admin #}
+            {# Hồ sơ bị từ chối → hiển thị lý do + cho phép xóa để đăng ký lại #}
             <div class="reg-card" style="max-width: 720px;">
                 <div class="reg-card-head">
                     <div class="reg-head-icon" style="background: var(--danger-100); color: var(--danger-600);">
@@ -851,8 +812,8 @@
                         <h2>{{ user_existing_org.name }}</h2>
                         <p>
                             Hồ sơ KYC trước đây của bạn đã bị quản trị viên từ chối.
-                            Vui lòng liên hệ bộ phận hỗ trợ qua email <strong>support@quynhanai.vn</strong>
-                            để được hướng dẫn bổ sung và gửi lại hồ sơ.
+                            Bạn có thể xóa hồ sơ cũ và gửi hồ sơ mới bất cứ lúc nào.
+                            Nếu cần hỗ trợ, vui lòng liên hệ <strong>support@quynhanai.vn</strong>.
                         </p>
                         {% if user_existing_org.kyc_rejection_reason %}
                         <div class="non-field-errors mt-3" style="background: var(--danger-100); color: var(--danger-600);">
@@ -860,6 +821,15 @@
                         </div>
                         {% endif %}
                     </div>
+                </div>
+                <div class="submit-bar" style="justify-content: flex-end; gap: 10px;">
+                    <form method="post" action="{% url 'client:tochuc_cancel_pending' %}" style="margin: 0;"
+                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa hồ sơ cũ để đăng ký lại? Hành động này không thể hoàn tác.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-submit-reg" style="background: var(--danger-600);">
+                            <i class="fas fa-trash-can me-1"></i> Xóa hồ sơ và đăng ký lại
+                        </button>
+                    </form>
                 </div>
             </div>
         {% else %}

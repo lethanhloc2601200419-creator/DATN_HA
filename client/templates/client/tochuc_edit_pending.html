@@ -1,0 +1,528 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+
+{% block title %}Chỉnh sửa hồ sơ tổ chức - {{ organization.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-hero {
+        background: linear-gradient(130deg, var(--primary-950) 0%, var(--primary-800) 100%);
+        color: var(--white);
+        padding: 3rem 0 3.5rem;
+    }
+    .edit-hero h1 {
+        color: var(--white);
+        font-size: 1.85rem;
+        font-weight: 800;
+        margin-bottom: 0.4rem;
+    }
+    .edit-hero p {
+        color: var(--primary-300);
+        font-size: 14px;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .edit-hero .eyebrow { color: var(--primary-300); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+    .edit-wrap { background: var(--primary-50); padding: 3rem 0 4rem; }
+
+    .reg-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--primary-200);
+        overflow: hidden;
+        max-width: 1040px;
+        margin: 0 auto;
+    }
+    .reg-card-head {
+        background: var(--white);
+        border-bottom: 1px solid var(--primary-200);
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 24px 28px;
+    }
+    .reg-head-icon {
+        width: 44px; height: 44px;
+        border-radius: var(--radius-md);
+        background: var(--warning-100);
+        color: var(--warning-600);
+        display: inline-flex; align-items: center; justify-content: center;
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+    .reg-card-kicker {
+        color: var(--warning-600);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
+    .reg-card-head h2 {
+        color: var(--primary-900);
+        font-size: 1.3rem;
+        font-weight: 700;
+        line-height: 1.3;
+        margin: 0 0 6px;
+    }
+    .reg-card-head p {
+        color: var(--neutral-500);
+        font-size: 13px;
+        line-height: 1.6;
+        margin: 0;
+    }
+    .reg-section {
+        padding: 26px 28px;
+        border-bottom: 1px solid var(--primary-100);
+        background: var(--white);
+    }
+    .reg-section:last-of-type { border-bottom: none; }
+    .reg-section h3 {
+        font-size: 1.02rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        line-height: 1.35;
+        margin-bottom: 5px;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .reg-section h3 i {
+        width: 34px; height: 34px;
+        background: var(--primary-100);
+        color: var(--primary-800);
+        border-radius: var(--radius-md);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        flex: 0 0 auto;
+    }
+    .reg-section .section-desc {
+        color: var(--neutral-500);
+        font-size: 13px;
+        line-height: 1.55;
+        margin-bottom: 20px;
+        margin-left: 44px;
+    }
+
+    .form-label-cust {
+        font-size: 12px; font-weight: 600;
+        color: var(--neutral-700);
+        margin-bottom: 6px;
+        display: block;
+    }
+    .form-label-cust .req { color: var(--danger-600); }
+    .reg-card .form-control,
+    .reg-card .form-select {
+        border: 1.5px solid var(--neutral-300);
+        background: var(--white);
+        border-radius: var(--radius-md);
+        padding: 10px 14px;
+        font-size: 14px;
+        color: var(--neutral-900);
+        transition: 0.2s;
+        width: 100%;
+    }
+    .reg-card textarea.form-control {
+        min-height: 96px;
+        resize: vertical;
+    }
+    .reg-card .form-control:focus,
+    .reg-card .form-select:focus {
+        background: var(--white);
+        border-color: var(--primary-600);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    .field-error {
+        color: var(--danger-600);
+        font-size: 12px; font-weight: 600;
+        margin-top: 4px;
+    }
+    .help-hint {
+        color: var(--neutral-500);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    .non-field-errors {
+        background: var(--danger-100);
+        color: var(--danger-600);
+        border-left: 3px solid var(--danger-600);
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        font-size: 13px; font-weight: 600;
+        margin-bottom: 16px;
+    }
+    .current-file-hint {
+        background: var(--primary-50);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        padding: 8px 12px;
+        font-size: 12px;
+        color: var(--neutral-700);
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .current-file-hint a {
+        color: var(--primary-700);
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .current-file-hint a:hover { text-decoration: underline; }
+
+    .submit-bar {
+        padding: 22px 28px;
+        background: var(--primary-50);
+        border-top: 1px solid var(--primary-200);
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; flex-wrap: wrap;
+    }
+    .submit-bar .note {
+        color: var(--neutral-700);
+        font-size: 13px;
+        line-height: 1.6;
+        max-width: 560px;
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+    }
+    .submit-bar .note i {
+        color: var(--primary-700);
+        margin-top: 3px;
+    }
+    .btn-submit-reg {
+        background: var(--primary-800);
+        color: var(--white);
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 12px 28px;
+        font-weight: 700; font-size: 14px;
+        box-shadow: var(--shadow-btn);
+        transition: 0.2s;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-submit-reg:hover {
+        background: var(--primary-700);
+        transform: translateY(-1px);
+        color: var(--white);
+        text-decoration: none;
+    }
+    .btn-cancel-light {
+        background: transparent;
+        color: var(--neutral-700);
+        border: 1.5px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        padding: 11px 22px;
+        font-weight: 600; font-size: 14px;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        transition: 0.2s;
+    }
+    .btn-cancel-light:hover {
+        border-color: var(--neutral-700);
+        color: var(--neutral-900);
+        text-decoration: none;
+    }
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--warning-100);
+        color: var(--warning-600);
+        font-size: 12px; font-weight: 700;
+        padding: 5px 10px;
+        border-radius: var(--radius-full);
+        margin-top: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="edit-hero">
+    <div class="container text-center">
+        <p class="eyebrow mb-1">KYC tổ chức</p>
+        <h1>Chỉnh sửa hồ sơ đăng ký tổ chức</h1>
+        <p>
+            Bạn có thể cập nhật thông tin hồ sơ <strong>{{ organization.name }}</strong>
+            trong khi quản trị viên chưa hoàn tất thẩm định. Sau khi lưu, hồ sơ vẫn
+            ở trạng thái chờ duyệt.
+        </p>
+        <span class="status-pill">
+            {% if organization.kyc_status == 'under_review' %}
+                <i class="fas fa-magnifying-glass"></i> Đang thẩm định
+            {% else %}
+                <i class="fas fa-hourglass-half"></i> Chờ duyệt
+            {% endif %}
+        </span>
+    </div>
+</section>
+
+<section class="edit-wrap">
+    <div class="container">
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+
+            <div class="reg-card">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon">
+                        <i class="fas fa-pen-to-square"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Cập nhật hồ sơ</div>
+                        <h2>Sửa thông tin tổ chức & người đại diện</h2>
+                        <p>
+                            Các trường có dấu <span style="color: var(--danger-600); font-weight: 700;">*</span> là bắt buộc.
+                            Nếu KHÔNG chọn lại file ảnh, hệ thống sẽ giữ file cũ.
+                        </p>
+                    </div>
+                </div>
+
+                {% if has_form_errors and org_form.non_field_errors or rep_form.non_field_errors %}
+                <div class="reg-section" style="padding-top: 20px; padding-bottom: 0;">
+                    {% for err in org_form.non_field_errors %}
+                        <div class="non-field-errors"><i class="fas fa-circle-exclamation me-2"></i>{{ err }}</div>
+                    {% endfor %}
+                    {% for err in rep_form.non_field_errors %}
+                        <div class="non-field-errors"><i class="fas fa-circle-exclamation me-2"></i>{{ err }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {# === SECTION 1: TỔ CHỨC === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-building"></i> Thông tin tổ chức</h3>
+                    <p class="section-desc">Tên gọi, mô tả, sứ mệnh và logo của tổ chức.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label-cust">{{ org_form.name.label }} <span class="req">*</span></label>
+                            {{ org_form.name }}
+                            {% for err in org_form.name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Logo tổ chức</label>
+                            {{ org_form.logo }}
+                            {% if organization.logo %}
+                            <div class="current-file-hint">
+                                <i class="fas fa-image"></i>
+                                <span>File hiện tại: <a href="{{ organization.logo.url }}" target="_blank">xem logo</a></span>
+                            </div>
+                            {% endif %}
+                            <div class="help-hint">PNG/JPG, tối đa 2MB. Để trống nếu giữ file cũ.</div>
+                            {% for err in org_form.logo.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Mô tả ngắn</label>
+                            {{ org_form.description }}
+                            {% for err in org_form.description.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Tuyên bố sứ mệnh</label>
+                            {{ org_form.mission_statement }}
+                            {% for err in org_form.mission_statement.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Website</label>
+                            {{ org_form.website }}
+                            {% for err in org_form.website.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Mạng xã hội</label>
+                            {{ org_form.social_media_link }}
+                            {% for err in org_form.social_media_link.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 2: PHÁP LÝ === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-file-shield"></i> Hồ sơ pháp lý</h3>
+                    <p class="section-desc">Giấy phép hoạt động, mã số thuế và địa chỉ trụ sở.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số giấy phép hoạt động</label>
+                            {{ org_form.operating_license_number }}
+                            {% for err in org_form.operating_license_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-cust">Ngày thành lập</label>
+                            {{ org_form.founding_date }}
+                            {% for err in org_form.founding_date.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-cust">Mã số thuế</label>
+                            {{ org_form.tax_id }}
+                            {% for err in org_form.tax_id.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Link giấy phép (PDF/Ảnh)</label>
+                            {{ org_form.license_document_url }}
+                            <div class="help-hint">Upload lên Google Drive / Dropbox công khai rồi dán link vào đây.</div>
+                            {% for err in org_form.license_document_url.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Địa chỉ trụ sở chính</label>
+                            {{ org_form.headquarters_address }}
+                            {% for err in org_form.headquarters_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 3: TÀI KHOẢN NHẬN QUỸ === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-vault"></i> Tài khoản nhận quỹ</h3>
+                    <p class="section-desc">Thông tin ngân hàng và ví crypto sẽ được dùng làm vault nhận tiền donate.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Tên ngân hàng <span class="req">*</span></label>
+                            {{ org_form.bank_name }}
+                            {% for err in org_form.bank_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chi nhánh</label>
+                            {{ org_form.bank_branch }}
+                            {% for err in org_form.bank_branch.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số tài khoản <span class="req">*</span></label>
+                            {{ org_form.bank_account_number }}
+                            {% for err in org_form.bank_account_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chủ tài khoản <span class="req">*</span></label>
+                            {{ org_form.bank_account_name }}
+                            {% for err in org_form.bank_account_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Link QR code</label>
+                            {{ org_form.qr_code_url }}
+                            {% for err in org_form.qr_code_url.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ví crypto (multisig vault)</label>
+                            {{ org_form.wallet_address }}
+                            <div class="help-hint">Địa chỉ ETH dùng làm vault. Có thể bổ sung sau khi KYC duyệt.</div>
+                            {% for err in org_form.wallet_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 4: NGƯỜI ĐẠI DIỆN === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-user-tie"></i> Người đại diện pháp luật</h3>
+                    <p class="section-desc">Cá nhân đứng tên ký kết và chịu trách nhiệm với cơ quan chức năng.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Họ và tên <span class="req">*</span></label>
+                            {{ rep_form.full_name }}
+                            {% for err in rep_form.full_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chức vụ <span class="req">*</span></label>
+                            {{ rep_form.position }}
+                            {% for err in rep_form.position.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Số CCCD/CMND <span class="req">*</span></label>
+                            {{ rep_form.id_card_number }}
+                            {% for err in rep_form.id_card_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Ngày cấp <span class="req">*</span></label>
+                            {{ rep_form.id_card_date }}
+                            {% for err in rep_form.id_card_date.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Nơi cấp <span class="req">*</span></label>
+                            {{ rep_form.id_card_place }}
+                            {% for err in rep_form.id_card_place.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số điện thoại <span class="req">*</span></label>
+                            {{ rep_form.phone }}
+                            {% for err in rep_form.phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Email <span class="req">*</span></label>
+                            {{ rep_form.email }}
+                            {% for err in rep_form.email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Địa chỉ thường trú <span class="req">*</span></label>
+                            {{ rep_form.permanent_address }}
+                            {% for err in rep_form.permanent_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ảnh mặt trước CCCD</label>
+                            {{ rep_form.id_card_front }}
+                            {% if representative and representative.id_card_front %}
+                            <div class="current-file-hint">
+                                <i class="fas fa-image"></i>
+                                <span>File hiện tại: <a href="{{ representative.id_card_front.url }}" target="_blank">xem ảnh</a></span>
+                            </div>
+                            {% endif %}
+                            <div class="help-hint">Để trống nếu giữ ảnh cũ.</div>
+                            {% for err in rep_form.id_card_front.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ảnh mặt sau CCCD</label>
+                            {{ rep_form.id_card_back }}
+                            {% if representative and representative.id_card_back %}
+                            <div class="current-file-hint">
+                                <i class="fas fa-image"></i>
+                                <span>File hiện tại: <a href="{{ representative.id_card_back.url }}" target="_blank">xem ảnh</a></span>
+                            </div>
+                            {% endif %}
+                            <div class="help-hint">Để trống nếu giữ ảnh cũ.</div>
+                            {% for err in rep_form.id_card_back.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Giấy ủy quyền (nếu có)</label>
+                            {{ rep_form.authorization_letter }}
+                            {% if representative and representative.authorization_letter %}
+                            <div class="current-file-hint">
+                                <i class="fas fa-file"></i>
+                                <span>File hiện tại: <a href="{{ representative.authorization_letter.url }}" target="_blank">xem file</a></span>
+                            </div>
+                            {% endif %}
+                            <div class="help-hint">Bắt buộc nếu người ký không phải Chủ tịch / Giám đốc tổ chức.</div>
+                            {% for err in rep_form.authorization_letter.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Người liên hệ tổ chức</label>
+                            {{ org_form.contact_person }}
+                            {% for err in org_form.contact_person.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">SĐT liên hệ tổ chức</label>
+                            {{ org_form.contact_phone }}
+                            {% for err in org_form.contact_phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="submit-bar">
+                    <div class="note">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>
+                            Mọi cập nhật sẽ giữ hồ sơ ở trạng thái chờ duyệt.
+                            Sau khi quản trị viên duyệt, hồ sơ sẽ chuyển thành tổ chức chính thức và bạn sẽ không sửa được nữa.
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <a href="{% url 'client:tochuc_list' %}#dangky-section" class="btn-cancel-light">
+                            <i class="fas fa-arrow-left"></i> Quay lại
+                        </a>
+                        <button type="submit" class="btn-submit-reg">
+                            <i class="fas fa-floppy-disk me-1"></i> Lưu thay đổi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

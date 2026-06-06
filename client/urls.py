@@ -33,6 +33,8 @@ urlpatterns = [
     path('api/donations/<int:donation_id>/retry-blockchain/', client.api_retry_donation_blockchain, name='api_retry_donation_blockchain'),
     
     path('to-chuc/', client.tochuc_list, name='tochuc_list'),
+    path('to-chuc/sua-ho-so/', client.tochuc_edit_pending, name='tochuc_edit_pending'),
+    path('to-chuc/huy-ho-so/', client.tochuc_cancel_pending, name='tochuc_cancel_pending'),
     path('dang-ky-to-chuc/', client.guest_register_organization, name='guest_register_organization'),
     path('to-chuc/<slug:slug>/', client.tochuc_detail, name='tochuc_detail'),
 
