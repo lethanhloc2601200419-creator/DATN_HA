@@ -643,6 +643,45 @@ def quanlytochuc(request):
     if not request.user.is_superuser:
         messages.error(request, "Bạn không có quyền truy cập trang Quản lý Tổ chức!")
         return redirect('admin_panel:trangchu')
+
+    if request.method == 'POST' and request.POST.get('kyc_action'):
+        action = request.POST.get('kyc_action')
+        org = get_object_or_404(Organization, pk=request.POST.get('organization_id'))
+        now = timezone.now()
+
+        if action == 'review':
+            org.kyc_status = 'under_review'
+            org.is_verified = False
+            org.save(update_fields=['kyc_status', 'is_verified', 'updated_at'])
+            messages.info(request, f"Đã chuyển hồ sơ '{org.name}' sang trạng thái đang thẩm định.")
+        elif action == 'approve':
+            org.kyc_status = 'approved'
+            org.is_verified = True
+            org.verified_at = now
+            org.kyc_reviewed_at = now
+            org.kyc_reviewed_by = request.user
+            org.kyc_rejection_reason = ''
+            org.save(update_fields=[
+                'kyc_status', 'is_verified', 'verified_at', 'kyc_reviewed_at',
+                'kyc_reviewed_by', 'kyc_rejection_reason', 'updated_at',
+            ])
+            messages.success(request, f"Đã duyệt hồ sơ KYC của '{org.name}'.")
+        elif action == 'reject':
+            org.kyc_status = 'rejected'
+            org.is_verified = False
+            org.kyc_reviewed_at = now
+            org.kyc_reviewed_by = request.user
+            org.kyc_rejection_reason = (request.POST.get('rejection_reason') or '').strip()
+            org.save(update_fields=[
+                'kyc_status', 'is_verified', 'kyc_reviewed_at',
+                'kyc_reviewed_by', 'kyc_rejection_reason', 'updated_at',
+            ])
+            messages.warning(request, f"Đã từ chối hồ sơ KYC của '{org.name}'.")
+        else:
+            messages.error(request, "Thao tác hồ sơ KYC không hợp lệ.")
+
+        return _safe_next_url(request, 'admin_panel:quanlytochuc')
+
     query = _normalize_query(request.GET.get('q'))
     status = request.GET.get('status', '')
     if query:
@@ -659,15 +698,25 @@ def quanlytochuc(request):
     if status == 'verified':
         orgs = orgs.filter(is_verified=True)
     elif status == 'locked':
-        orgs = orgs.filter(is_verified=False)
+        orgs = orgs.filter(kyc_status='suspended')
+    elif status == 'kyc_pending':
+        orgs = orgs.filter(kyc_status__in=['submitted', 'under_review'])
+    elif status == 'kyc_rejected':
+        orgs = orgs.filter(kyc_status='rejected')
 
     orgs = orgs.order_by('-created_at')
+    pending_applications = Organization.objects.select_related(
+        'representative', 'kyc_reviewed_by'
+    ).filter(
+        kyc_status__in=['submitted', 'under_review']
+    ).order_by('-kyc_submitted_at', '-created_at')
+
     export_format = _get_export_format(request)
     if export_format:
-        headers = ['ID', 'Tên tổ chức', 'Quản lý', 'Số điện thoại', 'Ngân hàng', 'Số tài khoản', 'Ví crypto', 'Đã xác thực', 'Ngày tạo']
+        headers = ['ID', 'Tên tổ chức', 'Quản lý', 'Số điện thoại', 'Ngân hàng', 'Số tài khoản', 'Ví crypto', 'KYC', 'Đã xác thực', 'Ngày tạo']
         rows = orgs.values_list(
             'id', 'name', 'manager__username', 'contact_phone', 'bank_name', 'bank_account_number',
-            'wallet_address', 'is_verified', 'created_at'
+            'wallet_address', 'kyc_status', 'is_verified', 'created_at'
         )
         return _export_table_response('to_chuc', headers, rows, export_format)
 
@@ -680,10 +729,16 @@ def quanlytochuc(request):
 
         selected_qs = Organization.objects.filter(id__in=ids)
         if action == 'verify':
-            count = selected_qs.update(is_verified=True, verified_at=timezone.now())
+            count = selected_qs.update(
+                is_verified=True,
+                verified_at=timezone.now(),
+                kyc_status='approved',
+                kyc_reviewed_at=timezone.now(),
+                kyc_reviewed_by=request.user,
+            )
             messages.success(request, f"Đã duyệt {count} tổ chức.")
         elif action == 'lock':
-            count = selected_qs.update(is_verified=False)
+            count = selected_qs.update(is_verified=False, kyc_status='suspended')
             messages.success(request, f"Đã khóa {count} tổ chức.")
         elif action == 'delete':
             count = selected_qs.count()
@@ -696,12 +751,14 @@ def quanlytochuc(request):
     stats = {
         'total': Organization.objects.count(),
         'verified': Organization.objects.filter(is_verified=True).count(),
-        'locked': Organization.objects.filter(is_verified=False).count(),
+        'locked': Organization.objects.filter(kyc_status='suspended').count(),
+        'pending_kyc': Organization.objects.filter(kyc_status__in=['submitted', 'under_review']).count(),
         'with_wallet': Organization.objects.exclude(wallet_address__isnull=True).exclude(wallet_address='').count(),
     }
 
     return render(request, 'admin_panel/quanlytochuc.html', {
         'orgs': orgs, 
+        'pending_applications': pending_applications,
         'query': query,
         'selected_status': status,
         'role': _get_user_role(request.user),
@@ -744,6 +801,10 @@ def them_tochuc(request):
                 org.logo = request.FILES['logo']
 
             org.is_verified = True
+            org.verified_at = timezone.now()
+            org.kyc_status = 'approved'
+            org.kyc_reviewed_at = timezone.now()
+            org.kyc_reviewed_by = request.user
             org.save()
             
             if org.logo:
@@ -790,7 +851,14 @@ def sua_tochuc(request, pk):
 def khoa_tochuc(request, pk):
     try:
         org = get_object_or_404(Organization, pk=pk)
-        org.is_verified = not org.is_verified 
+        org.is_verified = not org.is_verified
+        if org.is_verified:
+            org.kyc_status = 'approved'
+            org.verified_at = timezone.now()
+            org.kyc_reviewed_at = timezone.now()
+            org.kyc_reviewed_by = request.user
+        else:
+            org.kyc_status = 'suspended'
         org.save()
         status_text = "MỞ KHÓA" if org.is_verified else "ĐÃ KHÓA"
         messages.warning(request, f"Đã {status_text} tổ chức: {org.name}")

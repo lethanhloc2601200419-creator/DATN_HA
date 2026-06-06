@@ -18,30 +18,221 @@
     </div>
 
     <div class="row g-4 mb-4">
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
                 <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng tổ chức</div>
                 <div class="h3 fw-800 m-0">{{ stats.total }}</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
                 <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đã xác thực</div>
                 <div class="h3 fw-800 m-0 text-success">{{ stats.verified }}</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Hồ sơ chờ KYC</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.pending_kyc }}</div>
+            </div>
+        </div>
+        <div class="col-md">
             <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
                 <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang khóa</div>
                 <div class="h3 fw-800 m-0 text-warning">{{ stats.locked }}</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md">
             <div class="card-charity p-3 border-start border-4 border-info shadow-sm">
                 <div class="text-xs text-muted fw-800 text-uppercase mb-1">Có ví crypto</div>
                 <div class="h3 fw-800 m-0 text-info">{{ stats.with_wallet }}</div>
             </div>
         </div>
+    </div>
+
+    <div class="kyc-panel card-charity mb-4 overflow-hidden border-0 shadow-sm" id="hoso-kyc">
+        <div class="kyc-panel-head">
+            <div>
+                <div class="eyebrow mb-1">KYC gửi tới</div>
+                <h3 class="m-0">Hồ sơ đăng ký tổ chức đang chờ xử lý</h3>
+                <p class="m-0">Dữ liệu lấy trực tiếp từ form đăng ký tổ chức ngoài trang client.</p>
+            </div>
+            <span class="kyc-count">{{ pending_applications|length }} hồ sơ</span>
+        </div>
+
+        {% if pending_applications %}
+        <div class="table-responsive">
+            <table class="table kyc-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tổ chức</th>
+                        <th>Đại diện</th>
+                        <th>Ngân hàng / Ví</th>
+                        <th>Ngày gửi</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in pending_applications %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                {% if org.logo %}
+                                    <img src="{{ org.logo.url }}" alt="{{ org.name }}" class="kyc-logo">
+                                {% elif org.logo_url %}
+                                    <img src="/media/{{ org.logo_url }}" alt="{{ org.name }}" class="kyc-logo">
+                                {% else %}
+                                    <div class="kyc-logo-fallback"><i class="fas fa-building"></i></div>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-800 text-dark">{{ org.name }}</div>
+                                    <div class="caption">{{ org.contact_phone|default:"Chưa có SĐT liên hệ" }}</div>
+                                    {% if org.tax_id %}
+                                        <span class="kyc-mini-badge mt-1">MST: {{ org.tax_id }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if org.representative %}
+                                <div class="fw-600 text-dark">{{ org.representative.full_name }}</div>
+                                <div class="caption">{{ org.representative.position }} · {{ org.representative.phone }}</div>
+                                <div class="caption">{{ org.representative.email }}</div>
+                            {% else %}
+                                <span class="caption">Chưa có thông tin đại diện</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-600 text-dark">{{ org.bank_name|default:"Chưa cập nhật" }}</div>
+                            <div class="caption">{{ org.bank_account_number|default:"—" }} · {{ org.bank_account_name|default:"—" }}</div>
+                            <div class="caption text-truncate" style="max-width: 260px;">{{ org.wallet_address|default:"Chưa có ví crypto" }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-600 text-dark">{{ org.kyc_submitted_at|default:org.created_at|date:"d/m/Y" }}</div>
+                            <div class="caption">{{ org.kyc_submitted_at|default:org.created_at|date:"H:i" }}</div>
+                        </td>
+                        <td class="text-center">
+                            {% if org.kyc_status == 'under_review' %}
+                                <span class="kyc-badge badge-primary"><i class="fas fa-magnifying-glass me-1"></i>Đang thẩm định</span>
+                            {% else %}
+                                <span class="kyc-badge badge-warning"><i class="fas fa-hourglass-half me-1"></i>Chờ duyệt</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <button class="btn btn-sm kyc-btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#kyc-detail-{{ org.id }}" aria-expanded="false" aria-controls="kyc-detail-{{ org.id }}">
+                                    <i class="fas fa-eye"></i> Xem hồ sơ
+                                </button>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                    <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                    <button type="submit" name="kyc_action" value="review" class="btn btn-sm kyc-btn-outline">
+                                        <i class="fas fa-clipboard-check"></i> Thẩm định
+                                    </button>
+                                </form>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                    <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                    <button type="submit" name="kyc_action" value="approve" class="btn btn-sm kyc-btn-primary" onclick="return confirm('Duyệt hồ sơ KYC của {{ org.name }}?')">
+                                        <i class="fas fa-circle-check"></i> Duyệt
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="collapse kyc-detail-row" id="kyc-detail-{{ org.id }}">
+                        <td colspan="6">
+                            <div class="kyc-detail-grid">
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-building me-2"></i>Thông tin tổ chức</h4>
+                                    <p>{{ org.description|default:"Chưa có mô tả." }}</p>
+                                    <dl>
+                                        <dt>Website</dt><dd>{{ org.website|default:"—" }}</dd>
+                                        <dt>Mạng xã hội</dt><dd>{{ org.social_media_link|default:"—" }}</dd>
+                                        <dt>Sứ mệnh</dt><dd>{{ org.mission_statement|default:"—" }}</dd>
+                                        <dt>Trụ sở</dt><dd>{{ org.headquarters_address|default:"—" }}</dd>
+                                    </dl>
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-file-shield me-2"></i>Pháp lý</h4>
+                                    <dl>
+                                        <dt>Giấy phép</dt><dd>{{ org.operating_license_number|default:"—" }}</dd>
+                                        <dt>Ngày thành lập</dt><dd>{{ org.founding_date|date:"d/m/Y"|default:"—" }}</dd>
+                                        <dt>Mã số thuế</dt><dd>{{ org.tax_id|default:"—" }}</dd>
+                                        <dt>Link giấy phép</dt>
+                                        <dd>
+                                            {% if org.license_document_url %}
+                                                <a href="{{ org.license_document_url }}" target="_blank" rel="noopener">Mở tài liệu</a>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </dd>
+                                    </dl>
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-user-tie me-2"></i>Người đại diện</h4>
+                                    {% if org.representative %}
+                                    <dl>
+                                        <dt>Họ tên</dt><dd>{{ org.representative.full_name }}</dd>
+                                        <dt>Chức vụ</dt><dd>{{ org.representative.position }}</dd>
+                                        <dt>CCCD/CMND</dt><dd>{{ org.representative.id_card_number }}</dd>
+                                        <dt>Ngày cấp</dt><dd>{{ org.representative.id_card_date|date:"d/m/Y" }}</dd>
+                                        <dt>Nơi cấp</dt><dd>{{ org.representative.id_card_place }}</dd>
+                                        <dt>Địa chỉ thường trú</dt><dd>{{ org.representative.permanent_address }}</dd>
+                                    </dl>
+                                    {% else %}
+                                        <p>Chưa có thông tin đại diện.</p>
+                                    {% endif %}
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-paperclip me-2"></i>Tệp đính kèm</h4>
+                                    {% if org.representative %}
+                                    <div class="kyc-doc-links">
+                                        {% if org.representative.id_card_front %}
+                                            <a href="{{ org.representative.id_card_front.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt trước CCCD</a>
+                                        {% endif %}
+                                        {% if org.representative.id_card_back %}
+                                            <a href="{{ org.representative.id_card_back.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt sau CCCD</a>
+                                        {% endif %}
+                                        {% if org.representative.authorization_letter %}
+                                            <a href="{{ org.representative.authorization_letter.url }}" target="_blank" rel="noopener"><i class="fas fa-file-signature"></i> Giấy ủy quyền</a>
+                                        {% endif %}
+                                        {% if not org.representative.id_card_front and not org.representative.id_card_back and not org.representative.authorization_letter %}
+                                            <span class="caption">Chưa có tệp đính kèm.</span>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                        <p>Chưa có tệp đại diện.</p>
+                                    {% endif %}
+                                    <form method="post" class="mt-3">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                        <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                        <textarea name="rejection_reason" class="form-control kyc-reject-note" rows="2" placeholder="Lý do từ chối hồ sơ (nếu cần)"></textarea>
+                                        <button type="submit" name="kyc_action" value="reject" class="btn btn-sm kyc-btn-danger mt-2" onclick="return confirm('Từ chối hồ sơ KYC của {{ org.name }}?')">
+                                            <i class="fas fa-circle-xmark"></i> Từ chối hồ sơ
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="kyc-empty">
+            <i class="fas fa-inbox"></i>
+            <div>
+                <h4 class="m-0">Chưa có hồ sơ mới</h4>
+                <p class="m-0">Khi tổ chức gửi form đăng ký ngoài client, hồ sơ sẽ xuất hiện tại đây.</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
@@ -61,6 +252,8 @@
                         <option value="">— Trạng thái —</option>
                         <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Đã xác thực</option>
                         <option value="locked" {% if selected_status == 'locked' %}selected{% endif %}>Đang khóa</option>
+                        <option value="kyc_pending" {% if selected_status == 'kyc_pending' %}selected{% endif %}>Hồ sơ chờ KYC</option>
+                        <option value="kyc_rejected" {% if selected_status == 'kyc_rejected' %}selected{% endif %}>KYC bị từ chối</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -137,6 +330,12 @@
                             <td class="text-center">
                                 {% if org.is_verified %}
                                     <span class="badge bg-success-subtle text-success border border-success px-2 py-1 radius-pill small"><i class="fas fa-check-circle me-1"></i> Hoạt động</span>
+                                {% elif org.kyc_status == 'submitted' %}
+                                    <span class="kyc-badge badge-warning"><i class="fas fa-hourglass-half me-1"></i>Chờ KYC</span>
+                                {% elif org.kyc_status == 'under_review' %}
+                                    <span class="kyc-badge badge-primary"><i class="fas fa-magnifying-glass me-1"></i>Đang thẩm định</span>
+                                {% elif org.kyc_status == 'rejected' %}
+                                    <span class="kyc-badge badge-danger"><i class="fas fa-circle-xmark me-1"></i>Từ chối</span>
                                 {% else %}
                                     <span class="badge bg-secondary px-2 py-1 radius-pill small"><i class="fas fa-lock me-1"></i> Đang khóa</span>
                                 {% endif %}
@@ -346,5 +545,255 @@
     .fw-800 { font-weight: 800; }
     .fw-600 { font-weight: 600; }
     .opacity-20 { opacity: 0.2; }
+    .eyebrow {
+        color: var(--primary-600);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+    .caption {
+        color: var(--neutral-500);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .kyc-panel {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+    }
+    .kyc-panel-head {
+        background: var(--primary-50);
+        border-bottom: 1px solid var(--primary-200);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        flex-wrap: wrap;
+    }
+    .kyc-panel-head h3 {
+        color: var(--primary-900);
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .kyc-panel-head p {
+        color: var(--neutral-500);
+        font-size: 13px;
+        line-height: 1.6;
+        margin-top: 4px !important;
+    }
+    .kyc-count,
+    .kyc-mini-badge,
+    .kyc-badge {
+        border-radius: var(--radius-full);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 6px 10px;
+        white-space: nowrap;
+    }
+    .kyc-count,
+    .kyc-mini-badge,
+    .kyc-badge.badge-primary {
+        background: var(--primary-100);
+        color: var(--primary-800);
+    }
+    .kyc-badge.badge-warning {
+        background: var(--warning-100);
+        color: var(--warning-600);
+    }
+    .kyc-badge.badge-success {
+        background: var(--success-100);
+        color: var(--success-600);
+    }
+    .kyc-badge.badge-danger {
+        background: var(--danger-100);
+        color: var(--danger-600);
+    }
+    .kyc-table th {
+        background: var(--white);
+        border-bottom: 1px solid var(--primary-200);
+        color: var(--neutral-500);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        padding: 14px 18px;
+        text-transform: uppercase;
+    }
+    .kyc-table td {
+        border-color: var(--primary-100);
+        color: var(--neutral-700);
+        padding: 16px 18px;
+    }
+    .kyc-logo,
+    .kyc-logo-fallback {
+        width: 52px;
+        height: 52px;
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        flex: 0 0 auto;
+    }
+    .kyc-logo {
+        background: var(--neutral-100);
+        object-fit: cover;
+    }
+    .kyc-logo-fallback {
+        background: var(--primary-100);
+        color: var(--primary-800);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .kyc-btn-primary,
+    .kyc-btn-outline,
+    .kyc-btn-ghost,
+    .kyc-btn-danger {
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 700;
+        gap: 6px;
+        padding: 7px 12px;
+    }
+    .kyc-btn-primary {
+        background: var(--primary-800);
+        color: var(--white);
+        box-shadow: var(--shadow-btn);
+    }
+    .kyc-btn-primary:hover {
+        background: var(--primary-700);
+        color: var(--white);
+    }
+    .kyc-btn-outline {
+        background: transparent;
+        border: 1.5px solid var(--primary-300);
+        color: var(--primary-800);
+    }
+    .kyc-btn-outline:hover,
+    .kyc-btn-ghost:hover {
+        background: var(--primary-50);
+        color: var(--primary-800);
+    }
+    .kyc-btn-ghost {
+        background: var(--primary-100);
+        color: var(--primary-800);
+    }
+    .kyc-btn-danger {
+        background: var(--danger-100);
+        color: var(--danger-600);
+    }
+    .kyc-btn-danger:hover {
+        background: var(--danger-600);
+        color: var(--white);
+    }
+    .kyc-detail-row td {
+        background: var(--primary-50);
+        padding: 1.25rem 1.5rem;
+    }
+    .kyc-detail-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    .kyc-detail-card {
+        background: var(--white);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 1rem;
+    }
+    .kyc-detail-card h4 {
+        color: var(--primary-800);
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+    .kyc-detail-card p {
+        color: var(--neutral-700);
+        font-size: 13px;
+        line-height: 1.65;
+    }
+    .kyc-detail-card dl {
+        display: grid;
+        gap: 8px 12px;
+        grid-template-columns: 110px minmax(0, 1fr);
+        margin: 0;
+    }
+    .kyc-detail-card dt {
+        color: var(--neutral-500);
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .kyc-detail-card dd {
+        color: var(--neutral-700);
+        font-size: 13px;
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+    .kyc-doc-links {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .kyc-doc-links a {
+        align-items: center;
+        background: var(--primary-50);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        color: var(--primary-800);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 700;
+        gap: 8px;
+        padding: 9px 11px;
+        text-decoration: none;
+    }
+    .kyc-doc-links a:hover {
+        background: var(--primary-100);
+    }
+    .kyc-reject-note {
+        border: 1.5px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+    }
+    .kyc-empty {
+        align-items: center;
+        color: var(--neutral-500);
+        display: flex;
+        gap: 1rem;
+        padding: 2rem 1.5rem;
+    }
+    .kyc-empty i {
+        align-items: center;
+        background: var(--primary-100);
+        border-radius: var(--radius-md);
+        color: var(--primary-800);
+        display: inline-flex;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+    }
+    .kyc-empty h4 {
+        color: var(--primary-900);
+        font-size: 15px;
+        font-weight: 700;
+    }
+    @media (max-width: 767.98px) {
+        .kyc-panel-head {
+            align-items: flex-start;
+        }
+        .kyc-table th,
+        .kyc-table td {
+            min-width: 180px;
+        }
+        .kyc-detail-card dl {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}

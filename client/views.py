@@ -1995,7 +1995,7 @@ def tochuc_list(request):
                     request,
                     'Hồ sơ đăng ký tổ chức đã được gửi thành công. Quản trị viên sẽ đánh giá và liên hệ lại sớm nhất.'
                 )
-                return redirect('client:tochuc_list')
+                return redirect(reverse('client:tochuc_list') + '#hosodangcho')
             except IntegrityError:
                 rep_form.add_error(
                     'id_card_number',
@@ -2008,6 +2008,10 @@ def tochuc_list(request):
     organizations_list = Organization.objects.filter(
         is_verified=True, kyc_status='approved'
     ).order_by('name')
+    pending_organizations = Organization.objects.filter(
+        is_verified=False,
+        kyc_status__in=['submitted', 'under_review'],
+    ).order_by('-kyc_submitted_at', '-created_at')
 
     paginator = Paginator(organizations_list, 12)
     page = request.GET.get('page')
@@ -2026,6 +2030,7 @@ def tochuc_list(request):
 
     context = {
         'organizations': organizations,
+        'pending_organizations': pending_organizations,
         'org_form': org_form,
         'rep_form': rep_form,
         'has_form_errors': request.method == 'POST',
