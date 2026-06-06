@@ -738,6 +738,132 @@
             </p>
         </div>
 
+        {# === GATING THEO TRẠNG THÁI TÀI KHOẢN === #}
+        {% if not is_authenticated_user %}
+            {# Chưa login → CTA login bằng tài khoản web nội bộ #}
+            <div class="reg-card" style="max-width: 720px;">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon" style="background: var(--warning-100); color: var(--warning-600);">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Yêu cầu đăng nhập</div>
+                        <h2>Vui lòng đăng nhập để gửi hồ sơ tổ chức</h2>
+                        <p>
+                            Chỉ tài khoản web nội bộ (đăng ký bằng email + mật khẩu trên hệ thống) mới được phép
+                            nộp hồ sơ KYC tổ chức. Tài khoản đăng nhập qua Google/Web3 không thể gửi form này.
+                        </p>
+                    </div>
+                </div>
+                <div class="submit-bar" style="justify-content: center;">
+                    <a href="{% url 'admin_panel:dangnhap' %}?next={% url 'client:tochuc_list' %}%23dangky-section" class="btn-submit-reg" style="text-decoration:none;">
+                        <i class="fas fa-right-to-bracket me-1"></i> Đăng nhập tài khoản web
+                    </a>
+                    <a href="{% url 'admin_panel:dangky' %}" class="btn-detail">
+                        <i class="fas fa-user-plus"></i> Đăng ký tài khoản mới
+                    </a>
+                </div>
+            </div>
+        {% elif is_google_account %}
+            {# Login bằng Google → KHÔNG cho dùng form #}
+            <div class="reg-card" style="max-width: 720px;">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon" style="background: var(--danger-100); color: var(--danger-600);">
+                        <i class="fas fa-circle-exclamation"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Tài khoản không đủ điều kiện</div>
+                        <h2>Tài khoản Google không thể đăng ký tổ chức</h2>
+                        <p>
+                            Bạn đang đăng nhập bằng tài khoản Google/Web3. Để đảm bảo trách nhiệm pháp lý của
+                            tổ chức từ thiện, hồ sơ KYC chỉ được gửi từ tài khoản web nội bộ (username + mật khẩu).
+                            Vui lòng đăng xuất và đăng ký một tài khoản web để tiếp tục.
+                        </p>
+                    </div>
+                </div>
+                <div class="submit-bar" style="justify-content: center;">
+                    <a href="{% url 'admin_panel:dangxuat' %}" class="btn-submit-reg" style="text-decoration:none;">
+                        <i class="fas fa-right-from-bracket me-1"></i> Đăng xuất
+                    </a>
+                    <a href="{% url 'admin_panel:dangky' %}" class="btn-detail">
+                        <i class="fas fa-user-plus"></i> Đăng ký tài khoản web
+                    </a>
+                </div>
+            </div>
+        {% elif has_approved_org %}
+            {# Đã có org đã duyệt → hiển thị thông tin tổ chức của user #}
+            <div class="reg-card" style="max-width: 720px;">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon" style="background: var(--success-100); color: var(--success-600);">
+                        <i class="fas fa-circle-check"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Tổ chức đã được phê duyệt</div>
+                        <h2>{{ user_existing_org.name }}</h2>
+                        <p>
+                            Tài khoản của bạn đã liên kết với tổ chức <strong>{{ user_existing_org.name }}</strong>
+                            và đã được phê duyệt KYC. Bạn có thể vào khu vực quản trị để tạo chiến dịch và quản lý quyên góp.
+                        </p>
+                    </div>
+                </div>
+                <div class="submit-bar" style="justify-content: center;">
+                    <a href="{% url 'admin_panel:trangchu' %}" class="btn-submit-reg" style="text-decoration:none;">
+                        <i class="fas fa-gauge-high me-1"></i> Vào khu vực quản trị
+                    </a>
+                    <a href="{% url 'client:tochuc_detail' slug=user_existing_org.slug %}" class="btn-detail">
+                        <i class="fas fa-eye"></i> Xem trang công khai
+                    </a>
+                </div>
+            </div>
+        {% elif has_pending_org %}
+            {# Có hồ sơ đang chờ duyệt → hiển thị trạng thái #}
+            <div class="reg-card" style="max-width: 720px;">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon" style="background: var(--warning-100); color: var(--warning-600);">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Hồ sơ đang xử lý</div>
+                        <h2>Hồ sơ {{ user_existing_org.name }} đang chờ duyệt</h2>
+                        <p>
+                            {% if user_existing_org.kyc_status == 'under_review' %}
+                                Quản trị viên đang thẩm định hồ sơ KYC của bạn.
+                            {% else %}
+                                Hồ sơ đã được gửi và đang chờ quản trị viên xem xét.
+                            {% endif %}
+                            Thời gian xử lý dự kiến 3-5 ngày làm việc. Vui lòng kiểm tra email để nhận thông báo.
+                        </p>
+                        <p class="mt-2 mb-0">
+                            <strong>Ngày gửi:</strong> {{ user_existing_org.kyc_submitted_at|date:"d/m/Y H:i"|default:"—" }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% elif user_existing_org and user_existing_org.kyc_status == 'rejected' %}
+            {# Hồ sơ bị từ chối → hiển thị lý do, cho phép gửi lại sau khi xóa hoặc hỗ trợ liên hệ admin #}
+            <div class="reg-card" style="max-width: 720px;">
+                <div class="reg-card-head">
+                    <div class="reg-head-icon" style="background: var(--danger-100); color: var(--danger-600);">
+                        <i class="fas fa-circle-xmark"></i>
+                    </div>
+                    <div>
+                        <div class="reg-card-kicker">Hồ sơ bị từ chối</div>
+                        <h2>{{ user_existing_org.name }}</h2>
+                        <p>
+                            Hồ sơ KYC trước đây của bạn đã bị quản trị viên từ chối.
+                            Vui lòng liên hệ bộ phận hỗ trợ qua email <strong>support@quynhanai.vn</strong>
+                            để được hướng dẫn bổ sung và gửi lại hồ sơ.
+                        </p>
+                        {% if user_existing_org.kyc_rejection_reason %}
+                        <div class="non-field-errors mt-3" style="background: var(--danger-100); color: var(--danger-600);">
+                            <strong>Lý do từ chối:</strong> {{ user_existing_org.kyc_rejection_reason }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% else %}
+        {# can_submit_form == True → render full form #}
         <form method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
 
@@ -958,7 +1084,7 @@
                 <div class="submit-bar">
                     <div class="note">
                         <i class="fas fa-shield-halved"></i>
-                        <span>Bằng việc gửi hồ sơ, bạn xác nhận thông tin cung cấp là đúng sự thật và đồng ý cho Quỹ Nhân Ái thẩm định KYC theo quy định.</span>
+                        <span>Bằng việc gửi hồ sơ, bạn xác nhận thông tin cung cấp là đúng sự thật và đồng ý cho Quỹ Nhân Ái thẩm định KYC theo quy định. Hồ sơ sẽ được gắn với tài khoản <strong>{{ request.user.username }}</strong>.</span>
                     </div>
                     <button type="submit" class="btn-submit-reg">
                         <i class="fas fa-paper-plane me-1"></i> Gửi hồ sơ KYC
@@ -966,6 +1092,7 @@
                 </div>
             </div>
         </form>
+        {% endif %}
     </div>
 </section>
 

@@ -107,13 +107,19 @@ def _get_or_create_web3_user(wallet_address, eoa_address='', email='', display_n
     profile.eoa_address = checksum_eoa or profile.eoa_address
     profile.smart_account_address = checksum_wallet
     profile.wallet_address = checksum_wallet
-    profile.save(update_fields=[
+    # Web3 login = Google / Web3Auth → đánh dấu để chặn ở form đăng ký tổ chức.
+    # Không override nếu profile đã được admin set='web' từ trước.
+    update_fields = [
         'display_name',
         'eoa_address',
         'smart_account_address',
         'wallet_address',
         'updated_at',
-    ])
+    ]
+    if profile.account_source != 'web':
+        profile.account_source = 'google'
+        update_fields.append('account_source')
+    profile.save(update_fields=update_fields)
 
     return user, profile
 
@@ -1938,16 +1944,76 @@ def tochuc_list(request):
     """
     Trang tổ chức — gộp 2 chức năng:
       1. Hiển thị danh sách các tổ chức đã được KYC + duyệt.
-      2. Cho phép Guest nộp hồ sơ đăng ký tổ chức mới (anchor #dangky-section).
+      2. Cho phép user (đã login bằng tài khoản web nội bộ) nộp hồ sơ đăng ký
+         tổ chức mới (anchor #dangky-section).
 
-    GET  → render list + 2 form rỗng.
-    POST → validate 2 form + lưu Organization (kyc_status='submitted')
-           và OrganizationRepresentative trong transaction.atomic().
+    Quy tắc gating form đăng ký (theo `fix_to_chuc.md`):
+      • Chưa login              → KHÔNG render form, hiển thị CTA login.
+      • Login bằng Google/Web3  → KHÔNG render form, hiển thị thông báo
+        không đủ điều kiện. Hướng dẫn dùng tài khoản web nội bộ.
+      • Login bằng tài khoản web → render form bình thường, kèm trạng thái
+        hồ sơ hiện có (đã nộp / đang thẩm định / bị từ chối / đã duyệt).
+      • Đã là manager của 1 tổ chức đã duyệt → KHÔNG cho gửi lại form.
+
+    GET  → render list + (có thể) form rỗng.
+    POST → chỉ chấp nhận từ user web đủ điều kiện; gắn manager=request.user
+           để admin duyệt sẽ chuyển user thành tài khoản tổ chức.
     """
-    org_form = GuestOrganizationForm()
-    rep_form = GuestRepresentativeForm()
+    org_form = None
+    rep_form = None
+
+    # ---- 1. Xác định trạng thái tài khoản người dùng ----
+    user = request.user if request.user.is_authenticated else None
+    user_profile = None
+    user_account_source = ''
+    if user is not None:
+        user_profile, _ = UserProfile.objects.get_or_create(user=user)
+        user_account_source = user_profile.account_source or 'web'
+
+    # Hồ sơ tổ chức đã có do user gửi (nếu là user web nội bộ).
+    # Quan hệ: Organization.manager → User. Một user chỉ làm manager 1 tổ chức
+    # tại 1 thời điểm, nhưng để defensive lấy bản mới nhất.
+    user_existing_org = None
+    if user is not None:
+        user_existing_org = Organization.objects.filter(manager=user).order_by('-created_at').first()
+
+    is_web_account = (user is not None) and (user_account_source == 'web')
+    is_google_account = (user is not None) and (user_account_source == 'google')
+    # User đã có tổ chức đã duyệt → không cho gửi lại; vẫn cho xem trạng thái.
+    has_approved_org = bool(
+        user_existing_org
+        and user_existing_org.kyc_status == 'approved'
+        and user_existing_org.is_verified
+    )
+    # User có hồ sơ đang chờ / đang thẩm định → chặn submit lại để tránh duplicate.
+    has_pending_org = bool(
+        user_existing_org and user_existing_org.kyc_status in ('submitted', 'under_review')
+    )
+    can_submit_form = is_web_account and not has_approved_org and not has_pending_org
+
+    if can_submit_form:
+        org_form = GuestOrganizationForm()
+        rep_form = GuestRepresentativeForm()
 
     if request.method == 'POST':
+        # Gate: chỉ user web nội bộ + chưa có tổ chức được duyệt / pending.
+        if user is None:
+            messages.warning(request, 'Vui lòng đăng nhập bằng tài khoản web nội bộ để gửi hồ sơ tổ chức.')
+            return redirect(reverse('admin_panel:dangnhap') + '?next=' + reverse('client:tochuc_list') + '%23dangky-section')
+        if is_google_account:
+            messages.error(
+                request,
+                'Tài khoản Google không được phép gửi hồ sơ đăng ký tổ chức. '
+                'Vui lòng đăng ký một tài khoản web nội bộ riêng để thực hiện thủ tục KYC.'
+            )
+            return redirect(reverse('client:tochuc_list') + '#dangky-section')
+        if has_approved_org:
+            messages.info(request, 'Tài khoản của bạn đã liên kết với một tổ chức đã được duyệt.')
+            return redirect(reverse('client:tochuc_list') + '#dangky-section')
+        if has_pending_org:
+            messages.info(request, 'Bạn đã có hồ sơ đang chờ duyệt. Vui lòng đợi quản trị viên xử lý.')
+            return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
         org_form = GuestOrganizationForm(request.POST, request.FILES)
         rep_form = GuestRepresentativeForm(request.POST, request.FILES)
 
@@ -1975,6 +2041,10 @@ def tochuc_list(request):
                     organization.kyc_status = 'submitted'
                     organization.kyc_submitted_at = timezone.now()
                     organization.is_verified = False
+                    # GẮN MANAGER = USER GỬI FORM. Khi admin duyệt KYC,
+                    # user này sẽ tự động thành "tài khoản tổ chức"
+                    # (admin views detect qua Organization.manager).
+                    organization.manager = user
                     organization.save()
 
                     representative = rep_form.save(commit=False)
@@ -1982,9 +2052,10 @@ def tochuc_list(request):
                     representative.save()
 
                     ActivityLog.objects.create(
+                        user=user,
                         type='organization_kyc_submitted',
                         description=(
-                            f'Guest nộp hồ sơ KYC tổ chức #{organization.id} - {organization.name} '
+                            f'User {user.username} nộp hồ sơ KYC tổ chức #{organization.id} - {organization.name} '
                             f'(đại diện: {representative.full_name}).'
                         ),
                         ip_address=get_client_ip(request),
@@ -2033,9 +2104,18 @@ def tochuc_list(request):
         'pending_organizations': pending_organizations,
         'org_form': org_form,
         'rep_form': rep_form,
-        'has_form_errors': request.method == 'POST',
+        'has_form_errors': request.method == 'POST' and (org_form is not None) and (not org_form.is_valid() or not rep_form.is_valid()),
         'total_orgs': total_orgs,
         'total_active_campaigns': total_active_campaigns,
+        # Trạng thái tài khoản dùng cho template gating.
+        'is_authenticated_user': user is not None,
+        'is_web_account': is_web_account,
+        'is_google_account': is_google_account,
+        'has_approved_org': has_approved_org,
+        'has_pending_org': has_pending_org,
+        'can_submit_form': can_submit_form,
+        'user_existing_org': user_existing_org,
+        'user_account_source': user_account_source,
     }
     return render(request, 'client/tochuc_list.html', context)
 

@@ -10,11 +10,14 @@
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="page-title m-0">Quản lý Tổ chức Đối tác</h2>
-        <button type="button" class="btn btn-primary px-4 radius-pill shadow-btn" data-bs-toggle="modal" data-bs-target="#addModal">
-            <i class="fas fa-plus-circle me-2"></i> Thêm Tổ chức mới
-        </button>
+        <a href="#hoso-kyc" class="btn btn-primary px-4 radius-pill shadow-btn position-relative">
+            <i class="fas fa-clipboard-check me-2"></i> Hồ sơ chờ duyệt
+            {% if stats.pending_kyc %}
+                <span class="badge bg-warning text-dark ms-2">{{ stats.pending_kyc }}</span>
+            {% endif %}
+        </a>
     </div>
 
     <div class="row g-4 mb-4">
@@ -369,7 +372,8 @@
     </div>
 </div>
 
-<div class="modal fade" id="addModal" tabindex="-1">
+{# Modal thêm thủ công đã bỏ theo yêu cầu fix_to_chuc.md — tổ chức bây giờ chỉ được tạo qua hồ sơ KYC do user web gửi từ /to-chuc/. Route them_tochuc giữ để backward-compat nếu có link cũ. #}
+<div class="modal fade d-none" id="addModal" tabindex="-1" aria-hidden="true" style="display: none !important;">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <form class="modal-content border-0 radius-lg shadow-lg" action="{% url 'admin_panel:them_tochuc' %}" method="POST" enctype="multipart/form-data">
             {% csrf_token %}

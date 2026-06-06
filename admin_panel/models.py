@@ -19,6 +19,14 @@ from django.utils import timezone
 # 1. USER PROFILE
 # =====================================================
 class UserProfile(models.Model):
+    # Phân biệt nguồn tài khoản: 'web' = đăng ký bằng form nội bộ
+    # (admin_panel:dangky), 'google' = đăng nhập qua OAuth Google /
+    # Web3Auth Google. Field này quyết định ai được phép nộp form
+    # đăng ký tổ chức ở /to-chuc/#dangky-section.
+    ACCOUNT_SOURCE_CHOICES = [
+        ('web', 'Tài khoản web nội bộ'),
+        ('google', 'Tài khoản Google / Web3Auth'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     display_name = models.CharField(max_length=255, blank=True, null=True)
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
@@ -31,6 +39,13 @@ class UserProfile(models.Model):
     eoa_address = models.CharField(max_length=42, blank=True, null=True)
     smart_account_address = models.CharField(max_length=42, blank=True, null=True)
     wallet_address = models.CharField(max_length=42, blank=True, null=True)
+    account_source = models.CharField(
+        max_length=20,
+        choices=ACCOUNT_SOURCE_CHOICES,
+        default='',
+        blank=True,
+        verbose_name="Nguồn tài khoản",
+    )
 
     is_verified = models.BooleanField(default=False)
     verification_token = models.CharField(max_length=255, blank=True, null=True)

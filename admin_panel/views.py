@@ -20,7 +20,8 @@ from django.db.models import Q, Sum
 from .models import (
     CampaignCategory, Organization, TargetProgram, Donation, Campaign,
     CampaignOccasion, DisbursementProposal, ProposalVote, CampaignDisbursement,
-    BankStatement, ActivityLog, DisbursementSignature,
+    BankStatement, ActivityLog, DisbursementSignature, UserProfile,
+    OrganizationRepresentative,
 )
 from .forms import DonationForm
 from django.contrib.admin.views.decorators import staff_member_required
@@ -48,12 +49,40 @@ WEI_IN_ETH = Decimal('1000000000000000000')
 # Ngưỡng coi chiến dịch đã giải ngân hết (để cho phép thu hồi gas 1 lần cuối)
 FULLY_DISBURSED_THRESHOLD_VND = Decimal('1000')
 
+def _approved_org_qs_for_user(user):
+    """
+    Trả queryset các Organization mà user là manager VÀ đã được duyệt KYC
+    (`is_verified=True` và `kyc_status='approved'`).
+
+    Tách thành helper riêng vì nhiều view dùng để:
+      • Quyết định role của user (admin / partner / user).
+      • Redirect sau login (admin panel vs client).
+      • Lọc dữ liệu thuộc về tổ chức của user (campaigns, proposals…).
+
+    QUAN TRỌNG (security): KHÔNG được dùng `user.managed_organizations.all()`
+    hay `Organization.objects.filter(manager=user)` không filter trạng thái —
+    user mới submit hồ sơ KYC (status='submitted', is_verified=False) cũng
+    sẽ là manager của Organization đó, nếu không filter approved thì họ sẽ
+    NGAY LẬP TỨC được quyền truy cập admin panel dù chưa được admin duyệt.
+    """
+    if not user or not user.is_authenticated:
+        return Organization.objects.none()
+    return Organization.objects.filter(
+        manager=user, is_verified=True, kyc_status='approved'
+    )
+
+
+def _user_has_approved_org(user):
+    """Shortcut boolean cho `_approved_org_qs_for_user(user).exists()`."""
+    return _approved_org_qs_for_user(user).exists()
+
+
 def _get_user_role(user):
     if not user or not user.is_authenticated:
         return 'user'
     if user.is_superuser:
         return 'admin'
-    if user.managed_organizations.exists() or Organization.objects.filter(manager=user).exists():
+    if _user_has_approved_org(user):
         return 'partner'
     return 'user'
 
@@ -259,7 +288,7 @@ def _can_manage_campaign_disbursement(user, campaign):
         return False
     if user.is_superuser:
         return True
-    my_org = user.managed_organizations.first()
+    my_org = _approved_org_qs_for_user(user).first()
     return bool(my_org and campaign.organization_id == my_org.id)
 
 
@@ -356,9 +385,9 @@ def trangchu(request):
         total_donations_amount = Donation.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
         total_pending_disbursements = DisbursementProposal.objects.filter(status='pending').count()
 
-    elif Organization.objects.filter(manager=user).exists():
+    elif _user_has_approved_org(user):
         role = 'partner'
-        my_org = user.managed_organizations.first()
+        my_org = _approved_org_qs_for_user(user).first()
         
         if my_org:
             total_campaigns = Campaign.objects.filter(organization=my_org).count()
@@ -387,7 +416,7 @@ def dangnhap(request):
         # để 3rd-party thấy ngay không gian làm việc của mình khi login.
         if _get_disbursement_approver_context(request.user).get('approver_role') == 'supervisor':
             return redirect('admin_panel:giamsat_giaingan')
-        if request.user.is_superuser or Organization.objects.filter(manager=request.user).exists():
+        if request.user.is_superuser or _user_has_approved_org(request.user):
             return redirect('admin_panel:trangchu')
         return redirect('client:trangchu')
 
@@ -413,7 +442,7 @@ def dangnhap(request):
             login(request, user)
             if _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
                 return redirect('admin_panel:giamsat_giaingan')
-            if user.is_superuser or Organization.objects.filter(manager=user).exists():
+            if user.is_superuser or _user_has_approved_org(user):
                 return redirect('admin_panel:trangchu')
             return redirect('client:trangchu')
 
@@ -461,6 +490,13 @@ def dangky(request):
         )
         user.first_name = fullname
         user.save()
+
+        # Đánh dấu nguồn tài khoản = web (đăng ký bằng form nội bộ).
+        # Field này quyết định ai được nộp form đăng ký tổ chức ở /to-chuc/.
+        UserProfile.objects.update_or_create(
+            user=user,
+            defaults={'account_source': 'web', 'display_name': fullname or username},
+        )
 
         messages.success(request, "Đăng ký thành công! Vui lòng đăng nhập")
         return redirect('admin_panel:dangnhap')
@@ -525,10 +561,18 @@ def google_callback(request):
         }
     )
 
+    # Tài khoản đến từ Google OAuth → đánh dấu để chặn ở form đăng ký tổ chức.
+    # Chỉ override nếu profile mới (created=True) HOẶC profile cũ chưa có
+    # account_source — không ghi đè nếu admin đã set='web' thủ công cho user nào đó.
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    if created or profile.account_source != 'web':
+        profile.account_source = 'google'
+        profile.save(update_fields=['account_source', 'updated_at'])
+
     login(request, user)
     messages.success(request, f'Chào mừng {user.get_full_name() or user.username}!')
 
-    if user.is_superuser or Organization.objects.filter(manager=user).exists():
+    if user.is_superuser or _user_has_approved_org(user):
         return redirect('admin_panel:trangchu')
     return redirect('client:trangchu')
 
@@ -665,6 +709,27 @@ def quanlytochuc(request):
                 'kyc_status', 'is_verified', 'verified_at', 'kyc_reviewed_at',
                 'kyc_reviewed_by', 'kyc_rejection_reason', 'updated_at',
             ])
+            # Khi admin duyệt KYC → user nộp hồ sơ (org.manager) tự động trở
+            # thành "tài khoản tổ chức" qua quan hệ Organization.manager.
+            # Ghi 2 ActivityLog: 1 cho admin (audit trail), 1 cho user gửi hồ sơ
+            # để user thấy thông báo trên dashboard cá nhân.
+            ActivityLog.objects.create(
+                user=request.user,
+                type='organization_kyc_approved',
+                description=(
+                    f'Admin {request.user.username} duyệt KYC tổ chức #{org.id} - {org.name}'
+                    + (f' (manager: {org.manager.username})' if org.manager else ' (chưa gắn manager)')
+                ),
+            )
+            if org.manager:
+                ActivityLog.objects.create(
+                    user=org.manager,
+                    type='account_promoted_to_organization',
+                    description=(
+                        f'Tài khoản {org.manager.username} đã được nâng quyền thành tài khoản tổ chức '
+                        f'"{org.name}" (KYC duyệt bởi admin {request.user.username}).'
+                    ),
+                )
             messages.success(request, f"Đã duyệt hồ sơ KYC của '{org.name}'.")
         elif action == 'reject':
             org.kyc_status = 'rejected'
@@ -676,6 +741,23 @@ def quanlytochuc(request):
                 'kyc_status', 'is_verified', 'kyc_reviewed_at',
                 'kyc_reviewed_by', 'kyc_rejection_reason', 'updated_at',
             ])
+            ActivityLog.objects.create(
+                user=request.user,
+                type='organization_kyc_rejected',
+                description=(
+                    f'Admin {request.user.username} từ chối KYC tổ chức #{org.id} - {org.name}. '
+                    f'Lý do: {org.kyc_rejection_reason or "(không nêu)"}'
+                ),
+            )
+            if org.manager:
+                ActivityLog.objects.create(
+                    user=org.manager,
+                    type='organization_kyc_rejected_notify',
+                    description=(
+                        f'Hồ sơ KYC tổ chức "{org.name}" đã bị từ chối. '
+                        f'Lý do: {org.kyc_rejection_reason or "(vui lòng liên hệ admin)"}'
+                    ),
+                )
             messages.warning(request, f"Đã từ chối hồ sơ KYC của '{org.name}'.")
         else:
             messages.error(request, "Thao tác hồ sơ KYC không hợp lệ.")
@@ -1056,9 +1138,9 @@ def quanlychiendich(request):
         campaigns = Campaign.objects.select_related('organization', 'target_program', 'category', 'occasion').all()
         programs = TargetProgram.objects.all()
         orgs = Organization.objects.all()
-    elif user.managed_organizations.exists():
+    elif _user_has_approved_org(user):
         role = 'partner'
-        my_org = user.managed_organizations.first()
+        my_org = _approved_org_qs_for_user(user).first()
         campaigns = Campaign.objects.select_related('organization', 'target_program', 'category', 'occasion').filter(organization=my_org)
         programs = TargetProgram.objects.filter(organization=my_org)
         orgs = [my_org]
@@ -1286,7 +1368,10 @@ def them_chiendich(request):
                 camp.organization_id = request.POST.get('org_id')
                 camp.status = 'active'
             else:
-                camp.organization = request.user.managed_organizations.first()
+                camp.organization = _approved_org_qs_for_user(request.user).first()
+                if camp.organization is None:
+                    messages.error(request, "Tài khoản của bạn chưa được liên kết với tổ chức đã duyệt KYC.")
+                    return redirect('admin_panel:quanlychiendich')
                 camp.status = 'pending'
 
             camp.creator = request.user
@@ -1343,7 +1428,7 @@ def sua_chiendich(request, pk):
             camp = get_object_or_404(Campaign, pk=pk)
             
             if not request.user.is_superuser:
-                my_org = request.user.managed_organizations.first()
+                my_org = _approved_org_qs_for_user(request.user).first()
                 if camp.organization != my_org:
                     messages.error(request, "Bạn không có quyền sửa chiến dịch này!")
                     return redirect('admin_panel:quanlychiendich')
@@ -1632,9 +1717,9 @@ def quanly_giaingan(request):
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
         ).prefetch_related('offchain_signatures').all()
         campaigns = Campaign.objects.none()
-    elif user.managed_organizations.exists():
+    elif _user_has_approved_org(user):
         role = 'partner'
-        my_org = user.managed_organizations.first()
+        my_org = _approved_org_qs_for_user(user).first()
         proposals_qs = DisbursementProposal.objects.select_related(
             'campaign', 'campaign__organization', 'created_by', 'approved_by'
         ).prefetch_related('offchain_signatures').filter(campaign__organization=my_org)
@@ -1771,7 +1856,7 @@ def quanly_giaingan(request):
     current_wallet = (approver_context.get('current_wallet') or '').lower()
     my_org_id = None
     if not user.is_superuser:
-        _my_org = user.managed_organizations.first() if user.is_authenticated else None
+        _my_org = _approved_org_qs_for_user(user).first() if user.is_authenticated else None
         my_org_id = _my_org.id if _my_org else None
 
     proposals_data = []
