@@ -434,6 +434,7 @@
                     <li class="nav-item"><a class="nav-link {% if '/gioithieu/' in request.path %}active{% endif %}" href="{% url 'client:gioithieu' %}">Giới thiệu</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/saoke/' in request.path %}active{% endif %}" href="{% url 'client:saoke' %}">Sao kê minh bạch</a></li>
                     <li class="nav-item"><a class="nav-link {% if '/biendong-sodu/' in request.path %}active{% endif %}" href="{% url 'client:biendong_sodu' %}">Biến động số dư</a></li>
+                    <li class="nav-item"><a class="nav-link {% if '/to-chuc' in request.path %}active{% endif %}" href="{% url 'client:tochuc_list' %}">Tổ chức từ thiện</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     {% if user.is_authenticated %}
@@ -529,6 +530,7 @@
                         <li><a href="{% url 'client:gioithieu' %}" class="text-white text-decoration-none hover-primary">Giới thiệu</a></li>
                         <li><a href="{% url 'client:saoke' %}" class="text-white text-decoration-none hover-primary">Sao kê</a></li>
                         <li><a href="{% url 'client:ban_do_thien_nguyen' %}" class="text-white text-decoration-none hover-primary">Bản đồ</a></li>
+                        <li><a href="{% url 'client:tochuc_list' %}" class="text-white text-decoration-none hover-primary">Tổ chức</a></li>
                     </ul>
                 </div>
                 <div class="col-md-4 offset-md-1">
@@ -608,6 +610,9 @@
             </a>
             <a href="{% url 'client:ban_do_thien_nguyen' %}" class="sidebar-link {% if '/map/' in request.path %}active{% endif %}">
                 <i class="fas fa-map-location-dot"></i> Bản đồ thiện nguyện
+            </a>
+            <a href="{% url 'client:tochuc_list' %}" class="sidebar-link {% if '/to-chuc' in request.path %}active{% endif %}">
+                <i class="fas fa-building-shield"></i> Tổ chức từ thiện
             </a>
 
             {% if user.is_authenticated %}

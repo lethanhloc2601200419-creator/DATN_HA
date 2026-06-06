@@ -3,8 +3,10 @@ from django.http import HttpResponseRedirect, JsonResponse
 from admin_panel.models import (
     UserProfile, Campaign, CampaignCategory, Donation, TargetProgram,
     BankStatement, ActivityLog,
-    DisbursementProposal, ProposalVote, Organization,
+    DisbursementProposal, ProposalVote, Organization, OrganizationRepresentative,
 )
+from admin_panel.forms import GuestOrganizationForm, GuestRepresentativeForm
+from django.utils.text import slugify
 from admin_panel.disbursement_utils import check_and_execute_proposal, estimate_gas_per_tx_vnd
 from django.contrib import messages
 from django.db.models import Sum, Count, F, Q
@@ -16,7 +18,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import F
 import hashlib
 import hmac
@@ -1934,15 +1936,81 @@ def api_confirm_donation(request):
 
 def tochuc_list(request):
     """
-    Trang danh sách các tổ chức đã được xác thực KYC và duyệt.
+    Trang tổ chức — gộp 2 chức năng:
+      1. Hiển thị danh sách các tổ chức đã được KYC + duyệt.
+      2. Cho phép Guest nộp hồ sơ đăng ký tổ chức mới (anchor #dangky-section).
+
+    GET  → render list + 2 form rỗng.
+    POST → validate 2 form + lưu Organization (kyc_status='submitted')
+           và OrganizationRepresentative trong transaction.atomic().
     """
+    org_form = GuestOrganizationForm()
+    rep_form = GuestRepresentativeForm()
+
+    if request.method == 'POST':
+        org_form = GuestOrganizationForm(request.POST, request.FILES)
+        rep_form = GuestRepresentativeForm(request.POST, request.FILES)
+
+        # Pre-check CCCD trùng để hiển thị field-level error
+        # thay vì IntegrityError 500 khi save.
+        if org_form.is_valid() and rep_form.is_valid():
+            id_card_no = rep_form.cleaned_data.get('id_card_number')
+            if id_card_no and OrganizationRepresentative.objects.filter(id_card_number=id_card_no).exists():
+                rep_form.add_error(
+                    'id_card_number',
+                    'Số CCCD/CMND này đã được đăng ký. Vui lòng kiểm tra lại.'
+                )
+
+        if org_form.is_valid() and rep_form.is_valid():
+            try:
+                with transaction.atomic():
+                    organization = org_form.save(commit=False)
+                    base_slug = slugify(organization.name) or 'to-chuc'
+                    candidate = base_slug
+                    suffix = 1
+                    while Organization.objects.filter(slug=candidate).exists():
+                        suffix += 1
+                        candidate = f"{base_slug}-{suffix}"
+                    organization.slug = candidate
+                    organization.kyc_status = 'submitted'
+                    organization.kyc_submitted_at = timezone.now()
+                    organization.is_verified = False
+                    organization.save()
+
+                    representative = rep_form.save(commit=False)
+                    representative.organization = organization
+                    representative.save()
+
+                    ActivityLog.objects.create(
+                        type='organization_kyc_submitted',
+                        description=(
+                            f'Guest nộp hồ sơ KYC tổ chức #{organization.id} - {organization.name} '
+                            f'(đại diện: {representative.full_name}).'
+                        ),
+                        ip_address=get_client_ip(request),
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
+                    )
+
+                messages.success(
+                    request,
+                    'Hồ sơ đăng ký tổ chức đã được gửi thành công. Quản trị viên sẽ đánh giá và liên hệ lại sớm nhất.'
+                )
+                return redirect('client:tochuc_list')
+            except IntegrityError:
+                rep_form.add_error(
+                    'id_card_number',
+                    'Số CCCD/CMND này vừa được đăng ký bởi hồ sơ khác. Vui lòng kiểm tra lại.'
+                )
+                messages.error(request, 'Hồ sơ đã có xung đột dữ liệu, vui lòng thử lại.')
+        else:
+            messages.error(request, 'Vui lòng kiểm tra lại các trường đã nhập.')
+
     organizations_list = Organization.objects.filter(
         is_verified=True, kyc_status='approved'
     ).order_by('name')
 
-    paginator = Paginator(organizations_list, 12)  # 12 tổ chức mỗi trang
+    paginator = Paginator(organizations_list, 12)
     page = request.GET.get('page')
-
     try:
         organizations = paginator.page(page)
     except PageNotAnInteger:
@@ -1950,10 +2018,33 @@ def tochuc_list(request):
     except EmptyPage:
         organizations = paginator.page(paginator.num_pages)
 
+    # Quick stats cho hero (số tổ chức đã verified, tổng số chiến dịch active...).
+    total_orgs = organizations_list.count()
+    total_active_campaigns = Campaign.objects.filter(
+        organization__in=organizations_list, status='active'
+    ).count()
+
     context = {
         'organizations': organizations,
+        'org_form': org_form,
+        'rep_form': rep_form,
+        'has_form_errors': request.method == 'POST',
+        'total_orgs': total_orgs,
+        'total_active_campaigns': total_active_campaigns,
     }
     return render(request, 'client/tochuc_list.html', context)
+
+def guest_register_organization(request):
+    """
+    LEGACY ROUTE: trước đây trang đăng ký tổ chức đứng riêng ở /dang-ky-to-chuc/.
+
+    Hiện tại form đã được mở vào trang /to-chuc/ (anchor #dangky-section)
+    để user thấy được các tổ chức đã đăng ký trước khi quyết định nộp hồ sơ.
+
+    Route cũ vẫn redirect 302 để tránh broken link từ bài viết / email đã gửi.
+    """
+    return redirect(reverse('client:tochuc_list') + '#dangky-section')
+
 
 def tochuc_detail(request, slug):
     """

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db.models import Sum
 from django.utils import timezone
-from .models import BankStatement, CampaignDisbursement, Campaign, Donation, Organization, CampaignDetail
+from .models import BankStatement, CampaignDisbursement, Campaign, Donation, Organization, OrganizationRepresentative, CampaignDetail
 
 
 @admin.action(description='Chuyển KYC sang đang thẩm định')
@@ -45,58 +45,76 @@ def verify_wallet_details(modeladmin, request, queryset):
     )
 
 
+class OrganizationRepresentativeInline(admin.StackedInline):
+    model = OrganizationRepresentative
+    can_delete = False
+    verbose_name_plural = 'Thông tin đại diện tổ chức'
+    fieldsets = (
+        (None, {
+            'fields': (
+                ('full_name', 'position'),
+                ('id_card_number', 'id_card_date', 'id_card_place'),
+                ('phone', 'email'),
+                'permanent_address',
+                ('id_card_front', 'id_card_back'),
+                'authorization_letter',
+            )
+        }),
+    )
+    readonly_fields = ('created_at', 'updated_at')
+
+
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'name', 'manager', 'kyc_status', 'bank_verified_by_admin',
-        'wallet_verified_by_admin', 'is_verified', 'verified_at', 'created_at',
+        'id', 'name', 'manager', 'kyc_status', 'is_verified', 'verified_at', 'created_at',
     )
     list_filter = (
-        'kyc_status', 'bank_verified_by_admin', 'wallet_verified_by_admin',
-        'is_verified', 'created_at',
+        'kyc_status', 'is_verified', 'bank_verified_by_admin', 'wallet_verified_by_admin',
+        'created_at',
     )
     search_fields = (
         'name', 'slug', 'manager__username', 'manager__email',
         'bank_account_number', 'bank_account_name', 'wallet_address',
+        'tax_id', 'operating_license_number', 'contact_person', 'contact_phone',
     )
     ordering = ('-created_at',)
+    inlines = [OrganizationRepresentativeInline]
     readonly_fields = (
         'slug', 'verified_at', 'kyc_submitted_at', 'kyc_reviewed_at', 'kyc_reviewed_by',
         'bank_verified_at', 'bank_verified_by', 'wallet_verified_at', 'wallet_verified_by',
         'created_at', 'updated_at',
     )
     fieldsets = (
-        ('Thông tin tổ chức', {
+        ('Thông tin cơ bản của Tổ chức', {
             'fields': (
-                'name', 'slug', 'description', 'logo_url', 'website', 'manager',
-                'contact_person', 'contact_phone',
+                'name', 'slug', 'description', 'logo', 'website', 'manager',
+                'mission_statement', 'headquarters_address', 'social_media_link',
             ),
         }),
-        ('Thông tin nhận tiền', {
+        ('Thông tin liên hệ & Pháp lý', {
+            'fields': (
+                ('contact_person', 'contact_phone'),
+                ('tax_id', 'operating_license_number', 'founding_date'),
+                'license_document_url',
+            ),
+        }),
+        ('Thông tin tài khoản nhận quỹ', {
             'fields': (
                 'bank_name', 'bank_branch', 'bank_account_number',
                 'bank_account_name', 'qr_code_url', 'wallet_address',
             ),
         }),
-        ('Kiểm soát KYC', {
+        ('Quản lý KYC & Xác minh', {
             'fields': (
-                'license_document_url', 'kyc_status', 'kyc_rejection_reason',
+                'kyc_status', 'kyc_rejection_reason',
                 'kyc_submitted_at', 'kyc_reviewed_at', 'kyc_reviewed_by',
                 'is_verified', 'verified_at',
-            ),
-        }),
-        ('Xác thực tài khoản nhận quỹ', {
-            'fields': (
                 'bank_verified_by_admin', 'bank_verified_at', 'bank_verified_by',
                 'wallet_verified_by_admin', 'wallet_verified_at', 'wallet_verified_by',
             ),
         }),
-        ('PayOS Credentials', {
-            'fields': (
-                'payos_client_id', 'payos_api_key', 'payos_checksum_key',
-            ),
-        }),
-        ('Dấu thời gian', {
+        ('Dấu thời gian hệ thống', {
             'fields': ('created_at', 'updated_at'),
         }),
     )

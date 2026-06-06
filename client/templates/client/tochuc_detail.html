@@ -2,125 +2,599 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Chi tiết Tổ chức - {{ organization.name }}{% endblock %}
+{% block title %}{{ organization.name }} - Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ===== HERO ===== */
+    .org-detail-hero {
+        background: linear-gradient(130deg, var(--primary-950) 0%, var(--primary-800) 100%);
+        color: var(--white);
+        padding: 4rem 0 5.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .org-detail-hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background-image:
+            radial-gradient(circle at 15% 30%, rgba(255,255,255,0.06) 0, transparent 40%),
+            radial-gradient(circle at 85% 70%, rgba(249,115,22,0.10) 0, transparent 40%);
+        pointer-events: none;
+    }
+    .org-detail-hero .breadcrumb-light {
+        color: rgba(255,255,255,0.7);
+        font-size: 13px;
+        margin-bottom: 1.5rem;
+        display: flex; align-items: center; gap: 8px;
+        flex-wrap: wrap;
+    }
+    .org-detail-hero .breadcrumb-light a {
+        color: rgba(255,255,255,0.7);
+        text-decoration: none;
+    }
+    .org-detail-hero .breadcrumb-light a:hover { color: var(--white); }
+    .org-detail-hero .breadcrumb-light i { font-size: 9px; opacity: 0.5; }
+
+    .org-hero-logo {
+        width: 120px; height: 120px;
+        border-radius: var(--radius-full);
+        object-fit: cover;
+        border: 4px solid rgba(255,255,255,0.2);
+        background: var(--white);
+        margin: 0 auto 1.25rem;
+        display: block;
+    }
+    .org-hero-logo-fallback {
+        width: 120px; height: 120px;
+        border-radius: var(--radius-full);
+        background: rgba(255,255,255,0.1);
+        border: 4px solid rgba(255,255,255,0.2);
+        color: var(--white);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 3rem;
+        margin: 0 auto 1.25rem;
+    }
+    .org-detail-hero h1 {
+        color: var(--white);
+        font-size: 2.25rem;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 0.75rem;
+    }
+    .org-detail-hero .org-tagline {
+        color: var(--primary-300);
+        text-align: center;
+        max-width: 720px;
+        margin: 0 auto 1.5rem;
+        font-size: 1rem;
+    }
+    .verified-badge-hero {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(22,163,74,0.15);
+        color: #4ade80;
+        border: 1px solid rgba(22,163,74,0.3);
+        padding: 5px 14px;
+        border-radius: var(--radius-full);
+        font-size: 12px; font-weight: 600;
+    }
+    .org-hero-actions {
+        display: flex; gap: 12px; justify-content: center;
+        margin-top: 1.5rem; flex-wrap: wrap;
+    }
+    .btn-hero-action {
+        background: rgba(255,255,255,0.1);
+        color: var(--white);
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: var(--radius-md);
+        padding: 10px 20px;
+        font-weight: 600; font-size: 14px;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        transition: 0.2s;
+    }
+    .btn-hero-action:hover {
+        background: rgba(255,255,255,0.2);
+        color: var(--white);
+        text-decoration: none;
+    }
+    .btn-hero-primary {
+        background: var(--accent-500);
+        border-color: var(--accent-500);
+    }
+    .btn-hero-primary:hover { background: var(--accent-400); border-color: var(--accent-400); }
+
+    /* ===== INFO CARDS ===== */
+    .info-section { margin-top: -2.5rem; position: relative; z-index: 2; }
+
+    .info-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--primary-100);
+        padding: 1.75rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .info-card-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 1rem;
+        display: flex; align-items: center; gap: 10px;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--primary-100);
+    }
+    .info-card-title i {
+        width: 36px; height: 36px;
+        background: var(--primary-100);
+        color: var(--primary-800);
+        border-radius: var(--radius-md);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 14px;
+    }
+
+    .info-list { list-style: none; padding: 0; margin: 0; }
+    .info-item {
+        display: flex; align-items: flex-start; gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px dashed var(--primary-100);
+        font-size: 14px;
+    }
+    .info-item:last-child { border-bottom: none; }
+    .info-item-icon {
+        width: 28px; height: 28px;
+        background: var(--primary-50);
+        color: var(--primary-700);
+        border-radius: var(--radius-sm);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+    .info-item-label {
+        font-weight: 600;
+        color: var(--neutral-700);
+        margin-right: 4px;
+    }
+    .info-item-value {
+        color: var(--neutral-900);
+        word-break: break-word;
+    }
+    .info-item-value a {
+        color: var(--primary-600);
+        font-weight: 600;
+    }
+    .info-item-value a:hover { color: var(--primary-800); }
+
+    /* ===== CAMPAIGN CARD ===== */
+    .campaign-mini {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--primary-100);
+        padding: 1rem;
+        display: flex; gap: 14px;
+        transition: 0.2s;
+    }
+    .campaign-mini:hover {
+        border-color: var(--primary-300);
+        box-shadow: 0 6px 20px rgba(30,58,138,0.12);
+        transform: translateY(-2px);
+    }
+    .campaign-mini-img {
+        width: 110px; height: 110px;
+        flex-shrink: 0;
+        border-radius: var(--radius-md);
+        object-fit: cover;
+        background: var(--primary-50);
+    }
+    .campaign-mini-img-fallback {
+        width: 110px; height: 110px;
+        flex-shrink: 0;
+        border-radius: var(--radius-md);
+        background: var(--primary-100);
+        color: var(--primary-800);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2rem;
+    }
+    .campaign-mini-body { flex-grow: 1; min-width: 0; }
+    .campaign-mini-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 4px;
+        line-height: 1.3;
+    }
+    .campaign-mini-title a { color: inherit; text-decoration: none; }
+    .campaign-mini-title a:hover { color: var(--primary-700); }
+    .campaign-mini-desc {
+        font-size: 12px;
+        color: var(--neutral-500);
+        line-height: 1.5;
+        margin-bottom: 8px;
+    }
+    .progress-label {
+        display: flex; justify-content: space-between;
+        font-size: 11px; margin-bottom: 4px;
+        color: var(--neutral-500);
+    }
+    .progress-label .raised { color: var(--primary-700); font-weight: 700; }
+    .progress-track {
+        height: 6px;
+        background: var(--primary-100);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+    .progress-fill {
+        height: 100%;
+        border-radius: var(--radius-full);
+        background: var(--primary-800);
+        transition: width 0.4s ease;
+    }
+    .btn-mini-detail {
+        font-size: 12px; font-weight: 600;
+        color: var(--primary-700);
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-mini-detail:hover { color: var(--primary-900); text-decoration: none; }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--primary-100);
+        padding: 1.5rem;
+        position: sticky;
+        top: 90px;
+    }
+    .sidebar-card-title {
+        font-size: 12px; font-weight: 700;
+        color: var(--primary-600);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 1rem;
+    }
+    .sidebar-link-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar-link-list li { margin-bottom: 6px; }
+    .sidebar-link-list a {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        color: var(--neutral-700);
+        font-size: 14px; font-weight: 500;
+        text-decoration: none;
+        transition: 0.15s;
+    }
+    .sidebar-link-list a:hover {
+        background: var(--primary-50);
+        color: var(--primary-800);
+        text-decoration: none;
+    }
+    .sidebar-link-list i {
+        width: 20px; text-align: center;
+        color: var(--primary-500);
+    }
+
+    .section-h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 1.25rem;
+        margin-top: 2rem;
+    }
+
+    .empty-campaigns {
+        text-align: center;
+        padding: 2rem;
+        color: var(--neutral-500);
+        background: var(--primary-50);
+        border-radius: var(--radius-lg);
+        border: 1px dashed var(--primary-200);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="hero">
-    <div class="container text-center">
+<!-- ===== HERO ===== -->
+<section class="org-detail-hero">
+    <div class="container position-relative" style="z-index: 1;">
+        <div class="breadcrumb-light">
+            <a href="{% url 'client:trangchu' %}">Trang chủ</a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="{% url 'client:tochuc_list' %}">Tổ chức</a>
+            <i class="fas fa-chevron-right"></i>
+            <span>{{ organization.name }}</span>
+        </div>
+
         {% if organization.logo %}
-            <img src="{{ organization.logo.url }}" class="rounded-circle mb-3" alt="{{ organization.name }}" style="width: 120px; height: 120px; object-fit: cover;">
+            <img src="{{ organization.logo.url }}" class="org-hero-logo" alt="{{ organization.name }}">
         {% else %}
-            <div class="rounded-circle mb-3 bg-primary-100 text-primary d-flex align-items-center justify-content-center mx-auto" style="width: 120px; height: 120px; font-size: 50px;">
+            <div class="org-hero-logo-fallback">
                 <i class="fas fa-building"></i>
             </div>
         {% endif %}
-        <h1 class="hero-h1 mb-2">{{ organization.name }}</h1>
-        <p class="hero-p mx-auto">{{ organization.description|safe }}</p>
-        {% if organization.website %}
-            <a href="{{ organization.website }}" target="_blank" class="btn btn-outline-light btn-sm mt-3">
-                <i class="fas fa-globe me-2"></i> Website
-            </a>
-        {% endif %}
-    </div>
-</div>
 
-<div class="container section">
-    <div class="row">
-        <div class="col-lg-8">
-            <h2 class="h3 fw-bold mb-4">Thông tin liên hệ & pháp lý</h2>
-            <div class="card p-4 mb-4">
-                <ul class="list-unstyled">
-                    {% if organization.contact_person %}
-                        <li class="mb-2"><i class="fas fa-user-tie me-2 text-primary"></i> <strong>Người liên hệ:</strong> {{ organization.contact_person }}</li>
-                    {% endif %}
-                    {% if organization.contact_phone %}
-                        <li class="mb-2"><i class="fas fa-phone me-2 text-primary"></i> <strong>Điện thoại:</strong> {{ organization.contact_phone }}</li>
-                    {% endif %}
-                    {% if organization.tax_id %}
-                        <li class="mb-2"><i class="fas fa-id-card me-2 text-primary"></i> <strong>Mã số thuế:</strong> {{ organization.tax_id }}</li>
-                    {% endif %}
-                    {% if organization.license_document_url %}
-                        <li class="mb-2"><i class="fas fa-file-alt me-2 text-primary"></i> <a href="{{ organization.license_document_url }}" target="_blank" class="text-primary fw-bold">Giấy phép hoạt động</a></li>
-                    {% endif %}
-                    {% if organization.is_verified %}
-                        <li class="mb-2"><i class="fas fa-check-circle me-2 text-success"></i> <strong class="text-success">Đã xác thực KYC</strong> ({{ organization.get_kyc_status_display }})</li>
-                    {% else %}
-                        <li class="mb-2"><i class="fas fa-hourglass-half me-2 text-warning"></i> <strong class="text-warning">Chưa xác thực KYC đầy đủ</strong> ({{ organization.get_kyc_status_display }})</li>
-                    {% endif %}
-                </ul>
-            </div>
-
-            <h2 class="h3 fw-bold mt-5 mb-4">Thông tin ngân hàng & Crypto</h2>
-            <div class="card p-4 mb-4">
-                <ul class="list-unstyled">
-                    <li class="mb-2"><i class="fas fa-university me-2 text-primary"></i> <strong>Tên ngân hàng:</strong> {{ organization.bank_name }}</li>
-                    <li class="mb-2"><i class="fas fa-credit-card me-2 text-primary"></i> <strong>Số tài khoản:</strong> {{ organization.bank_account_number }}</li>
-                    <li class="mb-2"><i class="fas fa-user-circle me-2 text-primary"></i> <strong>Chủ tài khoản:</strong> {{ organization.bank_account_name }}</li>
-                    {% if organization.bank_branch %}
-                        <li class="mb-2"><i class="fas fa-code-branch me-2 text-primary"></i> <strong>Chi nhánh:</strong> {{ organization.bank_branch }}</li>
-                    {% endif %}
-                    {% if organization.qr_code_url %}
-                        <li class="mb-2"><i class="fas fa-qrcode me-2 text-primary"></i> <a href="{{ organization.qr_code_url }}" target="_blank" class="text-primary fw-bold">Mã QR ngân hàng</a></li>
-                    {% endif %}
-                    {% if organization.wallet_address %}
-                        <li class="mb-2"><i class="fas fa-wallet me-2 text-primary"></i> <strong>Địa chỉ ví Crypto:</strong> <span class="text-break">{{ organization.wallet_address }}</span></li>
-                    {% endif %}
-                </ul>
-            </div>
-
-            {% if campaigns %}
-            <h2 class="h3 fw-bold mt-5 mb-4">Các chiến dịch đang hoạt động</h2>
-            <div class="row g-4">
-                {% for campaign in campaigns %}
-                <div class="col-md-6">
-                    <div class="card-charity d-flex">
-                        {% if campaign.avatar_image %}
-                            <img src="{{ campaign.avatar_image.url }}" alt="{{ campaign.title }}" class="flex-shrink-0 me-3 rounded" style="width: 100px; height: 100px; object-fit: cover;">
-                        {% else %}
-                            <div class="flex-shrink-0 me-3 rounded bg-light d-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
-                                <i class="fas fa-hand-holding-heart fa-2x text-primary"></i>
-                            </div>
-                        {% endif %}
-                        <div class="flex-grow-1">
-                            <h4 class="mb-1"><a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}" class="text-dark text-decoration-none">{{ campaign.title }}</a></h4>
-                            <p class="text-muted small mb-2">{{ campaign.short_description|truncatechars:100 }}</p>
-                            <div class="progress-label">
-                                <span class="text-primary-800">Đã gây quỹ: {{ campaign.current_amount|intcomma }} VNĐ</span>
-                                <span>Mục tiêu: {{ campaign.target_amount|intcomma }} VNĐ</span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill" style="width: {{ campaign.current_amount|div:campaign.target_amount|mul:100|floatformat:0 }}%;"></div>
-                            </div>
-                            <a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}" class="btn btn-sm btn-outline mt-3">
-                                Chi tiết <i class="fas fa-arrow-right ms-1"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="col-12">
-                <p class="lead text-muted">Tổ chức này hiện chưa có chiến dịch nào đang hoạt động.</p>
-            </div>
+        <div class="text-center">
+            {% if organization.is_verified %}
+                <span class="verified-badge-hero mb-3">
+                    <i class="fas fa-shield-halved"></i> Đã xác minh KYC
+                </span>
             {% endif %}
         </div>
 
-        <div class="col-lg-4">
-            <h2 class="h3 fw-bold mb-4">Liên kết nhanh</h2>
-            <div class="card p-4">
-                <ul class="list-unstyled mb-0">
-                    <li class="mb-2"><a href="{% url 'client:tochuc_list' %}" class="text-primary fw-bold"><i class="fas fa-list-alt me-2"></i> Danh sách các tổ chức</a></li>
-                    {% if organization.website %}
-                        <li class="mb-2"><a href="{{ organization.website }}" target="_blank" class="text-primary fw-bold"><i class="fas fa-globe me-2"></i> Website của tổ chức</a></li>
-                    {% endif %}
-                    {% if organization.contact_phone %}
-                        <li class="mb-2"><a href="tel:{{ organization.contact_phone }}" class="text-primary fw-bold"><i class="fas fa-headset me-2"></i> Liên hệ trực tiếp</a></li>
-                    {% endif %}
-                    <li class="mb-0"><a href="{% url 'client:trangchu' %}" class="text-primary fw-bold"><i class="fas fa-home me-2"></i> Quay về trang chủ</a></li>
-                </ul>
+        <h1>{{ organization.name }}</h1>
+        <p class="org-tagline">{{ organization.description|default:""|truncatechars:280 }}</p>
+
+        <div class="org-hero-actions">
+            {% if organization.website %}
+                <a href="{{ organization.website }}" target="_blank" rel="noopener" class="btn-hero-action">
+                    <i class="fas fa-globe"></i> Website chính thức
+                </a>
+            {% endif %}
+            {% if organization.contact_phone %}
+                <a href="tel:{{ organization.contact_phone }}" class="btn-hero-action">
+                    <i class="fas fa-phone"></i> {{ organization.contact_phone }}
+                </a>
+            {% endif %}
+            {% if campaigns %}
+                <a href="#campaigns" class="btn-hero-action btn-hero-primary">
+                    <i class="fas fa-hand-holding-heart"></i> Xem chiến dịch
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- ===== MAIN CONTENT ===== -->
+<section class="info-section">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Cột trái: thông tin chi tiết + chiến dịch -->
+            <div class="col-lg-8">
+                <!-- Thông tin pháp lý -->
+                <div class="info-card">
+                    <h3 class="info-card-title">
+                        <i class="fas fa-file-shield"></i> Thông tin pháp lý
+                    </h3>
+                    <ul class="info-list">
+                        {% if organization.contact_person %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-user-tie"></i></span>
+                                <div>
+                                    <span class="info-item-label">Người liên hệ:</span>
+                                    <span class="info-item-value">{{ organization.contact_person }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.tax_id %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-id-card"></i></span>
+                                <div>
+                                    <span class="info-item-label">Mã số thuế:</span>
+                                    <span class="info-item-value">{{ organization.tax_id }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.operating_license_number %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-certificate"></i></span>
+                                <div>
+                                    <span class="info-item-label">Số giấy phép hoạt động:</span>
+                                    <span class="info-item-value">{{ organization.operating_license_number }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.founding_date %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-calendar"></i></span>
+                                <div>
+                                    <span class="info-item-label">Ngày thành lập:</span>
+                                    <span class="info-item-value">{{ organization.founding_date|date:"d/m/Y" }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.headquarters_address %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-location-dot"></i></span>
+                                <div>
+                                    <span class="info-item-label">Trụ sở chính:</span>
+                                    <span class="info-item-value">{{ organization.headquarters_address }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.license_document_url %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-file-pdf"></i></span>
+                                <div>
+                                    <span class="info-item-label">Giấy phép:</span>
+                                    <span class="info-item-value">
+                                        <a href="{{ organization.license_document_url }}" target="_blank" rel="noopener">
+                                            Xem tài liệu <i class="fas fa-external-link-alt ms-1" style="font-size: 10px;"></i>
+                                        </a>
+                                    </span>
+                                </div>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+
+                <!-- Sứ mệnh -->
+                {% if organization.mission_statement %}
+                <div class="info-card">
+                    <h3 class="info-card-title">
+                        <i class="fas fa-flag"></i> Sứ mệnh
+                    </h3>
+                    <p style="color: var(--neutral-700); font-size: 14px; line-height: 1.7; margin: 0; white-space: pre-line;">{{ organization.mission_statement }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Tài khoản nhận quỹ -->
+                <div class="info-card">
+                    <h3 class="info-card-title">
+                        <i class="fas fa-vault"></i> Tài khoản nhận quỹ
+                    </h3>
+                    <ul class="info-list">
+                        {% if organization.bank_name %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-university"></i></span>
+                                <div>
+                                    <span class="info-item-label">Ngân hàng:</span>
+                                    <span class="info-item-value">{{ organization.bank_name }}{% if organization.bank_branch %} — CN {{ organization.bank_branch }}{% endif %}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.bank_account_number %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-credit-card"></i></span>
+                                <div>
+                                    <span class="info-item-label">Số tài khoản:</span>
+                                    <span class="info-item-value">{{ organization.bank_account_number }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.bank_account_name %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-user-circle"></i></span>
+                                <div>
+                                    <span class="info-item-label">Chủ tài khoản:</span>
+                                    <span class="info-item-value">{{ organization.bank_account_name }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.qr_code_url %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-qrcode"></i></span>
+                                <div>
+                                    <span class="info-item-label">QR code:</span>
+                                    <span class="info-item-value">
+                                        <a href="{{ organization.qr_code_url }}" target="_blank" rel="noopener">
+                                            Xem mã QR <i class="fas fa-external-link-alt ms-1" style="font-size: 10px;"></i>
+                                        </a>
+                                    </span>
+                                </div>
+                            </li>
+                        {% endif %}
+                        {% if organization.wallet_address %}
+                            <li class="info-item">
+                                <span class="info-item-icon"><i class="fas fa-wallet"></i></span>
+                                <div>
+                                    <span class="info-item-label">Ví crypto:</span>
+                                    <span class="info-item-value" style="font-family: monospace; font-size: 12px;">{{ organization.wallet_address }}</span>
+                                </div>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+
+                <!-- Chiến dịch đang chạy -->
+                <h2 class="section-h2" id="campaigns">
+                    <i class="fas fa-hand-holding-heart text-primary me-2" style="color: var(--primary-800);"></i>
+                    Các chiến dịch đang hoạt động
+                </h2>
+
+                {% if campaigns %}
+                    <div class="row g-3">
+                        {% for campaign in campaigns %}
+                        <div class="col-md-6">
+                            <div class="campaign-mini">
+                                {% if campaign.avatar_image_url %}
+                                    <img src="{{ campaign.avatar_image_url }}" alt="{{ campaign.title }}" class="campaign-mini-img">
+                                {% elif campaign.cover_image_url %}
+                                    <img src="{{ campaign.cover_image_url }}" alt="{{ campaign.title }}" class="campaign-mini-img">
+                                {% else %}
+                                    <div class="campaign-mini-img-fallback">
+                                        <i class="fas fa-hand-holding-heart"></i>
+                                    </div>
+                                {% endif %}
+                                <div class="campaign-mini-body">
+                                    <div class="campaign-mini-title">
+                                        <a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}">{{ campaign.title }}</a>
+                                    </div>
+                                    <div class="campaign-mini-desc">{{ campaign.short_description|default:""|truncatechars:80 }}</div>
+
+                                    {% if campaign.target_amount %}
+                                    <div class="progress-label">
+                                        <span class="raised">{{ campaign.current_amount|intcomma }} đ</span>
+                                        <span>/ {{ campaign.target_amount|intcomma }} đ</span>
+                                    </div>
+                                    <div class="progress-track">
+                                        {# Django widthratio để tính % an toàn (không cần custom filter) #}
+                                        <div class="progress-fill" style="width: {% widthratio campaign.current_amount campaign.target_amount 100 %}%;"></div>
+                                    </div>
+                                    {% endif %}
+
+                                    <a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}" class="btn-mini-detail">
+                                        Chi tiết <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-campaigns">
+                        <i class="fas fa-inbox" style="font-size: 2rem; color: var(--primary-300); margin-bottom: 0.5rem;"></i>
+                        <p class="m-0">Tổ chức này hiện chưa có chiến dịch nào đang hoạt động.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Cột phải: sidebar liên kết nhanh -->
+            <div class="col-lg-4">
+                <div class="sidebar-card">
+                    <p class="sidebar-card-title">Liên kết nhanh</p>
+                    <ul class="sidebar-link-list">
+                        <li>
+                            <a href="{% url 'client:tochuc_list' %}">
+                                <i class="fas fa-list"></i> Danh sách tổ chức
+                            </a>
+                        </li>
+                        {% if organization.website %}
+                        <li>
+                            <a href="{{ organization.website }}" target="_blank" rel="noopener">
+                                <i class="fas fa-globe"></i> Website tổ chức
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if organization.social_media_link %}
+                        <li>
+                            <a href="{{ organization.social_media_link }}" target="_blank" rel="noopener">
+                                <i class="fas fa-share-nodes"></i> Mạng xã hội
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if organization.contact_phone %}
+                        <li>
+                            <a href="tel:{{ organization.contact_phone }}">
+                                <i class="fas fa-headset"></i> Liên hệ trực tiếp
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li>
+                            <a href="{% url 'client:trangchu' %}">
+                                <i class="fas fa-home"></i> Trang chủ
+                            </a>
+                        </li>
+                    </ul>
+
+                    <hr style="border-color: var(--primary-100); margin: 1.25rem 0;">
+
+                    <p class="sidebar-card-title">Trạng thái</p>
+                    <div style="background: var(--success-100); color: var(--success-600); padding: 12px 14px; border-radius: var(--radius-md); border-left: 3px solid var(--success-600); font-size: 13px;">
+                        <i class="fas fa-shield-halved me-1"></i>
+                        <strong>Đã xác minh KYC</strong>
+                        <div style="font-size: 12px; color: var(--neutral-700); margin-top: 4px;">
+                            Tổ chức được Quỹ Nhân Ái thẩm định và xác thực thông tin pháp lý.
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
+
+<div class="py-4"></div>
 {% endblock %}

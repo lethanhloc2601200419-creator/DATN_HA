@@ -2,65 +2,713 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Danh sách Tổ chức - Quỹ Nhân Ái{% endblock %}
+{% block title %}Tổ chức Từ thiện - Quỹ Nhân Ái{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ==== HERO (theo design system §11) ==== */
+    .org-hero {
+        background: linear-gradient(130deg, var(--primary-950) 0%, var(--primary-800) 100%);
+        color: var(--white);
+        padding: 4.5rem 0 5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .org-hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background-image:
+            radial-gradient(circle at 15% 30%, rgba(255,255,255,0.06) 0, transparent 40%),
+            radial-gradient(circle at 85% 70%, rgba(249,115,22,0.10) 0, transparent 40%);
+        pointer-events: none;
+    }
+    .org-hero .eyebrow { color: var(--primary-300); }
+    .org-hero h1 {
+        color: var(--white);
+        font-size: 2.4rem;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 0.75rem;
+    }
+    .org-hero p {
+        color: var(--primary-300);
+        font-size: 1rem;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .org-hero-actions {
+        display: flex; gap: 12px; margin-top: 1.75rem; flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Stat chips trong hero */
+    .org-hero-stats {
+        display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+        margin-top: 2.5rem;
+    }
+    .stat-chip {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        backdrop-filter: blur(8px);
+        border-radius: var(--radius-md);
+        padding: 14px 22px;
+        min-width: 160px;
+        text-align: left;
+    }
+    .stat-chip .num {
+        font-size: 1.6rem; font-weight: 800; color: var(--white);
+        line-height: 1;
+    }
+    .stat-chip .lbl {
+        font-size: 11px; color: var(--primary-300); text-transform: uppercase;
+        letter-spacing: 0.08em; margin-top: 4px;
+    }
+
+    /* ==== ORG CARD GRID ==== */
+    .org-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+    .org-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 1.75rem 1.5rem;
+        text-align: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+        display: flex; flex-direction: column;
+        border: 1px solid transparent;
+    }
+    .org-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(30,58,138,0.14);
+        border-color: var(--primary-200);
+    }
+    .org-logo {
+        width: 84px; height: 84px;
+        border-radius: var(--radius-full);
+        margin: 0 auto 1rem;
+        object-fit: cover;
+        border: 3px solid var(--primary-100);
+        background: var(--primary-50);
+    }
+    .org-logo-fallback {
+        width: 84px; height: 84px;
+        border-radius: var(--radius-full);
+        margin: 0 auto 1rem;
+        background: var(--primary-100);
+        color: var(--primary-800);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2rem;
+    }
+    .org-name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 0.5rem;
+    }
+    .org-desc {
+        font-size: 13px;
+        color: var(--neutral-500);
+        line-height: 1.55;
+        flex-grow: 1;
+        margin-bottom: 1rem;
+    }
+    .org-badge-verified {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: var(--success-100);
+        color: var(--success-600);
+        font-size: 11px; font-weight: 600;
+        padding: 3px 10px;
+        border-radius: var(--radius-full);
+        margin-bottom: 0.75rem;
+    }
+    .btn-detail {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: transparent;
+        color: var(--primary-800);
+        border: 1.5px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 13px; font-weight: 600;
+        text-decoration: none;
+        transition: 0.2s;
+        align-self: center;
+    }
+    .btn-detail:hover {
+        background: var(--primary-50);
+        border-color: var(--primary-800);
+        color: var(--primary-800);
+        text-decoration: none;
+    }
+
+    /* ==== EMPTY STATE ==== */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 1rem;
+        color: var(--neutral-500);
+    }
+    .empty-state i {
+        font-size: 3rem; color: var(--primary-200);
+        margin-bottom: 1rem;
+    }
+
+    /* ==== SECTION TITLE ==== */
+    .section-title {
+        margin-bottom: 2rem;
+    }
+    .section-title .eyebrow {
+        font-size: 11px; font-weight: 600;
+        color: var(--primary-600);
+        letter-spacing: 0.1em; text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+    .section-title h2 {
+        font-size: 1.75rem; font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 0.5rem;
+    }
+    .section-title p {
+        color: var(--neutral-500);
+        font-size: 14px;
+        max-width: 640px;
+    }
+
+    /* ==== PAGINATION ==== */
+    .pagination .page-link {
+        color: var(--primary-700);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        margin: 0 3px;
+        font-size: 13px; font-weight: 600;
+    }
+    .pagination .page-item.active .page-link {
+        background: var(--primary-800);
+        border-color: var(--primary-800);
+        color: var(--white);
+    }
+    .pagination .page-link:hover {
+        background: var(--primary-50);
+        color: var(--primary-800);
+    }
+
+    /* ==== REGISTRATION SECTION ==== */
+    .reg-section-wrap {
+        background: var(--primary-50);
+        padding: 4rem 0;
+    }
+    .reg-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--primary-100);
+        overflow: hidden;
+    }
+    .reg-card-head {
+        background: linear-gradient(135deg, var(--primary-800) 0%, var(--primary-900) 100%);
+        color: var(--white);
+        padding: 28px 36px;
+    }
+    .reg-card-head h2 {
+        color: var(--white);
+        font-size: 1.5rem; font-weight: 700;
+        margin: 0 0 6px;
+    }
+    .reg-card-head p { color: var(--primary-300); margin: 0; font-size: 14px; }
+    .reg-section {
+        padding: 28px 36px;
+        border-bottom: 1px solid var(--primary-100);
+    }
+    .reg-section:last-of-type { border-bottom: none; }
+    .reg-section h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-900);
+        margin-bottom: 4px;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .reg-section h3 i {
+        width: 32px; height: 32px;
+        background: var(--primary-100);
+        color: var(--primary-800);
+        border-radius: var(--radius-md);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 13px;
+    }
+    .reg-section .section-desc {
+        color: var(--neutral-500);
+        font-size: 13px;
+        margin-bottom: 22px;
+        margin-left: 42px;
+    }
+
+    .form-label-cust {
+        font-size: 12px; font-weight: 700;
+        color: var(--neutral-700);
+        text-transform: uppercase; letter-spacing: 0.05em;
+        margin-bottom: 6px;
+        display: block;
+    }
+    .form-label-cust .req { color: var(--danger-600); }
+    .reg-card .form-control,
+    .reg-card .form-select {
+        border: 1.5px solid var(--primary-100);
+        background: var(--neutral-100);
+        border-radius: var(--radius-md);
+        padding: 10px 14px;
+        font-size: 14px;
+        transition: 0.2s;
+        width: 100%;
+    }
+    .reg-card .form-control:focus,
+    .reg-card .form-select:focus {
+        background: var(--white);
+        border-color: var(--primary-600);
+        box-shadow: 0 0 0 3px var(--primary-100);
+    }
+    .field-error {
+        color: var(--danger-600);
+        font-size: 12px; font-weight: 600;
+        margin-top: 4px;
+    }
+    .help-hint {
+        color: var(--neutral-500);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    .non-field-errors {
+        background: var(--danger-100);
+        color: var(--danger-600);
+        border-left: 4px solid var(--danger-600);
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        font-size: 13px; font-weight: 600;
+        margin-bottom: 16px;
+    }
+    .submit-bar {
+        padding: 24px 36px;
+        background: var(--primary-50);
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; flex-wrap: wrap;
+    }
+    .submit-bar .note {
+        color: var(--neutral-700);
+        font-size: 13px;
+        max-width: 520px;
+    }
+    .btn-submit-reg {
+        background: var(--primary-800);
+        color: var(--white);
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 12px 28px;
+        font-weight: 700; font-size: 14px;
+        box-shadow: var(--shadow-btn);
+        transition: 0.2s;
+    }
+    .btn-submit-reg:hover {
+        background: var(--primary-700);
+        transform: translateY(-1px);
+        color: var(--white);
+    }
+    .btn-cta-register {
+        background: var(--accent-500);
+        color: var(--white);
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 11px 24px;
+        font-weight: 700; font-size: 14px;
+        box-shadow: 0 2px 8px rgba(249,115,22,0.35);
+        transition: 0.2s;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-cta-register:hover {
+        background: var(--accent-400);
+        color: var(--white);
+        transform: translateY(-1px);
+        text-decoration: none;
+    }
+    .btn-ghost-light {
+        background: rgba(255,255,255,0.1);
+        color: var(--white);
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: var(--radius-md);
+        padding: 11px 24px;
+        font-weight: 600; font-size: 14px;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        transition: 0.2s;
+    }
+    .btn-ghost-light:hover {
+        background: rgba(255,255,255,0.18);
+        color: var(--white);
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="hero">
-    <div class="container text-center">
-        <h1 class="hero-h1 mb-3">Các Tổ chức Từ thiện</h1>
-        <p class="hero-p mx-auto">
-            Khám phá các tổ chức đã được xác minh trên nền tảng của chúng tôi.
-            Mỗi tổ chức đều đã trải qua quy trình KYC nghiêm ngặt để đảm bảo tính minh bạch và uy tín.
+<!-- ===== HERO ===== -->
+<section class="org-hero">
+    <div class="container text-center position-relative" style="z-index: 1;">
+        <p class="eyebrow mb-2">Đối tác minh bạch</p>
+        <h1>Các Tổ chức Từ thiện</h1>
+        <p>
+            Khám phá các tổ chức đã được xác minh KYC trên nền tảng Quỹ Nhân Ái.
+            Mỗi tổ chức đều trải qua quy trình thẩm định nghiêm ngặt để đảm bảo tính minh bạch và uy tín.
         </p>
-    </div>
-</div>
 
-<div class="container section">
-    <div class="row g-4 justify-content-center">
-        {% if organizations %}
+        <div class="org-hero-actions">
+            <a href="#dangky-section" class="btn-cta-register">
+                <i class="fas fa-handshake-angle"></i>
+                Đăng ký tổ chức của bạn
+            </a>
+            <a href="#danhsach" class="btn-ghost-light">
+                <i class="fas fa-list"></i>
+                Xem danh sách
+            </a>
+        </div>
+
+        <div class="org-hero-stats">
+            <div class="stat-chip">
+                <div class="num">{{ total_orgs|default:0 }}</div>
+                <div class="lbl">Tổ chức đã xác minh</div>
+            </div>
+            <div class="stat-chip">
+                <div class="num">{{ total_active_campaigns|default:0 }}</div>
+                <div class="lbl">Chiến dịch đang chạy</div>
+            </div>
+            <div class="stat-chip">
+                <div class="num"><i class="fas fa-shield-halved"></i></div>
+                <div class="lbl">Bảo mật Blockchain</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== DANH SÁCH TỔ CHỨC ===== -->
+<section class="container py-5" id="danhsach">
+    <div class="section-title text-center">
+        <p class="eyebrow">Danh sách</p>
+        <h2>Các tổ chức đã xác minh</h2>
+        <p class="mx-auto">Click vào từng tổ chức để xem hồ sơ chi tiết, thông tin pháp lý và các chiến dịch đang gây quỹ.</p>
+    </div>
+
+    {% if organizations %}
+        <div class="org-grid">
             {% for org in organizations %}
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="card h-100 p-4 d-flex flex-column align-items-center text-center">
-                    {% if org.logo %}
-                        <img src="{{ org.logo.url }}" class="rounded-circle mb-3" alt="{{ org.name }}" style="width: 80px; height: 80px; object-fit: cover;">
+            <div class="org-card">
+                {% if org.logo %}
+                    <img src="{{ org.logo.url }}" class="org-logo" alt="{{ org.name }}">
+                {% else %}
+                    <div class="org-logo-fallback">
+                        <i class="fas fa-building"></i>
+                    </div>
+                {% endif %}
+
+                <span class="org-badge-verified">
+                    <i class="fas fa-circle-check"></i> Đã xác minh KYC
+                </span>
+
+                <h3 class="org-name">{{ org.name }}</h3>
+                <p class="org-desc">{{ org.description|default:"Chưa có mô tả."|truncatechars:140 }}</p>
+
+                <a href="{% url 'client:tochuc_detail' slug=org.slug %}" class="btn-detail">
+                    Xem chi tiết <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if organizations.has_other_pages %}
+        <nav aria-label="Phân trang" class="mt-5">
+            <ul class="pagination justify-content-center">
+                {% if organizations.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ organizations.previous_page_number }}#danhsach">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                {% for i in organizations.paginator.page_range %}
+                    {% if organizations.number == i %}
+                        <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                     {% else %}
-                        <div class="rounded-circle mb-3 bg-primary-100 text-primary d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 30px;">
-                            <i class="fas fa-building"></i>
-                        </div>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ i }}#danhsach">{{ i }}</a>
+                        </li>
                     {% endif %}
-                    <h3 class="h5 fw-bold text-primary-800 mt-2">{{ org.name }}</h3>
-                    <p class="text-neutral-700 small flex-grow-1">{{ org.description|truncatechars:150 }}</p>
-                    <a href="{% url 'client:tochuc_detail' slug=org.slug %}" class="btn btn-outline btn-sm mt-3">
-                        Xem chi tiết <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
+                {% endfor %}
+                {% if organizations.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ organizations.next_page_number }}#danhsach">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-building-circle-exclamation"></i>
+            <h3 style="color: var(--neutral-700); font-size: 1.25rem;">Chưa có tổ chức nào</h3>
+            <p>Hãy là tổ chức đầu tiên đăng ký với Quỹ Nhân Ái!</p>
+            <a href="#dangky-section" class="btn-cta-register mt-2">
+                <i class="fas fa-handshake-angle"></i> Đăng ký ngay
+            </a>
+        </div>
+    {% endif %}
+</section>
+
+<!-- ===== ĐĂNG KÝ TỔ CHỨC ===== -->
+<section class="reg-section-wrap" id="dangky-section">
+    <div class="container">
+        <div class="section-title text-center">
+            <p class="eyebrow">KYC</p>
+            <h2>Đăng ký Tổ chức Từ thiện</h2>
+            <p class="mx-auto">
+                Trở thành đối tác chính thức của Quỹ Nhân Ái. Vui lòng cung cấp thông tin tổ chức
+                và người đại diện. Quản trị viên sẽ thẩm định KYC trong vòng 3-5 ngày làm việc.
+            </p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+
+            <div class="reg-card">
+                <div class="reg-card-head">
+                    <h2><i class="fas fa-handshake-angle me-2"></i>Hồ sơ đăng ký KYC</h2>
+                    <p>Tất cả các trường có dấu <span style="color: var(--accent-500);">*</span> là bắt buộc.</p>
+                </div>
+
+                {% if has_form_errors and org_form.non_field_errors or rep_form.non_field_errors %}
+                <div class="reg-section" style="padding-top: 20px; padding-bottom: 0;">
+                    {% for err in org_form.non_field_errors %}
+                        <div class="non-field-errors"><i class="fas fa-circle-exclamation me-2"></i>{{ err }}</div>
+                    {% endfor %}
+                    {% for err in rep_form.non_field_errors %}
+                        <div class="non-field-errors"><i class="fas fa-circle-exclamation me-2"></i>{{ err }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {# === SECTION 1: THÔNG TIN TỔ CHỨC === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-building"></i> Thông tin tổ chức</h3>
+                    <p class="section-desc">Tên gọi, mô tả, sứ mệnh và logo của tổ chức.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label-cust">{{ org_form.name.label }} <span class="req">*</span></label>
+                            {{ org_form.name }}
+                            {% for err in org_form.name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Logo tổ chức</label>
+                            {{ org_form.logo }}
+                            <div class="help-hint">PNG/JPG, tối đa 2MB.</div>
+                            {% for err in org_form.logo.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Mô tả ngắn</label>
+                            {{ org_form.description }}
+                            {% for err in org_form.description.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Tuyên bố sứ mệnh</label>
+                            {{ org_form.mission_statement }}
+                            {% for err in org_form.mission_statement.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Website</label>
+                            {{ org_form.website }}
+                            {% for err in org_form.website.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Mạng xã hội</label>
+                            {{ org_form.social_media_link }}
+                            {% for err in org_form.social_media_link.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 2: PHÁP LÝ === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-file-shield"></i> Hồ sơ pháp lý</h3>
+                    <p class="section-desc">Giấy phép hoạt động, mã số thuế và địa chỉ trụ sở.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số giấy phép hoạt động</label>
+                            {{ org_form.operating_license_number }}
+                            {% for err in org_form.operating_license_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-cust">Ngày thành lập</label>
+                            {{ org_form.founding_date }}
+                            {% for err in org_form.founding_date.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-cust">Mã số thuế</label>
+                            {{ org_form.tax_id }}
+                            {% for err in org_form.tax_id.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Link giấy phép (PDF/Ảnh)</label>
+                            {{ org_form.license_document_url }}
+                            <div class="help-hint">Upload lên Google Drive / Dropbox công khai rồi dán link vào đây.</div>
+                            {% for err in org_form.license_document_url.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Địa chỉ trụ sở chính</label>
+                            {{ org_form.headquarters_address }}
+                            {% for err in org_form.headquarters_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 3: TÀI KHOẢN NHẬN QUỸ === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-vault"></i> Tài khoản nhận quỹ</h3>
+                    <p class="section-desc">Thông tin ngân hàng và ví crypto sẽ được dùng làm vault nhận tiền donate.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Tên ngân hàng <span class="req">*</span></label>
+                            {{ org_form.bank_name }}
+                            {% for err in org_form.bank_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chi nhánh</label>
+                            {{ org_form.bank_branch }}
+                            {% for err in org_form.bank_branch.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số tài khoản <span class="req">*</span></label>
+                            {{ org_form.bank_account_number }}
+                            {% for err in org_form.bank_account_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chủ tài khoản <span class="req">*</span></label>
+                            {{ org_form.bank_account_name }}
+                            {% for err in org_form.bank_account_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Link QR code</label>
+                            {{ org_form.qr_code_url }}
+                            {% for err in org_form.qr_code_url.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ví crypto (multisig vault)</label>
+                            {{ org_form.wallet_address }}
+                            <div class="help-hint">Địa chỉ ETH dùng làm vault. Có thể bổ sung sau khi KYC duyệt.</div>
+                            {% for err in org_form.wallet_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# === SECTION 4: NGƯỜI ĐẠI DIỆN === #}
+                <div class="reg-section">
+                    <h3><i class="fas fa-user-tie"></i> Người đại diện pháp luật</h3>
+                    <p class="section-desc">Cá nhân đứng tên ký kết và chịu trách nhiệm với cơ quan chức năng.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Họ và tên <span class="req">*</span></label>
+                            {{ rep_form.full_name }}
+                            {% for err in rep_form.full_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Chức vụ <span class="req">*</span></label>
+                            {{ rep_form.position }}
+                            {% for err in rep_form.position.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Số CCCD/CMND <span class="req">*</span></label>
+                            {{ rep_form.id_card_number }}
+                            {% for err in rep_form.id_card_number.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Ngày cấp <span class="req">*</span></label>
+                            {{ rep_form.id_card_date }}
+                            {% for err in rep_form.id_card_date.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label-cust">Nơi cấp <span class="req">*</span></label>
+                            {{ rep_form.id_card_place }}
+                            {% for err in rep_form.id_card_place.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Số điện thoại <span class="req">*</span></label>
+                            {{ rep_form.phone }}
+                            {% for err in rep_form.phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Email <span class="req">*</span></label>
+                            {{ rep_form.email }}
+                            {% for err in rep_form.email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Địa chỉ thường trú <span class="req">*</span></label>
+                            {{ rep_form.permanent_address }}
+                            {% for err in rep_form.permanent_address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ảnh mặt trước CCCD <span class="req">*</span></label>
+                            {{ rep_form.id_card_front }}
+                            {% for err in rep_form.id_card_front.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Ảnh mặt sau CCCD <span class="req">*</span></label>
+                            {{ rep_form.id_card_back }}
+                            {% for err in rep_form.id_card_back.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label-cust">Giấy ủy quyền (nếu có)</label>
+                            {{ rep_form.authorization_letter }}
+                            <div class="help-hint">Bắt buộc nếu người ký không phải Chủ tịch / Giám đốc tổ chức.</div>
+                            {% for err in rep_form.authorization_letter.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label-cust">Người liên hệ tổ chức</label>
+                            {{ org_form.contact_person }}
+                            {% for err in org_form.contact_person.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label-cust">SĐT liên hệ tổ chức</label>
+                            {{ org_form.contact_phone }}
+                            {% for err in org_form.contact_phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="submit-bar">
+                    <div class="note">
+                        <i class="fas fa-shield-halved text-success me-1"></i>
+                        Bằng việc gửi hồ sơ, bạn xác nhận thông tin cung cấp là đúng sự thật và đồng ý cho Quỹ Nhân Ái thẩm định KYC theo quy định.
+                    </div>
+                    <button type="submit" class="btn-submit-reg">
+                        <i class="fas fa-paper-plane me-1"></i> Gửi hồ sơ KYC
+                    </button>
                 </div>
             </div>
-            {% endfor %}
-        {% else %}
-            <div class="col-12 text-center">
-                <p class="lead text-muted">Chưa có tổ chức nào được tìm thấy.</p>
-            </div>
-        {% endif %}
+        </form>
     </div>
+</section>
 
-    {% if organizations.has_other_pages %}
-    <nav aria-label="Page navigation" class="mt-5">
-        <ul class="pagination justify-content-center">
-            {% if organizations.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ organizations.previous_page_number }}">Trước</a></li>
-            {% endif %}
-            {% for i in organizations.paginator.page_range %}
-                {% if organizations.number == i %}
-                    <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
-                {% else %}
-                    <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
-                {% endif %}
-            {% endfor %}
-            {% if organizations.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ organizations.next_page_number }}">Sau</a></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
-</div>
+{# Auto-scroll to form section if there were validation errors #}
+{% if has_form_errors %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var section = document.getElementById('dangky-section');
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

@@ -110,6 +110,8 @@ class Organization(models.Model):
     tax_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="Mã số thuế")
 
     # Thông tin pháp lý & Xác minh (Admin duyệt)
+    operating_license_number = models.CharField(max_length=255, blank=True, null=True, verbose_name="Số giấy phép hoạt động")
+    founding_date = models.DateField(blank=True, null=True, verbose_name="Ngày thành lập")
     license_document_url = models.TextField(blank=True, null=True) # Ảnh giấy phép
     # Cờ tương thích với code cũ; Phase 2 sẽ dần chuyển toàn bộ logic sang kyc_status.
     is_verified = models.BooleanField(default=False, verbose_name="Đã xác thực")
@@ -155,11 +157,9 @@ class Organization(models.Model):
     # Liên hệ
     contact_person = models.CharField(max_length=255, blank=True, null=True)
     contact_phone = models.CharField(max_length=20, blank=True, null=True)
-
-    # PayOS Credentials for manual payouts
-    payos_client_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS Client ID")
-    payos_api_key = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS API Key")
-    payos_checksum_key = models.CharField(max_length=255, blank=True, null=True, verbose_name="PayOS Checksum Key")
+    mission_statement = models.TextField(blank=True, null=True, verbose_name="Tuyên bố sứ mệnh")
+    headquarters_address = models.TextField(blank=True, null=True, verbose_name="Địa chỉ trụ sở chính")
+    social_media_link = models.URLField(blank=True, null=True, verbose_name="Link mạng xã hội")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -169,6 +169,37 @@ class Organization(models.Model):
 
     class Meta:
         db_table = 'organization'
+
+# =====================================================
+# 1.1 ORGANIZATION REPRESENTATIVE (ĐẠI DIỆN TỔ CHỨC)
+# =====================================================
+class OrganizationRepresentative(models.Model):
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='representative')
+    full_name = models.CharField(max_length=255, verbose_name="Họ và tên")
+    position = models.CharField(max_length=255, verbose_name="Chức vụ")
+    id_card_number = models.CharField(max_length=50, unique=True, verbose_name="Số CCCD/CMND")
+    id_card_date = models.DateField(verbose_name="Ngày cấp CCCD/CMND")
+    id_card_place = models.CharField(max_length=255, verbose_name="Nơi cấp CCCD/CMND")
+    phone = models.CharField(max_length=20, verbose_name="Số điện thoại")
+    email = models.EmailField(verbose_name="Email")
+    permanent_address = models.TextField(verbose_name="Địa chỉ thường trú")
+    # Lưu ý: CloudinaryField không cho phép truyền `verbose_name` kwarg đồng thời với
+    # resource_type positional (sẽ raise TypeError multiple values for verbose_name).
+    # Verbose name được khai báo trong admin form / fieldsets thay vì ở field cấp model.
+    authorization_letter = CloudinaryField('raw', folder='organization_kyc/authorization_letters/', blank=True, null=True)
+    id_card_front = CloudinaryField('image', folder='organization_kyc/id_cards/')
+    id_card_back = CloudinaryField('image', folder='organization_kyc/id_cards/')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Đại diện của {self.organization.name}: {self.full_name}"
+
+    class Meta:
+        db_table = 'organization_representative'
+        verbose_name = "Đại diện tổ chức"
+        verbose_name_plural = "Đại diện tổ chức"
 
 # =====================================================
 # 2. TARGET PROGRAM (CHƯƠNG TRÌNH MỤC TIÊU)
