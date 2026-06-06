@@ -1,0 +1,66 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Danh sách Tổ chức - Quỹ Nhân Ái{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="container text-center">
+        <h1 class="hero-h1 mb-3">Các Tổ chức Từ thiện</h1>
+        <p class="hero-p mx-auto">
+            Khám phá các tổ chức đã được xác minh trên nền tảng của chúng tôi.
+            Mỗi tổ chức đều đã trải qua quy trình KYC nghiêm ngặt để đảm bảo tính minh bạch và uy tín.
+        </p>
+    </div>
+</div>
+
+<div class="container section">
+    <div class="row g-4 justify-content-center">
+        {% if organizations %}
+            {% for org in organizations %}
+            <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="card h-100 p-4 d-flex flex-column align-items-center text-center">
+                    {% if org.logo %}
+                        <img src="{{ org.logo.url }}" class="rounded-circle mb-3" alt="{{ org.name }}" style="width: 80px; height: 80px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle mb-3 bg-primary-100 text-primary d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 30px;">
+                            <i class="fas fa-building"></i>
+                        </div>
+                    {% endif %}
+                    <h3 class="h5 fw-bold text-primary-800 mt-2">{{ org.name }}</h3>
+                    <p class="text-neutral-700 small flex-grow-1">{{ org.description|truncatechars:150 }}</p>
+                    <a href="{% url 'client:tochuc_detail' slug=org.slug %}" class="btn btn-outline btn-sm mt-3">
+                        Xem chi tiết <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12 text-center">
+                <p class="lead text-muted">Chưa có tổ chức nào được tìm thấy.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if organizations.has_other_pages %}
+    <nav aria-label="Page navigation" class="mt-5">
+        <ul class="pagination justify-content-center">
+            {% if organizations.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ organizations.previous_page_number }}">Trước</a></li>
+            {% endif %}
+            {% for i in organizations.paginator.page_range %}
+                {% if organizations.number == i %}
+                    <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                {% else %}
+                    <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                {% endif %}
+            {% endfor %}
+            {% if organizations.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ organizations.next_page_number }}">Sau</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

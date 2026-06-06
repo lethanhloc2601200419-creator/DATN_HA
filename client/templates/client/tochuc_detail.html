@@ -1,0 +1,126 @@
+{% extends 'client/base_client.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Chi tiết Tổ chức - {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="container text-center">
+        {% if organization.logo %}
+            <img src="{{ organization.logo.url }}" class="rounded-circle mb-3" alt="{{ organization.name }}" style="width: 120px; height: 120px; object-fit: cover;">
+        {% else %}
+            <div class="rounded-circle mb-3 bg-primary-100 text-primary d-flex align-items-center justify-content-center mx-auto" style="width: 120px; height: 120px; font-size: 50px;">
+                <i class="fas fa-building"></i>
+            </div>
+        {% endif %}
+        <h1 class="hero-h1 mb-2">{{ organization.name }}</h1>
+        <p class="hero-p mx-auto">{{ organization.description|safe }}</p>
+        {% if organization.website %}
+            <a href="{{ organization.website }}" target="_blank" class="btn btn-outline-light btn-sm mt-3">
+                <i class="fas fa-globe me-2"></i> Website
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="container section">
+    <div class="row">
+        <div class="col-lg-8">
+            <h2 class="h3 fw-bold mb-4">Thông tin liên hệ & pháp lý</h2>
+            <div class="card p-4 mb-4">
+                <ul class="list-unstyled">
+                    {% if organization.contact_person %}
+                        <li class="mb-2"><i class="fas fa-user-tie me-2 text-primary"></i> <strong>Người liên hệ:</strong> {{ organization.contact_person }}</li>
+                    {% endif %}
+                    {% if organization.contact_phone %}
+                        <li class="mb-2"><i class="fas fa-phone me-2 text-primary"></i> <strong>Điện thoại:</strong> {{ organization.contact_phone }}</li>
+                    {% endif %}
+                    {% if organization.tax_id %}
+                        <li class="mb-2"><i class="fas fa-id-card me-2 text-primary"></i> <strong>Mã số thuế:</strong> {{ organization.tax_id }}</li>
+                    {% endif %}
+                    {% if organization.license_document_url %}
+                        <li class="mb-2"><i class="fas fa-file-alt me-2 text-primary"></i> <a href="{{ organization.license_document_url }}" target="_blank" class="text-primary fw-bold">Giấy phép hoạt động</a></li>
+                    {% endif %}
+                    {% if organization.is_verified %}
+                        <li class="mb-2"><i class="fas fa-check-circle me-2 text-success"></i> <strong class="text-success">Đã xác thực KYC</strong> ({{ organization.get_kyc_status_display }})</li>
+                    {% else %}
+                        <li class="mb-2"><i class="fas fa-hourglass-half me-2 text-warning"></i> <strong class="text-warning">Chưa xác thực KYC đầy đủ</strong> ({{ organization.get_kyc_status_display }})</li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <h2 class="h3 fw-bold mt-5 mb-4">Thông tin ngân hàng & Crypto</h2>
+            <div class="card p-4 mb-4">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-university me-2 text-primary"></i> <strong>Tên ngân hàng:</strong> {{ organization.bank_name }}</li>
+                    <li class="mb-2"><i class="fas fa-credit-card me-2 text-primary"></i> <strong>Số tài khoản:</strong> {{ organization.bank_account_number }}</li>
+                    <li class="mb-2"><i class="fas fa-user-circle me-2 text-primary"></i> <strong>Chủ tài khoản:</strong> {{ organization.bank_account_name }}</li>
+                    {% if organization.bank_branch %}
+                        <li class="mb-2"><i class="fas fa-code-branch me-2 text-primary"></i> <strong>Chi nhánh:</strong> {{ organization.bank_branch }}</li>
+                    {% endif %}
+                    {% if organization.qr_code_url %}
+                        <li class="mb-2"><i class="fas fa-qrcode me-2 text-primary"></i> <a href="{{ organization.qr_code_url }}" target="_blank" class="text-primary fw-bold">Mã QR ngân hàng</a></li>
+                    {% endif %}
+                    {% if organization.wallet_address %}
+                        <li class="mb-2"><i class="fas fa-wallet me-2 text-primary"></i> <strong>Địa chỉ ví Crypto:</strong> <span class="text-break">{{ organization.wallet_address }}</span></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            {% if campaigns %}
+            <h2 class="h3 fw-bold mt-5 mb-4">Các chiến dịch đang hoạt động</h2>
+            <div class="row g-4">
+                {% for campaign in campaigns %}
+                <div class="col-md-6">
+                    <div class="card-charity d-flex">
+                        {% if campaign.avatar_image %}
+                            <img src="{{ campaign.avatar_image.url }}" alt="{{ campaign.title }}" class="flex-shrink-0 me-3 rounded" style="width: 100px; height: 100px; object-fit: cover;">
+                        {% else %}
+                            <div class="flex-shrink-0 me-3 rounded bg-light d-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                                <i class="fas fa-hand-holding-heart fa-2x text-primary"></i>
+                            </div>
+                        {% endif %}
+                        <div class="flex-grow-1">
+                            <h4 class="mb-1"><a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}" class="text-dark text-decoration-none">{{ campaign.title }}</a></h4>
+                            <p class="text-muted small mb-2">{{ campaign.short_description|truncatechars:100 }}</p>
+                            <div class="progress-label">
+                                <span class="text-primary-800">Đã gây quỹ: {{ campaign.current_amount|intcomma }} VNĐ</span>
+                                <span>Mục tiêu: {{ campaign.target_amount|intcomma }} VNĐ</span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill" style="width: {{ campaign.current_amount|div:campaign.target_amount|mul:100|floatformat:0 }}%;"></div>
+                            </div>
+                            <a href="{% url 'client:chitiet_chiendich' pk=campaign.id %}" class="btn btn-sm btn-outline mt-3">
+                                Chi tiết <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="col-12">
+                <p class="lead text-muted">Tổ chức này hiện chưa có chiến dịch nào đang hoạt động.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <h2 class="h3 fw-bold mb-4">Liên kết nhanh</h2>
+            <div class="card p-4">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><a href="{% url 'client:tochuc_list' %}" class="text-primary fw-bold"><i class="fas fa-list-alt me-2"></i> Danh sách các tổ chức</a></li>
+                    {% if organization.website %}
+                        <li class="mb-2"><a href="{{ organization.website }}" target="_blank" class="text-primary fw-bold"><i class="fas fa-globe me-2"></i> Website của tổ chức</a></li>
+                    {% endif %}
+                    {% if organization.contact_phone %}
+                        <li class="mb-2"><a href="tel:{{ organization.contact_phone }}" class="text-primary fw-bold"><i class="fas fa-headset me-2"></i> Liên hệ trực tiếp</a></li>
+                    {% endif %}
+                    <li class="mb-0"><a href="{% url 'client:trangchu' %}" class="text-primary fw-bold"><i class="fas fa-home me-2"></i> Quay về trang chủ</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

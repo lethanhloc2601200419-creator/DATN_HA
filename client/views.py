@@ -31,6 +31,7 @@ import pytz
 import re
 import requests as http_requests
 from web3 import Web3
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 # Import Service Blockchain đã viết
 from .blockchain import BlockchainService, get_eth_vnd_rate
@@ -1930,3 +1931,45 @@ def api_confirm_donation(request):
         return JsonResponse({'ok': True})
     except Exception as e:
         return JsonResponse({'ok': False, 'message': str(e)}, status=500)
+
+def tochuc_list(request):
+    """
+    Trang danh sách các tổ chức đã được xác thực KYC và duyệt.
+    """
+    organizations_list = Organization.objects.filter(
+        is_verified=True, kyc_status='approved'
+    ).order_by('name')
+
+    paginator = Paginator(organizations_list, 12)  # 12 tổ chức mỗi trang
+    page = request.GET.get('page')
+
+    try:
+        organizations = paginator.page(page)
+    except PageNotAnInteger:
+        organizations = paginator.page(1)
+    except EmptyPage:
+        organizations = paginator.page(paginator.num_pages)
+
+    context = {
+        'organizations': organizations,
+    }
+    return render(request, 'client/tochuc_list.html', context)
+
+def tochuc_detail(request, slug):
+    """
+    Trang chi tiết thông tin của một tổ chức.
+    """
+    organization = get_object_or_404(
+        Organization, slug=slug, is_verified=True, kyc_status='approved'
+    )
+    
+    # Lấy các chiến dịch thuộc tổ chức này (có thể lọc trạng thái nếu cần)
+    campaigns = Campaign.objects.filter(
+        organization=organization, status='active'
+    ).order_by('-created_at')
+
+    context = {
+        'organization': organization,
+        'campaigns': campaigns,
+    }
+    return render(request, 'client/tochuc_detail.html', context)

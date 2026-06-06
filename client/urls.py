@@ -31,6 +31,10 @@ urlpatterns = [
     path('api/donations/confirm/', client.api_confirm_donation, name='api_confirm_donation'),
     path('api/donations/<int:donation_id>/blockchain-status/', client.api_donation_blockchain_status, name='api_donation_blockchain_status'),
     path('api/donations/<int:donation_id>/retry-blockchain/', client.api_retry_donation_blockchain, name='api_retry_donation_blockchain'),
+    
+    path('to-chuc/', client.tochuc_list, name='tochuc_list'),
+    path('to-chuc/<slug:slug>/', client.tochuc_detail, name='tochuc_detail'),
+
     path('export-donation-pdf/<int:donation_id>/', client.export_donation_pdf, name='export_donation_pdf'),
     path('lich-su-quyen-gop/', client.lichsu_quyen_gop, name='lichsu_quyen_gop'),
     path('export-donation-report/', client.export_donation_report, name='export_donation_report'),
