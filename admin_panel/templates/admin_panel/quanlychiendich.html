@@ -339,19 +339,21 @@
                                         <label>Địa chỉ chi tiết</label>
                                         <input type="text" name="beneficiary_address" id="add_beneficiary_address" class="form-control js-address-input" placeholder="Số nhà, đường, điểm trường...">
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-12">
                                         <input type="hidden" name="beneficiary_lat" id="add_beneficiary_lat" class="js-lat-input">
                                         <input type="hidden" name="beneficiary_lng" id="add_beneficiary_lng" class="js-lng-input">
-                                        <button type="button" class="btn btn-primary btn-sm js-locate-location">
-                                            <i class="fas fa-location-crosshairs"></i> Định vị trên bản đồ
-                                        </button>
-                                        <button type="button" class="btn btn-success btn-sm js-current-location">
-                                            <i class="fas fa-location-dot"></i> Lấy vị trí hiện tại
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
-                                            <i class="fas fa-rotate-left"></i> Xóa điểm chọn
-                                        </button>
-                                        <span class="small text-muted ms-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</span>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <button type="button" class="btn btn-primary btn-sm js-locate-location">
+                                                <i class="fas fa-location-crosshairs me-1"></i> Định vị trên bản đồ
+                                            </button>
+                                            <button type="button" class="btn btn-success btn-sm js-current-location">
+                                                <i class="fas fa-location-dot me-1"></i> Lấy vị trí hiện tại
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
+                                                <i class="fas fa-rotate-left me-1"></i> Xóa điểm chọn
+                                            </button>
+                                        </div>
+                                        <div class="small text-muted mt-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</div>
                                     </div>
                                     <div class="col-12">
                                         <div id="add_location_map" class="campaign-location-map js-location-map"></div>
@@ -482,19 +484,21 @@
                                         <label>Địa chỉ chi tiết</label>
                                         <input type="text" name="beneficiary_address" id="edit_beneficiary_address" class="form-control js-address-input" placeholder="Số nhà, đường, điểm trường...">
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-12">
                                         <input type="hidden" name="beneficiary_lat" id="edit_beneficiary_lat" class="js-lat-input">
                                         <input type="hidden" name="beneficiary_lng" id="edit_beneficiary_lng" class="js-lng-input">
-                                        <button type="button" class="btn btn-primary btn-sm js-locate-location">
-                                            <i class="fas fa-location-crosshairs"></i> Định vị trên bản đồ
-                                        </button>
-                                        <button type="button" class="btn btn-success btn-sm js-current-location">
-                                            <i class="fas fa-location-dot"></i> Lấy vị trí hiện tại
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
-                                            <i class="fas fa-rotate-left"></i> Xóa điểm chọn
-                                        </button>
-                                        <span class="small text-muted ms-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</span>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <button type="button" class="btn btn-primary btn-sm js-locate-location">
+                                                <i class="fas fa-location-crosshairs me-1"></i> Định vị trên bản đồ
+                                            </button>
+                                            <button type="button" class="btn btn-success btn-sm js-current-location">
+                                                <i class="fas fa-location-dot me-1"></i> Lấy vị trí hiện tại
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
+                                                <i class="fas fa-rotate-left me-1"></i> Xóa điểm chọn
+                                            </button>
+                                        </div>
+                                        <div class="small text-muted mt-2 js-location-status">Có thể chọn thủ công hoặc click trên bản đồ.</div>
                                     </div>
                                     <div class="col-12">
                                         <div id="edit_location_map" class="campaign-location-map js-location-map"></div>
