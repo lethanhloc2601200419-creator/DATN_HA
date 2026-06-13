@@ -345,6 +345,9 @@
                                         <button type="button" class="btn btn-primary btn-sm js-locate-location">
                                             <i class="fas fa-location-crosshairs"></i> Định vị trên bản đồ
                                         </button>
+                                        <button type="button" class="btn btn-success btn-sm js-current-location">
+                                            <i class="fas fa-location-dot"></i> Lấy vị trí hiện tại
+                                        </button>
                                         <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
                                             <i class="fas fa-rotate-left"></i> Xóa điểm chọn
                                         </button>
@@ -484,6 +487,9 @@
                                         <input type="hidden" name="beneficiary_lng" id="edit_beneficiary_lng" class="js-lng-input">
                                         <button type="button" class="btn btn-primary btn-sm js-locate-location">
                                             <i class="fas fa-location-crosshairs"></i> Định vị trên bản đồ
+                                        </button>
+                                        <button type="button" class="btn btn-success btn-sm js-current-location">
+                                            <i class="fas fa-location-dot"></i> Lấy vị trí hiện tại
                                         </button>
                                         <button type="button" class="btn btn-outline-primary btn-sm js-reset-location">
                                             <i class="fas fa-rotate-left"></i> Xóa điểm chọn
@@ -1034,6 +1040,36 @@
         picker.querySelector('.js-locate-location')?.addEventListener('click', () => {
             clearTimeout(forwardGeocodeTimers[prefix]);
             forwardGeocodePicker(picker, locationPickers[prefix], {manual: true});
+        });
+
+        // Nút Lấy vị trí hiện tại: dùng GPS trình duyệt → reverse-geocode →
+        // điền đủ 3 ô địa chỉ + marker/khoanh vùng (tôn trọng chế độ bảo vệ).
+        picker.querySelector('.js-current-location')?.addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                setStatus(picker, 'Trình duyệt không hỗ trợ định vị GPS.', true);
+                return;
+            }
+            clearTimeout(forwardGeocodeTimers[prefix]);
+            setStatus(picker, 'Đang lấy vị trí hiện tại...', false);
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    applyReverseGeocode(picker, locationPickers[prefix], lat, lng);
+                },
+                error => {
+                    let message = 'Không lấy được vị trí hiện tại.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        message = 'Bạn đã từ chối quyền định vị. Hãy cho phép truy cập vị trí hoặc click trực tiếp trên bản đồ.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        message = 'Không xác định được vị trí. Hãy thử lại hoặc click trên bản đồ.';
+                    } else if (error.code === error.TIMEOUT) {
+                        message = 'Hết thời gian lấy vị trí. Hãy thử lại.';
+                    }
+                    setStatus(picker, message, true);
+                },
+                {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+            );
         });
 
         picker.querySelector('.js-reset-location')?.addEventListener('click', () => {
