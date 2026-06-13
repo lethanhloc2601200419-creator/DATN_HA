@@ -171,6 +171,38 @@ def _reverse_geocode_with_nominatim(lat_value, lng_value):
     }
 
 
+def _forward_geocode_with_nominatim(query_text):
+    response = requests.get(
+        'https://nominatim.openstreetmap.org/search',
+        params={
+            'format': 'jsonv2',
+            'q': query_text,
+            'limit': 1,
+            'addressdetails': 1,
+            'countrycodes': 'vn',
+            'accept-language': 'vi',
+        },
+        headers={'User-Agent': 'doantn-charity-admin/1.0'},
+        timeout=12,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not payload:
+        return None
+    item = payload[0]
+    try:
+        lat_value = float(item.get('lat'))
+        lng_value = float(item.get('lon'))
+    except (TypeError, ValueError):
+        return None
+    return {
+        'lat': lat_value,
+        'lng': lng_value,
+        'formatted_address': _clean_admin_unit_name(item.get('display_name')),
+        'source': 'nominatim',
+    }
+
+
 def _format_export_value(value):
     if value is None:
         return ''
@@ -1335,6 +1367,74 @@ def api_openmap_reverse_geocode(request):
         'lng': lng_value,
         'source': 'openmap',
     })
+
+
+@login_required(login_url='admin_panel:dangnhap')
+def api_openmap_forward_geocode(request):
+    """
+    Forward geocode: nhận text địa chỉ (tỉnh + phường + địa chỉ chi tiết) do
+    user CHỌN/NHẬP THỦ CÔNG (không click bản đồ) → trả lat/lng để campaign vẫn
+    có toạ độ lên bản đồ. Dùng OpenMap forward (OSM format) + fallback Nominatim,
+    đối xứng với `api_openmap_reverse_geocode`.
+    """
+    query_text = _clean_admin_unit_name(request.GET.get('q') or request.GET.get('text') or '')
+    if not query_text:
+        return JsonResponse({'ok': False, 'message': 'Thiếu địa chỉ để định vị.'}, status=400)
+
+    openmap_error = ''
+    if settings.OPENMAP_API_KEY:
+        try:
+            response = requests.get(
+                'https://mapapis.openmap.vn/v1/geocode/forward',
+                params={
+                    'text': query_text,
+                    'size': 1,
+                    'admin_v2': 'true',
+                    'apikey': settings.OPENMAP_API_KEY,
+                },
+                timeout=12,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            feature = (payload.get('features') or [{}])[0]
+            geometry = feature.get('geometry') or {}
+            coords = geometry.get('coordinates') or []
+            if len(coords) >= 2:
+                lng_value, lat_value = float(coords[0]), float(coords[1])
+                props = feature.get('properties') or {}
+                return JsonResponse({
+                    'ok': True,
+                    'lat': lat_value,
+                    'lng': lng_value,
+                    'formatted_address': _clean_admin_unit_name(
+                        props.get('label') or props.get('name') or query_text
+                    ),
+                    'source': 'openmap',
+                })
+            openmap_error = 'OpenMap không tìm thấy toạ độ cho địa chỉ này.'
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            openmap_error = str(exc)
+
+    # Fallback Nominatim (OpenMap thiếu key / lỗi / không có kết quả).
+    try:
+        fallback = _forward_geocode_with_nominatim(query_text)
+    except requests.RequestException as fallback_exc:
+        return JsonResponse({
+            'ok': False,
+            'message': f'Không định vị được địa chỉ. OpenMap: {openmap_error or "chưa cấu hình"}. Nominatim: {fallback_exc}',
+        }, status=502)
+
+    if not fallback:
+        return JsonResponse({
+            'ok': False,
+            'message': 'Không tìm thấy toạ độ cho địa chỉ đã nhập. Vui lòng chọn điểm trực tiếp trên bản đồ.',
+        }, status=404)
+
+    result = dict(fallback)
+    if openmap_error:
+        result['warning'] = f'OpenMap không dùng được ({openmap_error}); đã dùng Nominatim làm dự phòng.'
+    result['ok'] = True
+    return JsonResponse(result)
 
 
 # ========================================================

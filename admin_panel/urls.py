@@ -65,6 +65,7 @@ urlpatterns = [
     path('api/address/provinces/', admin.api_vietnam_provinces, name='api_vietnam_provinces'),
     path('api/address/provinces/<str:province_code>/communes/', admin.api_vietnam_communes, name='api_vietnam_communes'),
     path('api/address/reverse-geocode/', admin.api_openmap_reverse_geocode, name='api_openmap_reverse_geocode'),
+    path('api/address/forward-geocode/', admin.api_openmap_forward_geocode, name='api_openmap_forward_geocode'),
     path('chiendich/them/', admin.them_chiendich, name='them_chiendich'),
     path('chiendich/sua/<int:pk>/', admin.sua_chiendich, name='sua_chiendich'),
     # Các nút hành động: Duyệt, Hủy, Xóa
