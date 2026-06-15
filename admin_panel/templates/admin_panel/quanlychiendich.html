@@ -188,6 +188,10 @@
                                         data-address="{{ c.beneficiary_address|default:'' }}" data-lat="{{ c.beneficiary_lat|default:'' }}" 
                                         data-lng="{{ c.beneficiary_lng|default:'' }}" 
                                         data-protected="{{ c.is_protected_beneficiary|yesno:'true,false' }}"
+                                        data-beneficiary-name="{{ c.detail.beneficiary_name|default:'' }}"
+                                        data-beneficiary-age="{{ c.detail.beneficiary_age|default:'' }}"
+                                        data-detail-story="{{ c.detail.story|default:'' }}"
+                                        data-detail-images="{{ c.detail.images_urls|join:',' }}"
                                         onclick="fillDataToModal(this)">
                                         <i class="fas fa-pen-to-square text-primary"></i>
                                     </button>
@@ -377,6 +381,30 @@
                             <label class="mt-2">Nội dung đầy đủ</label>
                             <textarea name="full_description" class="form-control" rows="4"></textarea>
                         </div>
+
+                        <!-- CHI TIẾT CHIẾN DỊCH (MỚI) -->
+                        <div class="col-12 mt-4">
+                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-circle-info me-2"></i>Chi tiết hoàn cảnh & Người thụ hưởng</h6>
+                            <div class="row g-3 bg-light p-3 rounded-xl border">
+                                <div class="col-md-8 mb-3">
+                                    <label class="fw-bold">Tên người thụ hưởng *</label>
+                                    <input type="text" name="beneficiary_name" class="form-control" placeholder="Ví dụ: Em Nguyễn Văn A">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="fw-bold">Tuổi/Năm sinh</label>
+                                    <input type="number" name="beneficiary_age" class="form-control" placeholder="Ví dụ: 2015">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="fw-bold">Câu chuyện chi tiết</label>
+                                    <textarea name="detail_story" class="form-control" rows="3" placeholder="Mô tả chi tiết về hoàn cảnh, lý do cần hỗ trợ..."></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="fw-bold">Ảnh chi tiết (Chọn nhiều ảnh)</label>
+                                    <input type="file" name="detail_images" class="form-control" multiple accept="image/*" onchange="previewMultipleImages(this, 'add_images_preview')">
+                                    <div id="add_images_preview" class="d-flex flex-wrap gap-2 mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -536,6 +564,32 @@
                             <textarea name="short_description" id="e_short" class="form-control" rows="2"></textarea>
                             <label class="mt-2">Nội dung đầy đủ</label>
                             <textarea name="full_description" id="e_full" class="form-control" rows="4"></textarea>
+                        </div>
+
+                        <!-- CHI TIẾT CHIẾN DỊCH (MỚI) -->
+                        <div class="col-12 mt-4">
+                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-circle-info me-2"></i>Chi tiết hoàn cảnh & Người thụ hưởng</h6>
+                            <div class="row g-3 bg-light p-3 rounded-xl border">
+                                <div class="col-md-8 mb-3">
+                                    <label class="fw-bold">Tên người thụ hưởng *</label>
+                                    <input type="text" name="beneficiary_name" id="e_beneficiary_name" class="form-control" placeholder="Ví dụ: Em Nguyễn Văn A">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="fw-bold">Tuổi/Năm sinh</label>
+                                    <input type="number" name="beneficiary_age" id="e_beneficiary_age" class="form-control" placeholder="Ví dụ: 2015">
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="fw-bold">Câu chuyện chi tiết</label>
+                                    <textarea name="detail_story" id="e_detail_story" class="form-control" rows="3" placeholder="Mô tả chi tiết về hoàn cảnh, lý do cần hỗ trợ..."></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="fw-bold">Ảnh chi tiết (Chọn nhiều ảnh mới để thay thế)</label>
+                                    <input type="file" name="detail_images" class="form-control" multiple accept="image/*" onchange="previewMultipleImages(this, 'edit_images_preview')">
+                                    <div id="edit_images_preview" class="d-flex flex-wrap gap-2 mt-3">
+                                        <!-- Ảnh cũ sẽ được JS fill vào đây -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1101,8 +1155,29 @@
         });
     });
 
-    function fillDataToModal(btn) {
-    // 1. Lấy dữ liệu cơ bản (Giữ nguyên code cũ)
+    function previewMultipleImages(input, previewId) {
+    var previewContainer = document.getElementById(previewId);
+    previewContainer.innerHTML = '';
+    if (input.files) {
+        Array.from(input.files).forEach(file => {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var div = document.createElement('div');
+                div.className = 'position-relative';
+                div.style.width = '80px';
+                div.style.height = '80px';
+                div.innerHTML = `
+                    <img src="${e.target.result}" class="rounded border shadow-sm w-100 h-100 object-fit-cover">
+                `;
+                previewContainer.appendChild(div);
+            }
+            reader.readAsDataURL(file);
+        });
+    }
+}
+
+function fillDataToModal(btn) {
+    // 1. Lấy dữ liệu cơ bản
     var id = btn.getAttribute('data-id');
     var title = btn.getAttribute('data-title');
     var amount = btn.getAttribute('data-amount');
@@ -1120,14 +1195,20 @@
     var lat = btn.getAttribute('data-lat');
     var lng = btn.getAttribute('data-lng');
 
-    // 2. LẤY LINK ẢNH (MỚI)
+    // 2. LẤY DỮ LIỆU CHI TIẾT (MỚI)
+    var beneficiaryName = btn.getAttribute('data-beneficiary-name');
+    var beneficiaryAge = btn.getAttribute('data-beneficiary-age');
+    var detailStory = btn.getAttribute('data-detail-story');
+    var detailImagesStr = btn.getAttribute('data-detail-images'); // Chuỗi link ảnh cách nhau bằng dấu phẩy
+
+    // 3. LẤY LINK ẢNH AVATAR/COVER
     var avatarUrl = btn.getAttribute('data-avatar');
     var coverUrl = btn.getAttribute('data-cover');
 
-    // 3. Cập nhật Action Form
+    // 4. Cập nhật Action Form
     document.getElementById('editForm').action = "/admin/chiendich/sua/" + id + "/";
 
-    // 4. Điền dữ liệu Text
+    // 5. Điền dữ liệu Text
     document.getElementById('e_title').value = title;
     document.getElementById('e_amount').value = amount; 
     document.getElementById('e_start').value = start;
@@ -1135,21 +1216,40 @@
     document.getElementById('e_short').value = short;
     document.getElementById('e_full').value = full;
 
-    // 5. XỬ LÝ HIỂN THỊ ẢNH (LOGIC MỚI)
-    
-    // --- Xử lý Avatar ---
+    // 6. Điền dữ liệu Chi tiết (MỚI)
+    document.getElementById('e_beneficiary_name').value = beneficiaryName;
+    document.getElementById('e_beneficiary_age').value = beneficiaryAge;
+    document.getElementById('e_detail_story').value = detailStory;
+
+    // Hiển thị ảnh chi tiết cũ (MỚI)
+    var detailPreviewContainer = document.getElementById('edit_images_preview');
+    detailPreviewContainer.innerHTML = '';
+    if (detailImagesStr) {
+        var images = detailImagesStr.split(',');
+        images.forEach(imgUrl => {
+            if (imgUrl.trim()) {
+                var div = document.createElement('div');
+                div.className = 'position-relative';
+                div.style.width = '60px';
+                div.style.height = '60px';
+                div.innerHTML = `<img src="${imgUrl}" class="rounded border shadow-sm w-100 h-100 object-fit-cover">`;
+                detailPreviewContainer.appendChild(div);
+            }
+        });
+    }
+
+    // 7. Xử lý Avatar / Cover
     var imgAvatar = document.getElementById('preview_avatar');
     var txtNoAvatar = document.getElementById('no_avatar');
     if (avatarUrl && avatarUrl !== 'None' && avatarUrl !== '') {
         imgAvatar.src = avatarUrl;
-        imgAvatar.style.display = 'block'; // Hiện ảnh
+        imgAvatar.style.display = 'block';
         txtNoAvatar.style.display = 'none';
     } else {
-        imgAvatar.style.display = 'none'; // Ẩn ảnh
-        txtNoAvatar.style.display = 'block'; // Hiện chữ "Chưa có ảnh"
+        imgAvatar.style.display = 'none';
+        txtNoAvatar.style.display = 'block';
     }
 
-    // --- Xử lý Cover ---
     var imgCover = document.getElementById('preview_cover');
     var txtNoCover = document.getElementById('no_cover');
     if (coverUrl && coverUrl !== 'None' && coverUrl !== '') {
@@ -1161,7 +1261,7 @@
         txtNoCover.style.display = 'block';
     }
 
-    // 6. Dropdown (Giữ nguyên)
+    // 8. Dropdown
     if(document.getElementById('e_org_id')) document.getElementById('e_org_id').value = orgId;
     if(document.getElementById('e_program_id')) document.getElementById('e_program_id').value = progId;
     if(document.getElementById('e_category_id')) document.getElementById('e_category_id').value = catId;
@@ -1175,12 +1275,11 @@
         lng: lng
     });
 
-    // 7. XỬ LÝ TOGGLE BẢO VỆ (MỚI)
+    // 9. Xử lý Bảo vệ
     var isProtected = (btn.getAttribute('data-protected') === 'true');
     var protectedToggle = document.getElementById('edit_is_protected_beneficiary');
     if (protectedToggle) {
         protectedToggle.checked = isProtected;
-        // Kích hoạt sự kiện change để UI cập nhật theo
         protectedToggle.dispatchEvent(new Event('change'));
     }
 }

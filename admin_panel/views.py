@@ -21,8 +21,9 @@ from .models import (
     CampaignCategory, Organization, TargetProgram, Donation, Campaign,
     CampaignOccasion, DisbursementProposal, ProposalVote, CampaignDisbursement,
     BankStatement, ActivityLog, DisbursementSignature, UserProfile,
-    OrganizationRepresentative,
+    OrganizationRepresentative, CampaignDetail
 )
+import cloudinary.uploader
 from .forms import DonationForm
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -1437,6 +1438,17 @@ def api_openmap_forward_geocode(request):
     return JsonResponse(result)
 
 
+def _upload_multiple_to_cloudinary(files, folder='campaigns/details/'):
+    urls = []
+    for f in files:
+        try:
+            result = cloudinary.uploader.upload(f, folder=folder)
+            urls.append(result.get('secure_url'))
+        except Exception as e:
+            logger.error(f"Error uploading to Cloudinary: {e}")
+    return urls
+
+
 # ========================================================
 # 🔥🔥🔥 HÀM QUAN TRỌNG: THÊM CHIẾN DỊCH + BLOCKCHAIN 🔥🔥🔥
 # ========================================================
@@ -1488,6 +1500,21 @@ def them_chiendich(request):
             if camp.status == 'active':
                 camp._skip_auto_sync = True
             camp.save()
+
+            # --- XỬ LÝ CHI TIẾT CHIẾN DỊCH (MỚI) ---
+            beneficiary_name = request.POST.get('beneficiary_name')
+            if beneficiary_name:
+                detail = CampaignDetail(campaign=camp)
+                detail.beneficiary_name = beneficiary_name
+                detail.beneficiary_age = request.POST.get('beneficiary_age') or None
+                detail.story = request.POST.get('detail_story')
+                
+                # Upload nhiều ảnh chi tiết
+                detail_files = request.FILES.getlist('detail_images')
+                if detail_files:
+                    detail.images_urls = _upload_multiple_to_cloudinary(detail_files)
+                
+                detail.save()
             
             # Đồng bộ URL text fields
             update_fields = []
@@ -1557,6 +1584,23 @@ def sua_chiendich(request, pk):
                 camp.cover_image = request.FILES['cover']
 
             camp.save()
+
+            # --- CẬP NHẬT CHI TIẾT CHIẾN DỊCH (MỚI) ---
+            beneficiary_name = request.POST.get('beneficiary_name')
+            if beneficiary_name:
+                detail, created = CampaignDetail.objects.get_or_create(campaign=camp)
+                detail.beneficiary_name = beneficiary_name
+                detail.beneficiary_age = request.POST.get('beneficiary_age') or None
+                detail.story = request.POST.get('detail_story')
+                
+                # Xử lý ảnh chi tiết: Nếu có up ảnh mới thì thay thế/thêm vào
+                # Ở đây mình chọn logic: Nếu up ảnh mới thì thay thế toàn bộ cho đơn giản
+                # hoặc có thể là append. User yêu cầu "chọn nhiều ảnh mới để thay thế".
+                detail_files = request.FILES.getlist('detail_images')
+                if detail_files:
+                    detail.images_urls = _upload_multiple_to_cloudinary(detail_files)
+                
+                detail.save()
             
             update_fields = []
             if 'avatar' in request.FILES and camp.avatar_image:

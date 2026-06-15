@@ -23,9 +23,17 @@
             <h1 class="fw-800 mb-3 text-neutral-900">{{ campaign.title }}</h1>
             
             <div class="d-flex align-items-center mb-4 text-muted gap-3 flex-wrap">
-                <span class="small"><i class="fas fa-calendar-alt me-2 text-primary"></i>Ngày tạo: <strong>{{ campaign.created_at|date:"d/m/Y" }}</strong></span>
+                <span class="small"><i class="fas fa-calendar-alt me-2 text-primary"></i>Thời gian: <strong>{{ campaign.start_date|date:"d/m/Y" }} - {{ campaign.end_date|date:"d/m/Y" }}</strong></span>
                 <span class="vr d-none d-md-block" style="height: 15px;"></span>
                 <span class="small"><i class="fas fa-building me-2 text-primary"></i>Tổ chức: <strong class="text-trust">{{ campaign.organization.name }}</strong></span>
+                {% if campaign.target_program %}
+                <span class="vr d-none d-md-block" style="height: 15px;"></span>
+                <span class="small"><i class="fas fa-bullseye me-2 text-primary"></i>Chương trình: <strong class="text-trust">{{ campaign.target_program.name }}</strong></span>
+                {% endif %}
+                {% if campaign.occasion %}
+                <span class="vr d-none d-md-block" style="height: 15px;"></span>
+                <span class="small"><i class="fas fa-star me-2 text-primary"></i>Dịp: <strong class="text-trust">{{ campaign.occasion.name }}</strong></span>
+                {% endif %}
             </div>
 
             {% if campaign.short_description %}
@@ -91,8 +99,9 @@
                                     <strong>Khu vực:</strong>
                                     <span class="ms-1">
                                         {{ campaign.beneficiary_province }}
-                                        {% if not campaign.is_protected_beneficiary and campaign.beneficiary_ward %}
-                                            , {{ campaign.beneficiary_ward }}
+                                        {% if not campaign.is_protected_beneficiary %}
+                                            {% if campaign.beneficiary_ward %}, {{ campaign.beneficiary_ward }}{% endif %}
+                                            {% if campaign.beneficiary_address %}, {{ campaign.beneficiary_address }}{% endif %}
                                         {% endif %}
                                     </span>
                                 </li>
