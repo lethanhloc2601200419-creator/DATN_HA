@@ -758,6 +758,10 @@ class DisbursementProposal(models.Model):
     payos_order_code = models.BigIntegerField(blank=True, null=True,
                                               verbose_name='PayOS Order Code (for webhook lookup)')
 
+    post_proof_general_desc = models.TextField(blank=True, null=True, verbose_name='Mô tả chung minh chứng sau giải ngân')
+    post_proof_data = models.JSONField(blank=True, null=True, verbose_name='Dữ liệu ảnh và mô tả từng ảnh')
+    post_proof_ipfs_cid = models.CharField(max_length=255, blank=True, null=True, verbose_name='IPFS CID minh chứng sau giải ngân')
+
     executed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

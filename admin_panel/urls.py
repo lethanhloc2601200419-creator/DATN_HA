@@ -83,6 +83,7 @@ urlpatterns = [
     # Chỉ user có ví trùng `supervisorWallet()` on-chain mới vào được.
     path('giamsat/giaingan/', admin.giamsat_giaingan, name='giamsat_giaingan'),
     path('api/ipfs/upload/', admin.ipfs_upload_view, name='ipfs_upload_view'),
+    path('giaingan/<int:pk>/upload-post-proof/', admin.upload_post_disbursement_proof, name='upload_post_disbursement_proof'),
     path('api/disbursement/approve/', admin.sync_disbursement_approval, name='sync_disbursement_approval'),
     path('giaingan/duyet/<int:pk>/', admin.duyet_giaingan, name='duyet_giaingan'),
     path('giaingan/sync-onchain/<int:pk>/', admin.sync_disbursement_onchain, name='sync_disbursement_onchain'),

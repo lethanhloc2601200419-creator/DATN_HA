@@ -3047,3 +3047,91 @@ def v3_simulate_webhook(request, pk):
     rf = RequestFactory()
     fake_req = rf.post('/fake', data=json.dumps(payload), content_type='application/json')
     return v3_payos_payout_webhook(fake_req)
+
+from django.views.decorators.http import require_POST
+
+@login_required
+@require_POST
+def upload_post_disbursement_proof(request, pk):
+    proposal = get_object_or_404(DisbursementProposal, pk=pk)
+    
+    # Check permission (same as tao_yeucau_giaingan)
+    if not _can_manage_campaign_disbursement(request.user, proposal.campaign):
+        return JsonResponse({'ok': False, 'message': 'Bạn không có quyền thao tác trên chiến dịch này.'}, status=403)
+        
+    if proposal.v3_status != 'completed_audited':
+        return JsonResponse({'ok': False, 'message': 'Chỉ có thể up minh chứng khi đã giải ngân hoàn tất.'}, status=400)
+
+    general_desc = request.POST.get('general_desc', '')
+    
+    if not settings.PINATA_API_KEY or not settings.PINATA_API_SECRET:
+        return JsonResponse({'ok': False, 'message': 'Thiếu cấu hình Pinata trong server.'}, status=500)
+
+    proof_data = []
+    
+    # Files are sent as images_0, images_1, etc.
+    # We will iterate through request.FILES
+    for key, file_obj in request.FILES.items():
+        if key.startswith('image_'):
+            idx = key.split('_')[1]
+            desc = request.POST.get(f'desc_{idx}', '')
+            
+            # Upload to Pinata
+            try:
+                response = requests.post(
+                    'https://api.pinata.cloud/pinning/pinFileToIPFS',
+                    headers={
+                        'pinata_api_key': settings.PINATA_API_KEY,
+                        'pinata_secret_api_key': settings.PINATA_API_SECRET,
+                    },
+                    files={
+                        'file': (file_obj.name, file_obj, file_obj.content_type or 'application/octet-stream'),
+                    },
+                    timeout=60,
+                )
+                response.raise_for_status()
+                cid = response.json().get('IpfsHash')
+                gateway_url = f"https://gateway.pinata.cloud/ipfs/{cid}"
+                proof_data.append({
+                    'url': gateway_url,
+                    'cid': cid,
+                    'desc': desc
+                })
+            except Exception as e:
+                return JsonResponse({'ok': False, 'message': f'Lỗi upload ảnh {file_obj.name}: {str(e)}'}, status=502)
+
+    # Now we have proof_data and general_desc. 
+    # Let's create a JSON object and pin it to IPFS
+    json_payload = {
+        'proposal_id': proposal.id,
+        'campaign_id': proposal.campaign.id,
+        'general_desc': general_desc,
+        'images': proof_data
+    }
+    
+    try:
+        response = requests.post(
+            'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+            headers={
+                'pinata_api_key': settings.PINATA_API_KEY,
+                'pinata_secret_api_key': settings.PINATA_API_SECRET,
+            },
+            json={
+                'pinataContent': json_payload,
+                'pinataMetadata': {
+                    'name': f'post_proof_proposal_{proposal.id}.json'
+                }
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        json_cid = response.json().get('IpfsHash')
+    except Exception as e:
+        return JsonResponse({'ok': False, 'message': f'Lỗi upload dữ liệu JSON lên IPFS: {str(e)}'}, status=502)
+        
+    proposal.post_proof_general_desc = general_desc
+    proposal.post_proof_data = proof_data
+    proposal.post_proof_ipfs_cid = json_cid
+    proposal.save(update_fields=['post_proof_general_desc', 'post_proof_data', 'post_proof_ipfs_cid'])
+    
+    return JsonResponse({'ok': True, 'message': 'Upload minh chứng thành công!', 'ipfs_cid': json_cid})

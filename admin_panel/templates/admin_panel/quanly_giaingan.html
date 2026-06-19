@@ -302,11 +302,16 @@
                                 {% endif %}
 
                                 {# ---- COMPLETED_AUDITED: Burn Tx ---- #}
-                                {% if item.obj.v3_status == 'completed_audited' and item.obj.burn_tx_hash %}
+                                {% if item.obj.v3_status == 'completed_audited' %}
+                                    {% if item.obj.burn_tx_hash %}
                                     <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" rel="noopener"
                                        class="btn btn-sm btn-outline-success fw-bold" title="Xem burn tx trên Etherscan">
                                         <i class="fas fa-fire me-1"></i> Burn Tx
                                     </a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-sm btn-info fw-bold text-white shadow-sm" data-bs-toggle="modal" data-bs-target="#postProofModal{{ item.obj.id }}" title="Up minh chứng sau giải ngân">
+                                        <i class="fas fa-cloud-upload-alt me-1"></i> Up IPFS
+                                    </button>
                                 {% endif %}
 
                                 {# ---- Admin Reject ---- #}
@@ -493,6 +498,41 @@
                             </div>
                         </div>
 
+                        {# =============================================================== #}
+                        {# POST PROOF MODAL — Upload minh chứng sau giải ngân              #}
+                        {# =============================================================== #}
+                        <div class="modal fade" id="postProofModal{{ item.obj.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                                <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
+                                    <form action="{% url 'admin_panel:upload_post_disbursement_proof' item.obj.id %}" method="POST" enctype="multipart/form-data" class="post-proof-form">
+                                        {% csrf_token %}
+                                        <div class="modal-header bg-info text-white border-0 py-4">
+                                            <h5 class="modal-title fw-800"><i class="fas fa-cloud-upload-alt me-2"></i> Upload minh chứng sau giải ngân #{{ item.obj.id }}</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4 bg-light">
+                                            <div class="mb-3">
+                                                <label class="fw-bold mb-2">Mô tả chung</label>
+                                                <textarea name="general_desc" class="form-control" rows="3" placeholder="Nhập mô tả chung cho đợt giải ngân này..."></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="fw-bold mb-2">Hình ảnh minh chứng</label>
+                                                <input type="file" id="postProofImages{{ item.obj.id }}" class="form-control" multiple accept="image/*" onchange="previewPostProofImages(this, {{ item.obj.id }})">
+                                                <small class="text-muted d-block mt-1">Chọn nhiều ảnh cùng lúc. Khi chọn, bạn có thể điền mô tả riêng cho từng ảnh.</small>
+                                            </div>
+                                            <div id="postProofPreview{{ item.obj.id }}" class="row g-3 mt-2"></div>
+                                        </div>
+                                        <div class="modal-footer bg-white border-top py-3 px-4">
+                                            <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                                            <button type="submit" class="btn btn-info text-white fw-bold radius-pill px-4 btn-submit-proof">
+                                                <i class="fas fa-upload me-1"></i> Upload lên IPFS
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
                         {% empty %}
                         <tr>
                             <td colspan="7" class="admin-empty py-5">
@@ -514,7 +554,75 @@
     .opacity-20 { opacity: 0.2; }
     .hover-up { transition: 0.3s; }
     .hover-up:hover { transform: translateY(-3px); }
-    </style></div>
+    </style>
+    
+    <script>
+    function previewPostProofImages(input, proposalId) {
+        const container = document.getElementById('postProofPreview' + proposalId);
+        container.innerHTML = '';
+        if (input.files && input.files.length > 0) {
+            Array.from(input.files).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6';
+                    col.innerHTML = `
+                        <div class="card p-2 border shadow-sm h-100">
+                            <img src="${e.target.result}" style="height:150px; object-fit:cover; border-radius: 4px;" class="mb-2">
+                            <input type="text" name="desc_${index}" class="form-control form-control-sm mt-auto" placeholder="Mô tả ảnh này...">
+                        </div>
+                    `;
+                    container.appendChild(col);
+                }
+                reader.readAsDataURL(file);
+            });
+            input.name = "image_multiple"; 
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.post-proof-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const btn = this.querySelector('.btn-submit-proof');
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Đang upload...';
+                btn.disabled = true;
+                
+                const formData = new FormData(this);
+                const fileInput = this.querySelector('input[type="file"]');
+                
+                formData.delete('image_multiple');
+                if (fileInput.name) formData.delete(fileInput.name);
+                
+                Array.from(fileInput.files).forEach((file, index) => {
+                    formData.append('image_' + index, file);
+                });
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).then(res => res.json()).then(data => {
+                    if(data.ok) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                        btn.innerHTML = '<i class="fas fa-upload me-1"></i> Upload lên IPFS';
+                        btn.disabled = false;
+                    }
+                }).catch(err => {
+                    alert('Lỗi kết nối');
+                    btn.innerHTML = '<i class="fas fa-upload me-1"></i> Upload lên IPFS';
+                    btn.disabled = false;
+                });
+            });
+        });
+    });
+    </script>
+    </div>
 
 {% if role != 'supervisor' %}
 {# ============================================================ #}
