@@ -1261,6 +1261,18 @@ def chitiet_chiendich(request, pk):
         'onchain_total_fund_vnd': onchain_total_fund_vnd,
         'onchain_total_disbursed_vnd': onchain_total_disbursed_vnd,
         'onchain_available_vnd': onchain_available_vnd,
+        # Disbursed/remaining from DB (accurate)
+        'total_proposal_disbursed': DisbursementProposal.objects.filter(
+            campaign=campaign, v3_status='completed_audited'
+        ).aggregate(total=Sum('amount_requested'))['total'] or Decimal('0'),
+        'remaining_after_disbursed': max(
+            Decimal('0'),
+            campaign.current_amount - (
+                DisbursementProposal.objects.filter(
+                    campaign=campaign, v3_status='completed_audited'
+                ).aggregate(total=Sum('amount_requested'))['total'] or Decimal('0')
+            )
+        ),
     }
     return render(request, 'client/chitiet_chiendich.html', context)
 
