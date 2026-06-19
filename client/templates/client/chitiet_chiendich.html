@@ -292,10 +292,10 @@
                                 </div>
                             </div>
                             <div class="text-end">
-                                <div class="fw-800 {% if item.proposal.status == 'executed' %}text-success{% else %}text-danger{% endif %} fs-5">
-                                    {% if item.proposal.status == 'executed' %}-{% endif %}{{ item.proposal.amount_requested|intcomma }}đ
+                                <div class="fw-800 {% if item.proposal.status == 'executed' or item.proposal.v3_status == 'completed_audited' %}text-success{% else %}text-danger{% endif %} fs-5">
+                                    {% if item.proposal.status == 'executed' or item.proposal.v3_status == 'completed_audited' %}-{% endif %}{{ item.proposal.amount_requested|intcomma }}đ
                                 </div>
-                                {% if item.proposal.status == 'executed' %}
+                                {% if item.proposal.status == 'executed' or item.proposal.v3_status == 'completed_audited' %}
                                     <span class="badge bg-success-subtle text-success border border-success radius-pill px-2">Đã giải ngân</span>
                                 {% else %}
                                     <span class="badge bg-danger-subtle text-danger border border-danger radius-pill px-2">Bị từ chối</span>
