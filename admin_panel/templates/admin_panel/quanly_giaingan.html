@@ -301,7 +301,7 @@
                                 </button>
                                 {% endif %}
 
-                                {# ---- COMPLETED_AUDITED: Burn Tx ---- #}
+                                {# ---- COMPLETED_AUDITED: Post Proof ---- #}
                                 {% if item.obj.v3_status == 'completed_audited' %}
                                     {% if item.obj.burn_tx_hash %}
                                     <a href="https://sepolia.etherscan.io/tx/{{ item.obj.burn_tx_hash|urlencode }}" target="_blank" rel="noopener"
@@ -309,9 +309,21 @@
                                         <i class="fas fa-fire me-1"></i> Burn Tx
                                     </a>
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm btn-info fw-bold text-white shadow-sm" onclick="(function(){ var el = document.getElementById('postProofModal{{ item.obj.id }}'); var m = bootstrap.Modal.getOrCreateInstance(el); m.show(); })()" title="Up minh chứng sau giải ngân">
-                                        <i class="fas fa-cloud-upload-alt me-1"></i> Up IPFS
-                                    </button>
+                                    {% if item.obj.post_proof_ipfs_cid %}
+                                        {# Đã upload — chỉ cho xem, không cho upload lại #}
+                                        <button type="button" class="btn btn-sm btn-outline-info fw-bold"
+                                                onclick="(function(){ var el = document.getElementById('postProofModal{{ item.obj.id }}'); var m = bootstrap.Modal.getOrCreateInstance(el); m.show(); })()"
+                                                title="Xem minh chứng đã upload lên IPFS">
+                                            <i class="fas fa-eye me-1"></i> Xem minh chứng
+                                        </button>
+                                    {% else %}
+                                        {# Chưa upload — cho phép upload 1 lần #}
+                                        <button type="button" class="btn btn-sm btn-info fw-bold text-white shadow-sm"
+                                                onclick="(function(){ var el = document.getElementById('postProofModal{{ item.obj.id }}'); var m = bootstrap.Modal.getOrCreateInstance(el); m.show(); })()"
+                                                title="Up minh chứng sau giải ngân lên IPFS (chỉ 1 lần)">
+                                            <i class="fas fa-cloud-upload-alt me-1"></i> Up IPFS
+                                        </button>
+                                    {% endif %}
                                 {% endif %}
 
                                 {# ---- Admin Reject ---- #}
@@ -521,13 +533,65 @@
             <div class="modal fade" id="postProofModal{{ item.obj.id }}" tabindex="-1">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
+
+                        {% if item.obj.post_proof_ipfs_cid %}
+                        {# ===== CHẾ ĐỘ XEM — đã upload rồi ===== #}
+                        <div class="modal-header bg-success text-white border-0 py-4">
+                            <h5 class="modal-title fw-800"><i class="fas fa-shield-halved me-2"></i> Minh chứng sau giải ngân #{{ item.obj.id }}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+                                <i class="fas fa-lock fa-lg"></i>
+                                <div>
+                                    <strong>Đã lưu trên IPFS — Bất biến vĩnh viễn</strong><br>
+                                    <small>Dữ liệu này đã được ghi lên mạng IPFS phi tập trung, không ai có thể xóa hoặc thay đổi.</small>
+                                </div>
+                            </div>
+                            <div class="mb-3 p-3 bg-light rounded">
+                                <p class="mb-1 small text-muted fw-bold text-uppercase">IPFS CID</p>
+                                <a href="https://gateway.pinata.cloud/ipfs/{{ item.obj.post_proof_ipfs_cid }}" target="_blank" class="text-break small fw-bold">
+                                    {{ item.obj.post_proof_ipfs_cid }}
+                                </a>
+                            </div>
+                            {% if item.obj.post_proof_general_desc %}
+                            <p class="text-muted lh-base mb-4">{{ item.obj.post_proof_general_desc }}</p>
+                            {% endif %}
+                            {% if item.obj.post_proof_data %}
+                            <div class="row g-3">
+                                {% for proof in item.obj.post_proof_data %}
+                                <div class="col-md-6">
+                                    <div class="card p-2 border shadow-sm h-100">
+                                        <a href="{{ proof.url }}" target="_blank">
+                                            <img src="{{ proof.url }}" class="w-100 mb-2" style="height:160px; object-fit:cover; border-radius:6px;">
+                                        </a>
+                                        {% if proof.desc %}<p class="small text-muted mb-0">{{ proof.desc }}</p>{% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="modal-footer border-0 py-3 px-4">
+                            <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+
+                        {% else %}
+                        {# ===== CHẾ ĐỘ UPLOAD — chưa upload ===== #}
                         <form action="{% url 'admin_panel:upload_post_disbursement_proof' item.obj.id %}" method="POST" enctype="multipart/form-data" class="post-proof-form">
                             {% csrf_token %}
                             <div class="modal-header bg-info text-white border-0 py-4">
-                                <h5 class="modal-title fw-800"><i class="fas fa-cloud-upload-alt me-2"></i> Upload minh chứng sau giải ngân #{{ item.obj.id }}</h5>
+                                <h5 class="modal-title fw-800"><i class="fas fa-cloud-upload-alt me-2"></i> Upload minh chứng #{{ item.obj.id }}</h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body p-4 bg-light">
+                                <div class="alert alert-warning d-flex align-items-start gap-2 mb-4">
+                                    <i class="fas fa-triangle-exclamation fa-lg mt-1"></i>
+                                    <div>
+                                        <strong>⚠️ Lưu ý quan trọng — Chỉ được upload 1 lần duy nhất!</strong><br>
+                                        <small>Sau khi upload, hình ảnh và mô tả sẽ được lưu vĩnh viễn lên mạng IPFS (phi tập trung). Không ai — kể cả quản trị viên — có thể xóa hoặc chỉnh sửa dữ liệu này sau khi đã ghi lên blockchain.</small>
+                                    </div>
+                                </div>
                                 <div class="mb-3">
                                     <label class="fw-bold mb-2">Mô tả chung</label>
                                     <textarea name="general_desc" class="form-control" rows="3" placeholder="Nhập mô tả chung cho đợt giải ngân này..."></textarea>
@@ -535,22 +599,25 @@
                                 <div class="mb-3">
                                     <label class="fw-bold mb-2">Hình ảnh minh chứng</label>
                                     <input type="file" id="postProofImages{{ item.obj.id }}" class="form-control" multiple accept="image/*" onchange="previewPostProofImages(this, {{ item.obj.id }})">
-                                    <small class="text-muted d-block mt-1">Chọn nhiều ảnh cùng lúc. Khi chọn, bạn có thể điền mô tả riêng cho từng ảnh.</small>
+                                    <small class="text-muted d-block mt-1">Chọn nhiều ảnh cùng lúc. Mỗi ảnh có thể điền mô tả riêng bên dưới.</small>
                                 </div>
                                 <div id="postProofPreview{{ item.obj.id }}" class="row g-3 mt-2"></div>
                             </div>
                             <div class="modal-footer bg-white border-top py-3 px-4">
                                 <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
                                 <button type="submit" class="btn btn-info text-white fw-bold radius-pill px-4 btn-submit-proof">
-                                    <i class="fas fa-upload me-1"></i> Upload lên IPFS
+                                    <i class="fas fa-upload me-1"></i> Xác nhận & Upload lên IPFS
                                 </button>
                             </div>
                         </form>
+                        {% endif %}
+
                     </div>
                 </div>
             </div>
         {% endif %}
     {% endfor %}
+
 
     <style>
     .fw-800 { font-weight: 800; }

@@ -1221,7 +1221,10 @@ def chitiet_chiendich(request, pk):
         })
 
     completed_proposals = DisbursementProposal.objects.filter(
-        campaign=campaign, status__in=['executed', 'rejected', 'approved']
+        campaign=campaign
+    ).filter(
+        Q(status__in=['executed', 'rejected', 'approved']) |
+        Q(v3_status='completed_audited')
     ).select_related('created_by').order_by('-created_at')
 
     completed_data = []
