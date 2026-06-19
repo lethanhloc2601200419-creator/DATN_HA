@@ -15,6 +15,7 @@ urlpatterns = [
     path('sao-ke-minh-bach/', client.saoke, name='saoke'),
     path('chien-dich/<int:pk>/', client.chitiet_chiendich, name='chitiet_chiendich'),
     path('ban-do-thien-nguyen/', client.ban_do_page, name='ban_do_thien_nguyen'),
+    path('danh-sach-chien-dich/', client.chiendich_list, name='chiendich_list'),
     path('chuong-trinh/<int:program_id>/', client.chitiet_chuongtrinh, name='chitiet_chuongtrinh'),
     path('chien-dich/<int:campaign_id>/vote/<int:proposal_id>/', client.vote_proposal, name='vote_proposal'),
     path('bien-dong-so-du/', client.biendong_sodu, name='biendong_sodu'),

@@ -498,41 +498,6 @@
                             </div>
                         </div>
 
-                        {# =============================================================== #}
-                        {# POST PROOF MODAL — Upload minh chứng sau giải ngân              #}
-                        {# =============================================================== #}
-                        <div class="modal fade" id="postProofModal{{ item.obj.id }}" tabindex="-1">
-                            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                                <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
-                                    <form action="{% url 'admin_panel:upload_post_disbursement_proof' item.obj.id %}" method="POST" enctype="multipart/form-data" class="post-proof-form">
-                                        {% csrf_token %}
-                                        <div class="modal-header bg-info text-white border-0 py-4">
-                                            <h5 class="modal-title fw-800"><i class="fas fa-cloud-upload-alt me-2"></i> Upload minh chứng sau giải ngân #{{ item.obj.id }}</h5>
-                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body p-4 bg-light">
-                                            <div class="mb-3">
-                                                <label class="fw-bold mb-2">Mô tả chung</label>
-                                                <textarea name="general_desc" class="form-control" rows="3" placeholder="Nhập mô tả chung cho đợt giải ngân này..."></textarea>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="fw-bold mb-2">Hình ảnh minh chứng</label>
-                                                <input type="file" id="postProofImages{{ item.obj.id }}" class="form-control" multiple accept="image/*" onchange="previewPostProofImages(this, {{ item.obj.id }})">
-                                                <small class="text-muted d-block mt-1">Chọn nhiều ảnh cùng lúc. Khi chọn, bạn có thể điền mô tả riêng cho từng ảnh.</small>
-                                            </div>
-                                            <div id="postProofPreview{{ item.obj.id }}" class="row g-3 mt-2"></div>
-                                        </div>
-                                        <div class="modal-footer bg-white border-top py-3 px-4">
-                                            <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                                            <button type="submit" class="btn btn-info text-white fw-bold radius-pill px-4 btn-submit-proof">
-                                                <i class="fas fa-upload me-1"></i> Upload lên IPFS
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
                         {% empty %}
                         <tr>
                             <td colspan="7" class="admin-empty py-5">
@@ -547,6 +512,45 @@
         </form>
     </div>
     </div>
+
+    {# =============================================================== #}
+    {# POST PROOF MODALS (OUTSIDE MAIN FORM TO AVOID NESTED FORMS)     #}
+    {# =============================================================== #}
+    {% for item in page_obj %}
+        {% if item.obj.v3_status == 'completed_audited' %}
+            <div class="modal fade" id="postProofModal{{ item.obj.id }}" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content border-0 shadow-lg radius-lg overflow-hidden">
+                        <form action="{% url 'admin_panel:upload_post_disbursement_proof' item.obj.id %}" method="POST" enctype="multipart/form-data" class="post-proof-form">
+                            {% csrf_token %}
+                            <div class="modal-header bg-info text-white border-0 py-4">
+                                <h5 class="modal-title fw-800"><i class="fas fa-cloud-upload-alt me-2"></i> Upload minh chứng sau giải ngân #{{ item.obj.id }}</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-4 bg-light">
+                                <div class="mb-3">
+                                    <label class="fw-bold mb-2">Mô tả chung</label>
+                                    <textarea name="general_desc" class="form-control" rows="3" placeholder="Nhập mô tả chung cho đợt giải ngân này..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="fw-bold mb-2">Hình ảnh minh chứng</label>
+                                    <input type="file" id="postProofImages{{ item.obj.id }}" class="form-control" multiple accept="image/*" onchange="previewPostProofImages(this, {{ item.obj.id }})">
+                                    <small class="text-muted d-block mt-1">Chọn nhiều ảnh cùng lúc. Khi chọn, bạn có thể điền mô tả riêng cho từng ảnh.</small>
+                                </div>
+                                <div id="postProofPreview{{ item.obj.id }}" class="row g-3 mt-2"></div>
+                            </div>
+                            <div class="modal-footer bg-white border-top py-3 px-4">
+                                <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-info text-white fw-bold radius-pill px-4 btn-submit-proof">
+                                    <i class="fas fa-upload me-1"></i> Upload lên IPFS
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
 
     <style>
     .fw-800 { font-weight: 800; }
