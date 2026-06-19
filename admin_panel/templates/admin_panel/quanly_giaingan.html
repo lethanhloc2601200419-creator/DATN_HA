@@ -516,7 +516,7 @@
     {# =============================================================== #}
     {# POST PROOF MODALS (OUTSIDE MAIN FORM TO AVOID NESTED FORMS)     #}
     {# =============================================================== #}
-    {% for item in page_obj %}
+    {% for item in proposals %}
         {% if item.obj.v3_status == 'completed_audited' %}
             <div class="modal fade" id="postProofModal{{ item.obj.id }}" tabindex="-1">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
