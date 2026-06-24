@@ -3203,3 +3203,51 @@ def toggle_user_lock(request, user_id):
         
     profile.save()
     return redirect('admin_panel:quanlynguoidung')
+
+@login_required(login_url='admin_panel:dangnhap')
+def chitiet_chiendich(request, pk):
+    campaign = get_object_or_404(Campaign, id=pk)
+    role = _get_user_role(request.user)
+
+    # Check permission
+    if role == 'partner':
+        my_org = _approved_org_qs_for_user(request.user).first()
+        if not my_org or campaign.organization_id != my_org.id:
+            messages.error(request, "Bạn không có quyền xem chiến dịch này.")
+            return redirect('admin_panel:quanlychiendich')
+    elif role not in ['admin', 'supervisor']:
+        messages.error(request, "Bạn không có quyền truy cập.")
+        return redirect('admin_panel:trangchu')
+
+    donations = Donation.objects.filter(campaign=campaign, status='completed').order_by('-created_at')
+    
+    context = {
+        'c': campaign,
+        'role': role,
+        'donations': donations,
+        'total_donors': donations.count(),
+        'total_raised': sum(d.amount for d in donations)
+    }
+    return render(request, 'admin_panel/chitiet_chiendich.html', context)
+
+@login_required(login_url='admin_panel:dangnhap')
+def chitiet_nguoidung(request, user_id):
+    if not request.user.is_superuser:
+        messages.error(request, "Bạn không có quyền truy cập trang này!")
+        return redirect('admin_panel:trangchu')
+
+    target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    
+    donations = Donation.objects.filter(user=target_user).order_by('-created_at')
+    total_donated = sum(d.amount for d in donations if d.status == 'completed')
+    
+    managed_orgs = Organization.objects.filter(manager=target_user)
+    
+    context = {
+        'u': target_user,
+        'donations': donations,
+        'total_donated': total_donated,
+        'managed_orgs': managed_orgs,
+        'role': _get_user_role(request.user),
+    }
+    return render(request, 'admin_panel/chitiet_nguoidung.html', context)

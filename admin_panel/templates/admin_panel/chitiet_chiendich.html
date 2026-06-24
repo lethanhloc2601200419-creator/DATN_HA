@@ -1,0 +1,142 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static humanize %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:quanlychiendich' %}" class="text-decoration-none">Quản lý Chiến dịch</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Chi tiết Chiến dịch</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Chi tiết Chiến dịch: {{ c.title }}</h2>
+        <a href="{% url 'admin_panel:quanlychiendich' %}" class="btn btn-outline-secondary radius-md fw-bold">
+            <i class="fas fa-arrow-left me-1"></i> Quay lại
+        </a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Thông tin chiến dịch -->
+        <div class="col-md-5">
+            <div class="card-charity border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-info-circle me-2"></i> Thông tin chung</h6>
+                </div>
+                <div class="card-body p-4">
+                    {% if c.cover_image_url %}
+                    <img src="{{ c.cover_image_url }}" alt="Cover" class="img-fluid rounded mb-3" style="max-height: 200px; width: 100%; object-fit: cover;">
+                    {% endif %}
+                    
+                    <ul class="list-group list-group-flush text-sm">
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted fw-bold">Tổ chức:</span>
+                            <span class="text-dark">{{ c.organization.name }}</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted fw-bold">Trạng thái:</span>
+                            <span>
+                                {% if c.status == 'active' %} <span class="badge bg-success">Đang chạy</span>
+                                {% elif c.status == 'pending' %} <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                                {% elif c.status == 'rejected' %} <span class="badge bg-danger">Từ chối</span>
+                                {% else %} <span class="badge bg-secondary">{{ c.status|upper }}</span> {% endif %}
+                            </span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted fw-bold">Mục tiêu:</span>
+                            <span class="text-dark fw-bold text-primary">{{ c.target_amount|intcomma }}đ</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted fw-bold">Đã quyên góp:</span>
+                            <span class="text-dark fw-bold text-success">{{ c.current_amount|intcomma }}đ</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2">
+                            <div class="d-flex justify-content-between text-xs mb-1">
+                                <span class="text-muted fw-bold">Tiến độ:</span>
+                                <span class="text-muted">{{ c.get_percentage }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px; border-radius: 10px;">
+                                <div class="progress-bar bg-success" style="width: {{ c.get_percentage }}%"></div>
+                            </div>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted fw-bold">Thời gian:</span>
+                            <span class="text-dark">{{ c.start_date|date:"d/m/Y" }} - {{ c.end_date|date:"d/m/Y" }}</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2">
+                            <span class="text-muted fw-bold d-block mb-1">Mô tả ngắn:</span>
+                            <span class="text-dark small">{{ c.short_description }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lịch sử quyên góp -->
+        <div class="col-md-7">
+            <div class="card-charity border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-hand-holding-heart me-2"></i> Lịch sử quyên góp</h6>
+                    <div class="badge bg-primary-subtle text-primary border border-primary px-3 py-1 radius-pill">
+                        {{ total_donors }} lượt quyên góp
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0 text-sm">
+                            <thead class="bg-light text-muted sticky-top">
+                                <tr>
+                                    <th width="30%" class="ps-4">Người quyên góp</th>
+                                    <th width="25%" class="text-end">Số tiền (VNĐ)</th>
+                                    <th width="25%" class="text-center">Thời gian</th>
+                                    <th width="20%">Lời nhắn</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in donations %}
+                                <tr>
+                                    <td class="ps-4">
+                                        {% if d.is_anonymous %}
+                                        <div class="fw-bold text-muted"><i class="fas fa-user-secret me-1"></i> Nhà hảo tâm ẩn danh</div>
+                                        {% else %}
+                                        <div class="fw-bold text-dark">{{ d.donor_name|default:d.user.profile.display_name|default:d.user.username }}</div>
+                                        {% if d.user %}<div class="text-xs text-muted">@{{ d.user.username }}</div>{% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold text-success">
+                                        +{{ d.amount|intcomma }}đ
+                                    </td>
+                                    <td class="text-center text-muted small">
+                                        {{ d.created_at|date:"d/m/Y H:i" }}
+                                    </td>
+                                    <td class="small text-muted fst-italic">
+                                        {{ d.message|default:"—"|truncatechars:30 }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-5 text-muted">
+                                        <i class="fas fa-box-open fa-3x opacity-20 mb-3 d-block"></i>
+                                        Chưa có lượt quyên góp nào.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .opacity-20 { opacity: 0.2; }
+    .text-sm { font-size: 0.875rem; }
+    .bg-primary-subtle { background-color: rgba(13, 110, 253, 0.1); }
+</style>
+
+{% endblock %}

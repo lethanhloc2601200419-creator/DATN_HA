@@ -111,16 +111,17 @@
                             <form action="{% url 'admin_panel:toggle_user_lock' u.id %}" method="post" class="d-inline">
                                 {% csrf_token %}
                                 {% if u.profile.is_locked %}
-                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Mở khóa tài khoản này?')">
-                                    <i class="fas fa-unlock me-1"></i> Mở khóa
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Mở khóa" onclick="return confirm('Mở khóa tài khoản này?')">
+                                    <i class="fas fa-unlock"></i>
                                 </button>
                                 {% else %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Khóa tài khoản này?')">
-                                    <i class="fas fa-lock me-1"></i> Khóa
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Khóa" onclick="return confirm('Khóa tài khoản này?')">
+                                    <i class="fas fa-lock"></i>
                                 </button>
                                 {% endif %}
                             </form>
                             {% endif %}
+                            <a href="{% url 'admin_panel:chitiet_nguoidung' u.id %}" class="btn btn-sm btn-outline-info" title="Xem chi tiết"><i class="fas fa-eye"></i></a>
                         </td>
                     </tr>
                     {% empty %}

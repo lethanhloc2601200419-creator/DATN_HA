@@ -53,6 +53,7 @@ urlpatterns = [
     path('danhmuc/toggle/<int:id>/', admin.toggle_category, name='toggle_category'),
     path('quanlytochuc', admin.quanlytochuc, name='quanlytochuc'),
     path('nguoi-dung/', admin.quanlynguoidung, name='quanlynguoidung'),
+    path('nguoi-dung/chi-tiet/<int:user_id>/', admin.chitiet_nguoidung, name='chitiet_nguoidung'),
     path('nguoi-dung/toggle-lock/<int:user_id>/', admin.toggle_user_lock, name='toggle_user_lock'),
     path('tochuc/them/', admin.them_tochuc, name='them_tochuc'),
     path('tochuc/sua/<int:pk>/', admin.sua_tochuc, name='sua_tochuc'),
@@ -69,6 +70,7 @@ urlpatterns = [
     path('api/address/reverse-geocode/', admin.api_openmap_reverse_geocode, name='api_openmap_reverse_geocode'),
     path('api/address/forward-geocode/', admin.api_openmap_forward_geocode, name='api_openmap_forward_geocode'),
     path('chiendich/them/', admin.them_chiendich, name='them_chiendich'),
+    path('chiendich/chi-tiet/<int:pk>/', admin.chitiet_chiendich, name='chitiet_chiendich'),
     path('chiendich/sua/<int:pk>/', admin.sua_chiendich, name='sua_chiendich'),
     # Các nút hành động: Duyệt, Hủy, Xóa
     path('chiendich/duyet/<int:pk>/', admin.duyet_chiendich, name='duyet_chiendich'),

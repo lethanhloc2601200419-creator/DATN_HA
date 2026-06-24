@@ -1,0 +1,199 @@
+{% extends 'admin_panel/trangchu.html' %}
+{% load static humanize %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'admin_panel:quanlynguoidung' %}" class="text-decoration-none">Quản lý Người dùng</a></li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Chi tiết Người dùng</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="page-title m-0">Chi tiết Người dùng: @{{ u.username }}</h2>
+        <a href="{% url 'admin_panel:quanlynguoidung' %}" class="btn btn-outline-secondary radius-md fw-bold">
+            <i class="fas fa-arrow-left me-1"></i> Quay lại
+        </a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Thông tin người dùng -->
+        <div class="col-md-5">
+            <div class="card-charity border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-user-circle me-2"></i> Hồ sơ cá nhân</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        {% if u.profile.avatar_url %}
+                        <img src="{{ u.profile.avatar_url }}" alt="Avatar" class="img-fluid rounded-circle shadow-sm" style="width: 100px; height: 100px; object-fit: cover;">
+                        {% else %}
+                        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 100px; height: 100px;">
+                            <i class="fas fa-user fa-3x text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <h5 class="mt-3 fw-bold">{{ u.first_name }} {{ u.last_name }}</h5>
+                        <div class="text-muted small">@{{ u.username }}</div>
+                        
+                        <div class="mt-2">
+                            {% if u.is_superuser %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% elif u.managed_organizations.exists %}
+                                <span class="badge bg-warning text-dark">Tổ chức</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Người dùng</span>
+                            {% endif %}
+                            
+                            {% if u.profile.is_locked %}
+                                <span class="badge bg-danger ms-1"><i class="fas fa-lock"></i> Đã khóa</span>
+                            {% else %}
+                                <span class="badge bg-success ms-1"><i class="fas fa-check"></i> Hoạt động</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <ul class="list-group list-group-flush text-sm">
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted fw-bold">Email:</span>
+                            <span class="text-dark">{{ u.email }}</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted fw-bold">Nguồn đăng ký:</span>
+                            <span class="text-dark">{{ u.profile.get_account_source_display|default:"Mặc định" }}</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted fw-bold">Ngày tham gia:</span>
+                            <span class="text-dark">{{ u.date_joined|date:"d/m/Y H:i" }}</span>
+                        </li>
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted fw-bold">Tổng tiền đã QG:</span>
+                            <span class="text-success fw-bold">{{ total_donated|intcomma }}đ</span>
+                        </li>
+                        {% if u.profile.is_locked %}
+                        <li class="list-group-item px-0 py-2">
+                            <div class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> Lý do khóa:</div>
+                            <div class="text-dark small mt-1">{{ u.profile.locked_reason }}</div>
+                            <div class="text-muted small mt-1">Khóa lúc: {{ u.profile.locked_at|date:"d/m/Y H:i" }}</div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                    
+                    {% if not u.is_superuser %}
+                    <div class="mt-4 text-center">
+                        <form action="{% url 'admin_panel:toggle_user_lock' u.id %}" method="post">
+                            {% csrf_token %}
+                            {% if u.profile.is_locked %}
+                            <button type="submit" class="btn btn-outline-success w-100" onclick="return confirm('Mở khóa tài khoản này?')">
+                                <i class="fas fa-unlock me-1"></i> Mở khóa tài khoản
+                            </button>
+                            {% else %}
+                            <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Khóa tài khoản này?')">
+                                <i class="fas fa-lock me-1"></i> Khóa tài khoản
+                            </button>
+                            {% endif %}
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if managed_orgs %}
+            <div class="card-charity border-0 shadow-sm mt-4">
+                <div class="card-header bg-white py-3 px-4 border-bottom">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-building-ngo me-2"></i> Tổ chức đang quản lý</h6>
+                </div>
+                <div class="card-body p-3">
+                    {% for org in managed_orgs %}
+                    <div class="d-flex align-items-center mb-2 p-2 border rounded bg-light">
+                        {% if org.logo_url %}
+                        <img src="{{ org.logo_url }}" class="rounded me-3" style="width: 40px; height: 40px; object-fit: cover;">
+                        {% else %}
+                        <div class="bg-secondary rounded me-3 d-flex align-items-center justify-content-center text-white" style="width: 40px; height: 40px;">
+                            <i class="fas fa-building"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div class="fw-bold text-dark">{{ org.name }}</div>
+                            <div class="small text-muted">{{ org.get_kyc_status_display }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Lịch sử quyên góp -->
+        <div class="col-md-7">
+            <div class="card-charity border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-800 text-primary"><i class="fas fa-hand-holding-heart me-2"></i> Lịch sử quyên góp</h6>
+                    <div class="badge bg-primary-subtle text-primary border border-primary px-3 py-1 radius-pill">
+                        {{ donations.count }} lượt
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0 text-sm">
+                            <thead class="bg-light text-muted sticky-top">
+                                <tr>
+                                    <th width="35%" class="ps-4">Chiến dịch</th>
+                                    <th width="20%" class="text-end">Số tiền</th>
+                                    <th width="20%" class="text-center">Trạng thái</th>
+                                    <th width="25%">Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in donations %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <a href="{% url 'admin_panel:chitiet_chiendich' d.campaign.id %}" class="fw-bold text-decoration-none text-primary">
+                                            {{ d.campaign.title|truncatechars:40 }}
+                                        </a>
+                                        {% if d.is_anonymous %}
+                                        <div class="text-xs text-muted mt-1"><i class="fas fa-user-secret me-1"></i> Quyên góp ẩn danh</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold {% if d.status == 'completed' %}text-success{% else %}text-muted{% endif %}">
+                                        {{ d.amount|intcomma }}đ
+                                    </td>
+                                    <td class="text-center">
+                                        {% if d.status == 'completed' %}
+                                            <span class="badge bg-success-subtle text-success border border-success">Thành công</span>
+                                        {% elif d.status == 'pending' %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning">Chờ TT</span>
+                                        {% else %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger">Thất bại</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-muted small">
+                                        {{ d.created_at|date:"d/m/Y H:i" }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-5 text-muted">
+                                        <i class="fas fa-box-open fa-3x opacity-20 mb-3 d-block"></i>
+                                        Người dùng này chưa có lượt quyên góp nào.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .opacity-20 { opacity: 0.2; }
+    .text-sm { font-size: 0.875rem; }
+    .bg-primary-subtle { background-color: rgba(13, 110, 253, 0.1); }
+</style>
+
+{% endblock %}
