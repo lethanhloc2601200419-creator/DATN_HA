@@ -99,7 +99,7 @@
                                 <tr>
                                     <td class="ps-4">
                                         {% if d.user %}
-                                        <a href="{% url 'admin_panel:chitiet_nguoidung' d.user.id %}" class="fw-bold text-decoration-none text-primary">{{ d.donor_name|default:d.user.profile.display_name|default:d.user.username }}</a>
+                                        <a href="{% url 'admin_panel:chitiet_nguoidung' d.user.id %}" class="fw-bold text-decoration-none text-primary">{{ d.user.profile.display_name|default:d.user.username }}</a>
                                         <div class="text-xs text-muted">
                                             @{{ d.user.username }}
                                             {% if d.is_anonymous %}
