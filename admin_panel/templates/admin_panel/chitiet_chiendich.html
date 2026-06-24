@@ -98,23 +98,19 @@
                                 {% for d in donations %}
                                 <tr>
                                     <td class="ps-4">
-                                        {% if d.is_anonymous and role != 'admin' and role != 'supervisor' %}
-                                        <div class="fw-bold text-muted"><i class="fas fa-user-secret me-1"></i> Nhà hảo tâm ẩn danh</div>
-                                        {% else %}
-                                            {% if d.user %}
-                                            <a href="{% url 'admin_panel:chitiet_nguoidung' d.user.id %}" class="fw-bold text-decoration-none text-primary">{{ d.donor_name|default:d.user.profile.display_name|default:d.user.username }}</a>
-                                            <div class="text-xs text-muted">
-                                                @{{ d.user.username }}
-                                                {% if d.is_anonymous %}
-                                                <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;" title="Người dùng chọn ẩn danh trên trang khách"><i class="fas fa-user-secret"></i> Ẩn danh</span>
-                                                {% endif %}
-                                            </div>
-                                            {% else %}
-                                            <div class="fw-bold text-dark">{{ d.donor_name }}</div>
+                                        {% if d.user %}
+                                        <a href="{% url 'admin_panel:chitiet_nguoidung' d.user.id %}" class="fw-bold text-decoration-none text-primary">{{ d.donor_name|default:d.user.profile.display_name|default:d.user.username }}</a>
+                                        <div class="text-xs text-muted">
+                                            @{{ d.user.username }}
                                             {% if d.is_anonymous %}
-                                            <div class="text-xs text-muted mt-1"><span class="badge bg-secondary" style="font-size: 0.65rem;"><i class="fas fa-user-secret"></i> Ẩn danh</span></div>
+                                            <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;" title="Người dùng chọn ẩn danh trên trang khách"><i class="fas fa-user-secret"></i> Ẩn danh</span>
                                             {% endif %}
-                                            {% endif %}
+                                        </div>
+                                        {% else %}
+                                        <div class="fw-bold text-dark">{{ d.donor_name }}</div>
+                                        {% if d.is_anonymous %}
+                                        <div class="text-xs text-muted mt-1"><span class="badge bg-secondary" style="font-size: 0.65rem;"><i class="fas fa-user-secret"></i> Ẩn danh</span></div>
+                                        {% endif %}
                                         {% endif %}
                                     </td>
                                     <td class="text-end fw-bold text-success">
