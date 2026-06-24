@@ -98,16 +98,16 @@
                                 {% for d in donations %}
                                 <tr>
                                     <td class="ps-4">
-                                        {% if d.user %}
-                                        <a href="{% url 'admin_panel:chitiet_nguoidung' d.user.id %}" class="fw-bold text-decoration-none text-primary">{{ d.user.profile.display_name|default:d.user.username }}</a>
+                                        {% if d.donor %}
+                                        <a href="{% url 'admin_panel:chitiet_nguoidung' d.donor.id %}" class="fw-bold text-decoration-none text-primary">{{ d.donor.profile.display_name|default:d.donor.username }}</a>
                                         <div class="text-xs text-muted">
-                                            @{{ d.user.username }}
+                                            @{{ d.donor.username }}
                                             {% if d.is_anonymous %}
                                             <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;" title="Người dùng chọn ẩn danh trên trang khách"><i class="fas fa-user-secret"></i> Ẩn danh</span>
                                             {% endif %}
                                         </div>
                                         {% else %}
-                                        <div class="fw-bold text-dark">{{ d.donor_name }}</div>
+                                        <div class="fw-bold text-dark">{{ d.donor_name }} <span class="text-muted fw-normal text-xs" title="Khách vãng lai, không có tài khoản">(Khách)</span></div>
                                         {% if d.is_anonymous %}
                                         <div class="text-xs text-muted mt-1"><span class="badge bg-secondary" style="font-size: 0.65rem;"><i class="fas fa-user-secret"></i> Ẩn danh</span></div>
                                         {% endif %}

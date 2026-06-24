@@ -3238,7 +3238,7 @@ def chitiet_nguoidung(request, user_id):
 
     target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
     
-    donations = Donation.objects.filter(user=target_user).order_by('-created_at')
+    donations = Donation.objects.filter(donor=target_user).order_by('-created_at')
     total_donated = sum(d.amount for d in donations if d.status == 'completed')
     
     managed_orgs = Organization.objects.filter(manager=target_user)
