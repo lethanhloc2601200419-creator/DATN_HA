@@ -3135,3 +3135,71 @@ def upload_post_disbursement_proof(request, pk):
     proposal.save(update_fields=['post_proof_general_desc', 'post_proof_data', 'post_proof_ipfs_cid'])
     
     return JsonResponse({'ok': True, 'message': 'Upload minh chứng thành công!', 'ipfs_cid': json_cid})
+
+@login_required(login_url='admin_panel:dangnhap')
+def quanlynguoidung(request):
+    if not request.user.is_superuser:
+        messages.error(request, "Bạn không có quyền truy cập trang Quản lý Người dùng!")
+        return redirect('admin_panel:trangchu')
+
+    q = _normalize_query(request.GET.get('q'))
+    status = request.GET.get('status', '')
+    
+    users = User.objects.select_related('profile').all()
+    
+    if q:
+        users = users.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q)
+        )
+        
+    if status == 'locked':
+        users = users.filter(profile__is_locked=True)
+    elif status == 'active':
+        users = users.filter(profile__is_locked=False, is_active=True)
+        
+    users = users.order_by('-date_joined')
+    
+    stats = {
+        'total': User.objects.count(),
+        'locked': UserProfile.objects.filter(is_locked=True).count(),
+        'active': User.objects.filter(is_active=True, profile__is_locked=False).count()
+    }
+    
+    return render(request, 'admin_panel/quanlynguoidung.html', {
+        'users': users,
+        'role': _get_user_role(request.user),
+        'query': q,
+        'selected_status': status,
+        'stats': stats,
+        'current_url': request.get_full_path(),
+    })
+
+@login_required(login_url='admin_panel:dangnhap')
+def toggle_user_lock(request, user_id):
+    if not request.user.is_superuser:
+        messages.error(request, "Bạn không có quyền thao tác này!")
+        return redirect('admin_panel:trangchu')
+        
+    target_user = get_object_or_404(User, id=user_id)
+    if target_user.is_superuser:
+        messages.error(request, "Không thể khóa tài khoản quản trị viên!")
+        return redirect('admin_panel:quanlynguoidung')
+        
+    profile, created = UserProfile.objects.get_or_create(user=target_user)
+    
+    if profile.is_locked:
+        profile.is_locked = False
+        profile.locked_reason = None
+        profile.locked_at = None
+        messages.success(request, f"Đã mở khóa tài khoản {target_user.username}.")
+    else:
+        profile.is_locked = True
+        profile.locked_reason = request.POST.get('reason', 'Vi phạm chính sách')
+        profile.locked_at = timezone.now()
+        messages.success(request, f"Đã khóa tài khoản {target_user.username}.")
+        
+    profile.save()
+    return redirect('admin_panel:quanlynguoidung')

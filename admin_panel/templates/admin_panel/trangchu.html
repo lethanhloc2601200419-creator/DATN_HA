@@ -457,7 +457,7 @@
     <div class="sidebar-section-title">Hệ thống</div>
     <ul class="sidebar-nav">
       <li><a href="{% url 'admin_panel:quanlydanhmuc' %}" class="{% if '/danhmuc/' in request.path %}active{% endif %}"><i class="fas fa-tags"></i> Danh mục</a></li>
-      <li><a href="#"><i class="fas fa-users-gear"></i> Quản lý người dùng</a></li>
+      <li><a href="{% url 'admin_panel:quanlynguoidung' %}" class="{% if '/nguoi-dung/' in request.path %}active{% endif %}"><i class="fas fa-users-gear"></i> Quản lý người dùng</a></li>
       <li><a href="#"><i class="fas fa-sliders"></i> Cấu hình chung</a></li>
     </ul>
     {% endif %}
