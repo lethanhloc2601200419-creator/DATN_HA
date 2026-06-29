@@ -439,16 +439,20 @@
                 <div class="d-flex align-items-center gap-3">
                     {% if user.is_authenticated %}
                         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                            {% with raw_name=user.profile.display_name|default:user.get_full_name|default:user.first_name %}
+                            {% if raw_name and raw_name|slice:":5" != "web3_" %}{% with display_name=raw_name %}{% else %}{% with display_name=user.email %}{% endif %}
                             <a href="{% url 'client:profile' %}" class="d-flex align-items-center gap-2 text-decoration-none hover-primary transition-all p-1 rounded-pill pe-3 bg-light border border-primary-100 shadow-sm" style="color: inherit;">
                                 {% if user.profile.avatar_url %}
                                     <img src="{{ user.profile.avatar_url }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
                                 {% else %}
-                                    <img src="https://ui-avatars.com/api/?background=e8f1fe&color=1e3a8a&name={{ user.username }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
+                                    <img src="https://ui-avatars.com/api/?background=e8f1fe&color=1e3a8a&name={{ display_name|default:user.email|default:'User'|urlencode }}" class="rounded-circle border border-white" width="30" height="30" style="object-fit: cover;">
                                 {% endif %}
                                 <div class="d-flex flex-column leading-tight">
-                                    <span class="small fw-bold text-neutral-900" style="font-size: 11px;">{{ user.username }}</span>
+                                    <span class="small fw-bold text-neutral-900" style="font-size: 11px;">{{ display_name|default:user.email|default:user.username }}</span>
                                     <span class="text-primary fw-black" id="walletAddressBadge" style="font-size: 10px;" data-wallet-address="{{ web3auth_public_config.walletAddress }}">
-                                        {% if web3auth_public_config.walletAddress %}
+                                        {% if user.email %}
+                                            {{ user.email }}
+                                        {% elif web3auth_public_config.walletAddress %}
                                             {{ web3auth_public_config.walletAddress|slice:":6" }}...{{ web3auth_public_config.walletAddress|slice:"-4:" }}
                                         {% else %}
                                             Chưa có ví
@@ -456,6 +460,8 @@
                                     </span>
                                 </div>
                             </a>
+                            {% endwith %}
+                            {% endwith %}
                             <button
                                 type="button"
                                 class="btn btn-sm btn-primary rounded-pill px-3"
