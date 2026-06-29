@@ -197,7 +197,7 @@ window.addEventListener("load", async function () {
 
     web3auth = new Web3AuthClass({
       clientId: clientId,
-      web3AuthNetwork: config.network || "sapphire_mainnet",
+      web3AuthNetwork: config.network || "sapphire_devnet",
       chainConfig: chainConfig,
       privateKeyProvider: privateKeyProvider,
       sessionTime: 604800,
