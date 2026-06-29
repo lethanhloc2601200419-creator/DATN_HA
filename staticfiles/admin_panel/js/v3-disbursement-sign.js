@@ -17,6 +17,18 @@
   'use strict';
 
   const CSRF_TOKEN = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+  let refreshTimer = null;
+
+  function schedulePageRefresh(delayMs) {
+    if (refreshTimer) window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => {
+      if (document.hidden) {
+        schedulePageRefresh(2000);
+        return;
+      }
+      window.location.reload();
+    }, delayMs);
+  }
 
   async function getMetaMaskAccount() {
     if (!window.ethereum) {
@@ -39,6 +51,12 @@
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || `GET sign-payload failed (${res.status})`);
+    }
+    // Ensure chainId and name are explicitly set
+    if (data.typed_data && data.typed_data.domain) {
+      data.typed_data.domain.chainId = 11155111;
+      data.typed_data.domain.name = 'DisbursementExecutor';
+      data.typed_data.domain.version = '1';
     }
     return data;
   }
@@ -63,11 +81,22 @@
     return data;
   }
 
+  async function readJsonResponse(res, actionLabel) {
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (err) {
+      const preview = text.trim().slice(0, 240) || `HTTP ${res.status}`;
+      throw new Error(`${actionLabel} không trả JSON hợp lệ: ${preview}`);
+    }
+  }
+
   /**
    * Main entry: user bấm "Ký off-chain" trên proposal.
    * role ∈ {'organization', 'supervisor', 'admin'}.
    */
   async function signAs(proposalId, role) {
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const account = await getMetaMaskAccount();
       const payload = await fetchSignPayload(proposalId, role);
@@ -94,9 +123,12 @@
       }
       if (result.ready_to_relay) {
         setTimeout(() => window.location.reload(), 900);
+      } else {
+        if (typeof window.hideLoader === 'function') window.hideLoader();
       }
       return result;
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       console.error('[V3-sign] error', err);
       alert('❌ Ký thất bại: ' + (err.message || err));
       throw err;
@@ -106,17 +138,24 @@
   /** Admin relayer: submit 3 sigs lên smart3. */
   async function relayMultisig(proposalId) {
     if (!confirm('Bạn sẽ submit 3 chữ ký lên smart3 (ví Admin trả gas). Tiếp tục?')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/relay-multisig/`, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        headers: { 'Accept': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res, 'Relay');
       if (!res.ok || !data.ok) throw new Error(data.message || `HTTP ${res.status}`);
-      alert(`✅ MultisigConfirmed on-chain. tx=${data.tx_hash}`);
-      window.location.reload();
+      if (data.pending_confirmation) {
+        alert(`✅ Đã gửi relay tx lên chain. tx=${data.tx_hash}\nHệ thống sẽ tự cập nhật khi Sepolia confirm.`);
+        schedulePageRefresh(2500);
+      } else {
+        alert(`✅ MultisigConfirmed on-chain. tx=${data.tx_hash}`);
+        window.location.reload();
+      }
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Relay thất bại: ' + (err.message || err));
     }
   }
@@ -124,17 +163,19 @@
   /** Admin trigger PayOS payout (mock). */
   async function triggerPayout(proposalId) {
     if (!confirm('Gửi lệnh chuyển tiền PayOS? (mock hoặc real tuỳ config)')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/trigger-payout/`, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        headers: { 'Accept': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res, 'PayOS payout');
       if (!res.ok || !data.ok) throw new Error(data.message || `HTTP ${res.status}`);
       alert(`✅ Đã gửi lệnh PayOS. payout_id=${data.payout_id}${data.mock ? ' (MOCK)' : ''}`);
-      window.location.reload();
+      schedulePageRefresh(2500);
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Trigger payout thất bại: ' + (err.message || err));
     }
   }
@@ -142,6 +183,7 @@
   /** [DEV] Simulate webhook success để test pipeline burn. */
   async function simulateWebhook(proposalId) {
     if (!confirm('[DEV] Giả PayOS webhook success → sẽ trigger burn on-chain?')) return;
+    if (typeof window.showLoader === 'function') window.showLoader();
     try {
       const res = await fetch(`/admin/api/v3/disbursement/${proposalId}/simulate-webhook/`, {
         method: 'POST',
@@ -153,9 +195,15 @@
       alert(`✅ Mock webhook OK. bank_tx_id=${data.bank_tx_id}. Đang burn on-chain ở background…`);
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
+      if (typeof window.hideLoader === 'function') window.hideLoader();
       alert('❌ Simulate webhook thất bại: ' + (err.message || err));
     }
   }
 
   window.V3Disbursement = { signAs, relayMultisig, triggerPayout, simulateWebhook };
+
+  const autoRefresh = window.V3_DISBURSEMENT_AUTO_REFRESH || {};
+  if (autoRefresh.enabled) {
+    schedulePageRefresh(Number(autoRefresh.intervalMs) || 5000);
+  }
 })();

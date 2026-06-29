@@ -119,6 +119,7 @@ window.addEventListener("load", async function () {
   async function logoutAllSessions(event) {
     if (event) event.preventDefault();
     console.log("[DCP][Web3Auth] bắt đầu logout tất cả session...");
+    if (typeof window.showLoader === "function") window.showLoader();
 
     try {
       if (web3auth && typeof web3auth.logout === "function") {
@@ -199,6 +200,7 @@ window.addEventListener("load", async function () {
       web3AuthNetwork: config.network || "sapphire_devnet",
       chainConfig: chainConfig,
       privateKeyProvider: privateKeyProvider,
+      sessionTime: 604800,
     });
 
     var authAdapter = new AuthAdapterClass({
@@ -220,6 +222,50 @@ window.addEventListener("load", async function () {
       if (hydratedAddress) {
         console.log("[DCP][Web3Auth] hydrate thành công. address =", hydratedAddress);
         updateWalletBadge(hydratedAddress);
+        
+        // Kiểm tra xem URL có hash từ redirect về hay không
+        // Nếu có, đây là luồng vừa login xong, cần đẩy dữ liệu lên Django
+        if (window.location.hash.includes("access_token") || window.location.hash.includes("state")) {
+            console.log("[DCP][Web3Auth] Phát hiện redirect hash, tự động đồng bộ session...");
+            
+            // Xóa hash trên URL để URL sạch đẹp hơn
+            history.replaceState(null, null, ' ');
+            
+            var userInfo = {};
+            if (typeof web3auth.getUserInfo === "function") {
+                try {
+                    userInfo = await web3auth.getUserInfo();
+                } catch (e) {
+                    console.warn("[DCP][Web3Auth] getUserInfo sau redirect lỗi:", e);
+                }
+            }
+
+            try {
+                if (typeof window.showLoader === "function") window.showLoader();
+                showToast("Đang đồng bộ ví Web3...");
+                await postJson("/api/auth/web3-login/", {
+                    wallet_address: hydratedAddress,
+                    eoa_address: hydratedAddress,
+                    email: userInfo.email || "",
+                    display_name: userInfo.name || userInfo.email || "",
+                    provider: "web3auth_google",
+                });
+
+                await postJson("/api/auth/wallet-sync/", {
+                    wallet_address: hydratedAddress,
+                    eoa_address: hydratedAddress,
+                    smart_account_address: hydratedAddress,
+                    provider: "web3auth_google",
+                });
+                
+                showToast("Đăng nhập Web3 thành công!");
+                setTimeout(function() { window.location.reload(); }, 1000);
+            } catch (err) {
+                if (typeof window.hideLoader === "function") window.hideLoader();
+                console.error("[DCP][Web3Auth] Đồng bộ session sau redirect lỗi:", err);
+                showToast("Lỗi đồng bộ dữ liệu. Vui lòng thử lại.");
+            }
+        }
       } else {
         console.log("[DCP][Web3Auth] session có provider nhưng chưa lấy được address.");
       }
@@ -234,6 +280,7 @@ window.addEventListener("load", async function () {
   async function handleLoginClick(event) {
     event.preventDefault();
     console.log("[DCP][Web3Auth] 1. ĐÃ BẤM NÚT LOGIN");
+    if (typeof window.showLoader === "function") window.showLoader();
 
     try {
       console.log("[DCP][Web3Auth] 2. status trước connect =", web3auth.status);
@@ -299,6 +346,7 @@ window.addEventListener("load", async function () {
       alert("Login Successful");
       window.location.reload();
     } catch (error) {
+      if (typeof window.hideLoader === "function") window.hideLoader();
       console.error("[DCP][Web3Auth] 5. login lỗi:", error);
       showToast(error && error.message ? error.message : "Đăng nhập thất bại");
     }
