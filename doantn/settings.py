@@ -84,7 +84,7 @@ GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 
 # Web3Auth / Embedded Wallet Configuration
 WEB3AUTH_CLIENT_ID = os.getenv('WEB3AUTH_CLIENT_ID', '')
-WEB3AUTH_NETWORK = os.getenv('WEB3AUTH_NETWORK', 'sapphire_devnet')
+WEB3AUTH_NETWORK = os.getenv('WEB3AUTH_NETWORK', 'sapphire_mainnet')
 
 # Biconomy Smart Account Configuration
 BICONOMY_BUNDLER_URL = os.getenv('BICONOMY_BUNDLER_URL', '')
