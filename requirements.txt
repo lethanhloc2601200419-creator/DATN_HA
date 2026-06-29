@@ -62,5 +62,4 @@ xhtml2pdf==0.2.16
 reportlab==4.4.4
 svglib==1.6.0
 rlpycairo==0.4.0
-
-
+whitenoise==6.9.0

@@ -57,7 +57,7 @@ cloudinary.config(
 )
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-dev-secret-key')
-DEBUG = True
+DEBUG = env_bool('DEBUG', False)
 # ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1', '*')
 ALLOWED_HOSTS = ['*']
 
@@ -133,6 +133,7 @@ PINATA_API_SECRET = os.getenv('PINATA_API_SECRET', '')
 PLATFORM_FEE = int(os.getenv('PLATFORM_FEE', 0))
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -175,6 +176,13 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', ''),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'doantn_cache_table',
     }
 }
 

@@ -55,8 +55,7 @@ from web3.exceptions import LogTopicError, ContractLogicError
 _VNDT_DECIMALS = Decimal(10) ** 18
 
 # Module-level caches to avoid repeated network calls
-_rate_cache = {'value': None, 'ts': 0}
-_stats_cache = {}  # {campaign_id: {'value': stats_dict, 'ts': timestamp}}
+from django.core.cache import cache
 _RATE_CACHE_TTL = 300   # 5 minutes
 _STATS_CACHE_TTL = 120  # 2 minutes
 
@@ -318,11 +317,11 @@ class BlockchainService:
         Các key legacy (total_gas_cost_wei, total_admin_recovered_wei, available_wei…)
         được giữ = 0 để code view cũ không bị KeyError. Sẽ dọn ở lần refactor tới.
         """
-        now = time.time()
-        if use_cache and campaign_id in _stats_cache:
-            cached = _stats_cache[campaign_id]
-            if now - cached['ts'] < _STATS_CACHE_TTL:
-                return cached['value']
+        cache_key = f'campaign_stats_{campaign_id}'
+        if use_cache:
+            cached = cache.get(cache_key)
+            if cached:
+                return cached
 
         c = self.contract.functions.getCampaign(int(campaign_id)).call()
         organization = c[0]
@@ -357,7 +356,7 @@ class BlockchainService:
             'available_wei': 0,
         }
 
-        _stats_cache[campaign_id] = {'value': stats, 'ts': now}
+        cache.set(cache_key, stats, _STATS_CACHE_TTL)
         return stats
 
     # ==========================================================
@@ -753,9 +752,10 @@ class BlockchainService:
 
 def get_eth_vnd_rate():
     """Lấy tỉ giá ETH/VND realtime từ CoinGecko API (cached 5 min)"""
-    now = time.time()
-    if _rate_cache['value'] is not None and now - _rate_cache['ts'] < _RATE_CACHE_TTL:
-        return _rate_cache['value']
+    cache_key = 'eth_vnd_rate'
+    cached_rate = cache.get(cache_key)
+    if cached_rate is not None:
+        return cached_rate
 
     try:
         response = http_req.get(
@@ -767,17 +767,14 @@ def get_eth_vnd_rate():
             data = response.json()
             rate = Decimal(str(data['ethereum']['vnd']))
             print(f"📈 Tỉ giá ETH/VND hiện tại: {rate:,.0f} VNĐ (cached 5 min)", flush=True)
-            _rate_cache['value'] = rate
-            _rate_cache['ts'] = now
+            cache.set(cache_key, rate, _RATE_CACHE_TTL)
             return rate
     except Exception as e:
         print(f"⚠️ Không lấy được tỉ giá từ CoinGecko: {e}", flush=True)
 
-    if _rate_cache['value'] is not None:
-        return _rate_cache['value']
     return Decimal('60000000')
 
 
 def invalidate_campaign_cache(campaign_id):
     """Xóa cache on-chain stats cho campaign (gọi sau khi ghi giao dịch)"""
-    _stats_cache.pop(campaign_id, None)
+    cache.delete(f'campaign_stats_{campaign_id}')
