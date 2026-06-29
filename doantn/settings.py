@@ -31,6 +31,16 @@ CSRF_COOKIE_HTTPONLY = False
 # SameSite='Lax' là mặc định – đủ cho same-origin fetch từ chính domain Railway.
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Cross-Origin-Opener-Policy (COOP):
+# Django 4.0+ mặc định set SECURE_CROSS_ORIGIN_OPENER_POLICY='same-origin',
+# header này CẮT liên lạc window.opener/popup.closed giữa trang chính và popup.
+# Web3Auth (login Google qua popup) polling popup.closed để biết khi nào OAuth
+# xong → với 'same-origin' nó luôn thấy popup.closed=true → tưởng user đóng popup
+# → ném 'login popup has been closed by the user' sau 5-6s dù popup vẫn mở.
+# 'same-origin-allow-popups' cho phép cửa sổ con (popup OAuth) giữ tham chiếu
+# tới opener mà vẫn cô lập các origin khác. ĐÂY là fix cho lỗi login Web3Auth.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
