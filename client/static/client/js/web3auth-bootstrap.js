@@ -200,11 +200,12 @@ window.addEventListener("load", async function () {
       web3AuthNetwork: config.network || "sapphire_devnet",
       chainConfig: chainConfig,
       privateKeyProvider: privateKeyProvider,
+      sessionTime: 604800,
     });
 
     var authAdapter = new AuthAdapterClass({
       adapterSettings: {
-        uxMode: "redirect",
+        uxMode: "popup",
         redirectUrl: window.location.origin,
       },
     });
