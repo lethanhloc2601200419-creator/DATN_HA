@@ -871,8 +871,13 @@ document.getElementById('select-all-proposals')?.addEventListener('change', func
 {# ============================================================ #}
 {{ disbursement_web3_config|json_script:"disbursement-proposal-config" }}
 <script>
+// QUAN TRỌNG: auto full-page reload đã bị TẮT.
+// Lý do: timer reload (5s) reload cả trang giữa lúc admin bấm "Ký duyệt" →
+// giết popup MetaMask trước khi nó kịp hiện (eth_signTypedData_v4 không bao giờ
+// chạy) → triệu chứng "bấm ký nhưng không nhảy MetaMask, chỉ thấy reload loop".
+// Nếu cần cập nhật trạng thái burn/payout, admin tự refresh thủ công (F5).
 window.V3_DISBURSEMENT_AUTO_REFRESH = {
-    enabled: {% if has_live_v3_pending %}true{% else %}false{% endif %},
+    enabled: false,
     intervalMs: 5000
 };
 (() => {
