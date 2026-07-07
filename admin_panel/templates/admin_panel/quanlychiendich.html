@@ -288,29 +288,11 @@
                             <input type="date" name="end_date" class="form-control" required>
                         </div>
 
-                        <div class="col-md-4 mb-3">
-                            <label>Chương trình (GIS)</label>
-                            <select name="program_id" class="form-select">
-                                <option value="">-- Tự do --</option>
-                                {% for p in programs %}
-                                <option value="{{ p.id }}">{{ p.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-12 mb-3">
                             <label>Danh mục</label>
                             <select name="category_id" class="form-select">
                                 {% for cat in categories %}
                                 <option value="{{ cat.id }}">{{ cat.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Dịp</label>
-                            <select name="occasion_id" class="form-select">
-                                <option value="">-- Không --</option>
-                                {% for occ in occasions %}
-                                <option value="{{ occ.id }}">{{ occ.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -457,29 +439,11 @@
                             <input type="date" name="end_date" id="e_end" class="form-control" required>
                         </div>
 
-                        <div class="col-md-4 mb-3">
-                            <label>Chương trình</label>
-                            <select name="program_id" id="e_program_id" class="form-select">
-                                <option value="">-- Tự do --</option>
-                                {% for p in programs %}
-                                <option value="{{ p.id }}">{{ p.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-12 mb-3">
                             <label>Danh mục</label>
                             <select name="category_id" id="e_category_id" class="form-select">
                                 {% for cat in categories %}
                                 <option value="{{ cat.id }}">{{ cat.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label>Dịp</label>
-                            <select name="occasion_id" id="e_occasion_id" class="form-select">
-                                <option value="">-- Không --</option>
-                                {% for occ in occasions %}
-                                <option value="{{ occ.id }}">{{ occ.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
