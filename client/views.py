@@ -2320,7 +2320,16 @@ def tochuc_detail(request, slug):
 from django.core.paginator import Paginator
 
 def chiendich_list(request):
+    query = request.GET.get('q', '').strip()
     campaign_list = Campaign.objects.filter(status='active').order_by('-created_at')
+    
+    if query:
+        campaign_list = campaign_list.filter(
+            Q(title__icontains=query) | 
+            Q(short_description__icontains=query) |
+            Q(full_description__icontains=query)
+        )
+
     paginator = Paginator(campaign_list, 9)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -2329,4 +2338,5 @@ def chiendich_list(request):
         'campaigns': page_obj,
         'page_obj': page_obj,
         'paginator': paginator,
+        'query': query,
     })

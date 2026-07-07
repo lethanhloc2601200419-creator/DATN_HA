@@ -103,17 +103,17 @@
             <h1 class="hero-title animate__animated animate__fadeInDown">Trao yêu thương,<br>Nhận niềm vui</h1>
             <p class="hero-subtitle">Nền tảng gây quỹ từ thiện minh bạch, ứng dụng công nghệ Blockchain để đảm bảo niềm tin tuyệt đối cho cộng đồng.</p>
             
-            <div class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg w-100" style="max-width: 680px; border: 1px solid var(--primary-100);">
+            <form action="{% url 'client:chiendich_list' %}" method="GET" class="bg-white rounded-pill p-2 d-inline-flex align-items-center shadow-lg w-100" style="max-width: 680px; border: 1px solid var(--primary-100);">
                 <div class="input-group">
                     <span class="input-group-text bg-transparent border-0 ps-4">
                         <i class="fas fa-search text-primary opacity-50"></i>
                     </span>
-                    <input type="text" class="form-control border-0 py-3" placeholder="Tìm chiến dịch, hoàn cảnh khó khăn..." style="box-shadow: none; font-weight: 500;">
-                    <button class="btn btn-primary rounded-pill px-5 py-2 fw-bold ms-2 shadow-sm hover-lift">
+                    <input type="text" name="q" class="form-control border-0 py-3" placeholder="Tìm chiến dịch, hoàn cảnh khó khăn..." style="box-shadow: none; font-weight: 500;">
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 py-2 fw-bold ms-2 shadow-sm hover-lift">
                         Tìm kiếm
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
     </header>
 
