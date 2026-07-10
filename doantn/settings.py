@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://web-production-e589d.up.railway.app',
+    'https://web-production-9c2ee.up.railway.app',
     'https://*.up.railway.app',
 ]
 

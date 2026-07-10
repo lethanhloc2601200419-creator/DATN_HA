@@ -1,6 +1,6 @@
 # 🗺️ KẾ HOẠCH NÂNG CẤP TRANG "BẢN ĐỒ THIỆN NGUYỆN"
 
-> URL: https://web-production-e589d.up.railway.app/ban-do-thien-nguyen/
+> URL: https://web-production-9c2ee.up.railway.app/ban-do-thien-nguyen/
 > File: `client/templates/client/ban_do_thien_nguyen.html` + `client/views.py::ban_do_page`
 
 ---

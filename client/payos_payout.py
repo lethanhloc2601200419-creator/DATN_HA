@@ -320,7 +320,7 @@ def create_payment_link(
     # vì PayOS success page validate/render URL → trả 302 redirect sẽ khiến
     # Next.js page của PayOS crash "Application error". Chỉ dùng khi caller quên
     # truyền — trỏ tới root domain là an toàn nhất.
-    fallback_url = 'https://web-production-e589d.up.railway.app/'
+    fallback_url = 'https://web-production-9c2ee.up.railway.app/'
     cancel_url_final = cancel_url or fallback_url
     return_url_final = return_url or fallback_url
 
