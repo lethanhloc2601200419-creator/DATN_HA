@@ -2054,6 +2054,7 @@ def tochuc_list(request):
                         candidate = f"{base_slug}-{suffix}"
                     organization.slug = candidate
                     organization.kyc_status = 'submitted'
+                    organization.supervisor_kyc_status = 'submitted'
                     organization.kyc_submitted_at = timezone.now()
                     organization.is_verified = False
                     # GẮN MANAGER = USER GỬI FORM. Khi admin duyệt KYC,
@@ -2187,10 +2188,14 @@ def tochuc_edit_pending(request):
                     # Defensive: KHÔNG cho user đổi các trường quản trị qua form public.
                     updated_org.manager = user
                     updated_org.kyc_status = organization.kyc_status  # giữ nguyên submitted/under_review
+                    updated_org.supervisor_kyc_status = organization.supervisor_kyc_status
                     updated_org.is_verified = False
                     updated_org.kyc_reviewed_at = None
                     updated_org.kyc_reviewed_by = None
                     updated_org.kyc_rejection_reason = None
+                    updated_org.supervisor_reviewed_at = None
+                    updated_org.supervisor_reviewed_by = None
+                    updated_org.supervisor_rejection_reason = None
                     updated_org.save()
 
                     updated_rep = rep_form.save(commit=False)

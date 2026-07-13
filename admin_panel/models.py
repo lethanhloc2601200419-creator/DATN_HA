@@ -148,6 +148,24 @@ class Organization(models.Model):
         verbose_name="Admin duyệt KYC",
     )
     kyc_rejection_reason = models.TextField(blank=True, null=True, verbose_name="Lý do từ chối KYC")
+
+    # Thông tin thẩm định từ Giám sát viên (Cơ quan giám sát)
+    supervisor_kyc_status = models.CharField(
+        max_length=20,
+        choices=KYC_STATUS_CHOICES,
+        default='draft',
+        verbose_name="Trạng thái duyệt của Giám sát",
+    )
+    supervisor_reviewed_at = models.DateTimeField(blank=True, null=True)
+    supervisor_reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supervisor_reviewed_organizations',
+        verbose_name="Giám sát duyệt KYC",
+    )
+    supervisor_rejection_reason = models.TextField(blank=True, null=True, verbose_name="Lý do Giám sát từ chối KYC")
     bank_verified_by_admin = models.BooleanField(default=False, verbose_name="Ngân hàng đã xác thực")
     bank_verified_at = models.DateTimeField(blank=True, null=True)
     bank_verified_by = models.ForeignKey(

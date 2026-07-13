@@ -462,6 +462,14 @@
     </ul>
     {% endif %}
 
+    {% if role == 'supervisor' %}
+    <div class="sidebar-section-title">Khu vực Giám sát</div>
+    <ul class="sidebar-nav">
+      <li><a href="{% url 'admin_panel:giamsat_giaingan' %}" class="{% if '/giamsat/giaingan/' in request.path %}active{% endif %}"><i class="fas fa-money-bill-transfer"></i> Duyệt Giải ngân</a></li>
+      <li><a href="{% url 'admin_panel:giamsat_tochuc' %}" class="{% if '/giamsat/to-chuc/' in request.path %}active{% endif %}"><i class="fas fa-building-ngo"></i> Duyệt Tổ chức</a></li>
+    </ul>
+    {% endif %}
+
     {% if role == 'partner' %}
     <div class="sidebar-section-title">Tài khoản</div>
     <ul class="sidebar-nav">

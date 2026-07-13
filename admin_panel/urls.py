@@ -86,6 +86,7 @@ urlpatterns = [
     # [V3] Cổng thông tin dành riêng cho Giám sát viên (3rd party).
     # Chỉ user có ví trùng `supervisorWallet()` on-chain mới vào được.
     path('giamsat/giaingan/', admin.giamsat_giaingan, name='giamsat_giaingan'),
+    path('giamsat/to-chuc/', admin.giamsat_tochuc, name='giamsat_tochuc'),
     path('api/ipfs/upload/', admin.ipfs_upload_view, name='ipfs_upload_view'),
     path('giaingan/<int:pk>/upload-post-proof/', admin.upload_post_disbursement_proof, name='upload_post_disbursement_proof'),
     path('api/disbursement/approve/', admin.sync_disbursement_approval, name='sync_disbursement_approval'),

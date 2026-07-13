@@ -733,8 +733,12 @@ def quanlytochuc(request):
             messages.info(request, f"Đã chuyển hồ sơ '{org.name}' sang trạng thái đang thẩm định.")
         elif action == 'approve':
             org.kyc_status = 'approved'
-            org.is_verified = True
-            org.verified_at = now
+            # Kiểm tra xem giám sát viên đã duyệt chưa
+            if org.supervisor_kyc_status == 'approved':
+                org.is_verified = True
+                org.verified_at = now
+            else:
+                org.is_verified = False
             org.kyc_reviewed_at = now
             org.kyc_reviewed_by = request.user
             org.kyc_rejection_reason = ''
@@ -2247,7 +2251,93 @@ def giamsat_giaingan(request):
     }
     return render(request, 'admin_panel/giamsat_giaingan.html', context)
 
+# ============================================================
+# [V3] CỔNG THÔNG TIN DÀNH RIÊNG CHO GIÁM SÁT VIÊN DUYỆT TỔ CHỨC
+# ============================================================
+@login_required(login_url='admin_panel:dangnhap')
+def giamsat_tochuc(request):
+    user = request.user
+    approver_context = _get_disbursement_approver_context(user)
+    if approver_context.get('approver_role') != 'supervisor':
+        messages.error(
+            request,
+            "Trang này chỉ dành cho Giám sát viên. Ví đăng nhập của bạn không khớp "
+            "với supervisorWallet on-chain.",
+        )
+        return redirect('admin_panel:trangchu')
 
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        org_id = request.POST.get('organization_id')
+        org = get_object_or_404(Organization, pk=org_id)
+        now = timezone.now()
+
+        if action == 'approve':
+            org.supervisor_kyc_status = 'approved'
+            org.supervisor_reviewed_at = now
+            org.supervisor_reviewed_by = request.user
+            org.supervisor_rejection_reason = ''
+            
+            # Kiểm tra xem admin đã duyệt chưa
+            if org.kyc_status == 'approved':
+                org.is_verified = True
+                org.verified_at = now
+            
+            org.save(update_fields=[
+                'supervisor_kyc_status', 'supervisor_reviewed_at', 'supervisor_reviewed_by',
+                'supervisor_rejection_reason', 'is_verified', 'verified_at'
+            ])
+            messages.success(request, f"Đã duyệt tổ chức '{org.name}' (Giám sát).")
+            
+        elif action == 'reject':
+            org.supervisor_kyc_status = 'rejected'
+            org.supervisor_reviewed_at = now
+            org.supervisor_reviewed_by = request.user
+            org.supervisor_rejection_reason = request.POST.get('rejection_reason', '')
+            org.is_verified = False
+            org.save(update_fields=[
+                'supervisor_kyc_status', 'supervisor_reviewed_at', 'supervisor_reviewed_by',
+                'supervisor_rejection_reason', 'is_verified'
+            ])
+            messages.warning(request, f"Đã từ chối tổ chức '{org.name}'.")
+
+        return redirect('admin_panel:giamsat_tochuc')
+
+    # Get the list of organizations
+    orgs = Organization.objects.all().order_by('-created_at')
+    
+    status_filter = request.GET.get('status', 'pending')
+    if status_filter == 'pending':
+        orgs = orgs.filter(supervisor_kyc_status__in=['draft', 'submitted', 'under_review'])
+    elif status_filter == 'approved':
+        orgs = orgs.filter(supervisor_kyc_status='approved')
+    elif status_filter == 'rejected':
+        orgs = orgs.filter(supervisor_kyc_status='rejected')
+
+    q = request.GET.get('q', '').strip()
+    if q:
+        orgs = orgs.filter(name__icontains=q)
+
+    from django.core.paginator import Paginator
+    paginator = Paginator(orgs, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    stats = {
+        'pending': Organization.objects.filter(supervisor_kyc_status__in=['draft', 'submitted', 'under_review']).count(),
+        'approved': Organization.objects.filter(supervisor_kyc_status='approved').count(),
+        'rejected': Organization.objects.filter(supervisor_kyc_status='rejected').count(),
+    }
+
+    context = {
+        'page_obj': page_obj,
+        'stats': stats,
+        'selected_status': status_filter,
+        'query': q,
+        'approver_context': approver_context,
+    }
+
+    return render(request, 'admin_panel/giamsat_tochuc.html', context)
 @login_required
 def ipfs_upload_view(request):
     if request.method != 'POST':
