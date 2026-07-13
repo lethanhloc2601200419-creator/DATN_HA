@@ -1,257 +1,801 @@
 {% extends 'admin_panel/trangchu.html' %}
 {% load static %}
-{% load humanize %}
 
 {% block content %}
 <div class="container-fluid">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb bg-white p-3 radius-md shadow-sm border">
             <li class="breadcrumb-item"><a href="{% url 'admin_panel:trangchu' %}" class="text-decoration-none"><i class="fas fa-home me-1"></i> Dashboard</a></li>
-            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Giám sát Tổ chức</li>
+            <li class="breadcrumb-item active fw-bold text-primary" aria-current="page">Quản lý Tổ chức</li>
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title m-0">
-            <i class="fas fa-user-shield text-primary me-2"></i>
-            Cổng Giám sát viên <span class="badge bg-primary-100 text-primary fs-6 ms-2">Duyệt Tổ chức</span>
-        </h2>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="page-title m-0">Quản lý Tổ chức Đối tác</h2>
+        <a href="#hoso-kyc" class="btn btn-primary px-4 radius-pill shadow-btn position-relative">
+            <i class="fas fa-clipboard-check me-2"></i> Hồ sơ chờ duyệt
+            {% if stats.pending_kyc %}
+                <span class="badge bg-warning text-dark ms-2">{{ stats.pending_kyc }}</span>
+            {% endif %}
+        </a>
     </div>
 
-    <!-- Alert / Messages -->
-    {% if messages %}
-    <div class="mb-4">
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Stats -->
     <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm radius-md">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 bg-warning-100 text-warning rounded-circle p-3">
-                            <i class="fas fa-hourglass-half fa-2x"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="text-muted fw-bold">Đang chờ duyệt</div>
-                            <h3 class="m-0 fw-800 text-dark">{{ stats.pending }}</h3>
-                        </div>
-                    </div>
-                </div>
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-primary shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Tổng tổ chức</div>
+                <div class="h3 fw-800 m-0">{{ stats.total }}</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm radius-md">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 bg-success-100 text-success rounded-circle p-3">
-                            <i class="fas fa-check-circle fa-2x"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="text-muted fw-bold">Đã duyệt</div>
-                            <h3 class="m-0 fw-800 text-dark">{{ stats.approved }}</h3>
-                        </div>
-                    </div>
-                </div>
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-success shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đã xác thực</div>
+                <div class="h3 fw-800 m-0 text-success">{{ stats.verified }}</div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm radius-md">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0 bg-danger-100 text-danger rounded-circle p-3">
-                            <i class="fas fa-times-circle fa-2x"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="text-muted fw-bold">Đã từ chối</div>
-                            <h3 class="m-0 fw-800 text-dark">{{ stats.rejected }}</h3>
-                        </div>
-                    </div>
-                </div>
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Hồ sơ chờ KYC</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.pending_kyc }}</div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-warning shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Đang khóa</div>
+                <div class="h3 fw-800 m-0 text-warning">{{ stats.locked }}</div>
+            </div>
+        </div>
+        <div class="col-md">
+            <div class="card-charity p-3 border-start border-4 border-info shadow-sm">
+                <div class="text-xs text-muted fw-800 text-uppercase mb-1">Có ví crypto</div>
+                <div class="h3 fw-800 m-0 text-info">{{ stats.with_wallet }}</div>
             </div>
         </div>
     </div>
 
-    <!-- Filter & Search -->
-    <div class="card border-0 shadow-sm radius-md mb-4">
-        <div class="card-body">
+    <div class="kyc-panel card-charity mb-4 overflow-hidden border-0 shadow-sm" id="hoso-kyc">
+        <div class="kyc-panel-head">
+            <div>
+                <div class="eyebrow mb-1">KYC gửi tới</div>
+                <h3 class="m-0">Hồ sơ đăng ký tổ chức đang chờ xử lý</h3>
+                <p class="m-0">Dữ liệu lấy trực tiếp từ form đăng ký tổ chức ngoài trang client.</p>
+            </div>
+            <span class="kyc-count">{{ pending_applications|length }} hồ sơ</span>
+        </div>
+
+        {% if pending_applications %}
+        <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+            <table class="table kyc-table align-middle mb-0">
+                <thead class="sticky-top bg-light" style="z-index: 1;">
+                    <tr>
+                        <th>Tổ chức</th>
+                        <th>Đại diện</th>
+                        <th>Ngân hàng / Ví</th>
+                        <th>Ngày gửi</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in pending_applications %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                {% if org.logo %}
+                                    <img src="{{ org.logo.url }}" alt="{{ org.name }}" class="kyc-logo">
+                                {% elif org.logo_url %}
+                                    <img src="/media/{{ org.logo_url }}" alt="{{ org.name }}" class="kyc-logo">
+                                {% else %}
+                                    <div class="kyc-logo-fallback"><i class="fas fa-building"></i></div>
+                                {% endif %}
+                                <div>
+                                    <div class="fw-800 text-dark">{{ org.name }}</div>
+                                    <div class="caption">{{ org.contact_phone|default:"Chưa có SĐT liên hệ" }}</div>
+                                    {% if org.tax_id %}
+                                        <span class="kyc-mini-badge mt-1">MST: {{ org.tax_id }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if org.representative %}
+                                <div class="fw-600 text-dark">{{ org.representative.full_name }}</div>
+                                <div class="caption">{{ org.representative.position }} · {{ org.representative.phone }}</div>
+                                <div class="caption">{{ org.representative.email }}</div>
+                            {% else %}
+                                <span class="caption">Chưa có thông tin đại diện</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-600 text-dark">{{ org.bank_name|default:"Chưa cập nhật" }}</div>
+                            <div class="caption">{{ org.bank_account_number|default:"—" }} · {{ org.bank_account_name|default:"—" }}</div>
+                            <div class="caption text-truncate" style="max-width: 260px;">{{ org.wallet_address|default:"Chưa có ví crypto" }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-600 text-dark">{{ org.kyc_submitted_at|default:org.created_at|date:"d/m/Y" }}</div>
+                            <div class="caption">{{ org.kyc_submitted_at|default:org.created_at|date:"H:i" }}</div>
+                        </td>
+                        <td class="text-center">
+                            {% if org.supervisor_kyc_status == 'under_review' %}
+                                <span class="kyc-badge badge-primary"><i class="fas fa-magnifying-glass me-1"></i>Đang thẩm định</span>
+                            {% else %}
+                                <span class="kyc-badge badge-warning"><i class="fas fa-hourglass-half me-1"></i>Chờ duyệt</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <button class="btn btn-sm kyc-btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#kyc-detail-{{ org.id }}" aria-expanded="false" aria-controls="kyc-detail-{{ org.id }}">
+                                    <i class="fas fa-eye"></i> Xem hồ sơ
+                                </button>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                    <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                    <button type="submit" name="kyc_action" value="review" class="btn btn-sm kyc-btn-outline">
+                                        <i class="fas fa-clipboard-check"></i> Thẩm định
+                                    </button>
+                                </form>
+                                <form method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                    <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                    <button type="submit" name="kyc_action" value="approve" class="btn btn-sm kyc-btn-primary" onclick="return confirm('Duyệt hồ sơ KYC của {{ org.name }}?')">
+                                        <i class="fas fa-circle-check"></i> Duyệt
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="collapse kyc-detail-row" id="kyc-detail-{{ org.id }}">
+                        <td colspan="6">
+                            <div class="kyc-detail-grid">
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-building me-2"></i>Thông tin tổ chức</h4>
+                                    <p>{{ org.description|default:"Chưa có mô tả." }}</p>
+                                    <dl>
+                                        <dt>Website</dt><dd>{{ org.website|default:"—" }}</dd>
+                                        <dt>Mạng xã hội</dt><dd>{{ org.social_media_link|default:"—" }}</dd>
+                                        <dt>Sứ mệnh</dt><dd>{{ org.mission_statement|default:"—" }}</dd>
+                                        <dt>Trụ sở</dt><dd>{{ org.headquarters_address|default:"—" }}</dd>
+                                    </dl>
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-file-shield me-2"></i>Pháp lý</h4>
+                                    <dl>
+                                        <dt>Giấy phép</dt><dd>{{ org.operating_license_number|default:"—" }}</dd>
+                                        <dt>Ngày thành lập</dt><dd>{{ org.founding_date|date:"d/m/Y"|default:"—" }}</dd>
+                                        <dt>Mã số thuế</dt><dd>{{ org.tax_id|default:"—" }}</dd>
+                                        <dt>Link giấy phép</dt>
+                                        <dd>
+                                            {% if org.license_document_url %}
+                                                <a href="{{ org.license_document_url }}" target="_blank" rel="noopener">Mở tài liệu</a>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </dd>
+                                    </dl>
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-user-tie me-2"></i>Người đại diện</h4>
+                                    {% if org.representative %}
+                                    <dl>
+                                        <dt>Họ tên</dt><dd>{{ org.representative.full_name }}</dd>
+                                        <dt>Chức vụ</dt><dd>{{ org.representative.position }}</dd>
+                                        <dt>CCCD/CMND</dt><dd>{{ org.representative.id_card_number }}</dd>
+                                        <dt>Ngày cấp</dt><dd>{{ org.representative.id_card_date|date:"d/m/Y" }}</dd>
+                                        <dt>Nơi cấp</dt><dd>{{ org.representative.id_card_place }}</dd>
+                                        <dt>Địa chỉ thường trú</dt><dd>{{ org.representative.permanent_address }}</dd>
+                                    </dl>
+                                    {% else %}
+                                        <p>Chưa có thông tin đại diện.</p>
+                                    {% endif %}
+                                </div>
+                                <div class="kyc-detail-card">
+                                    <h4><i class="fas fa-paperclip me-2"></i>Tệp đính kèm</h4>
+                                    {% if org.representative %}
+                                    <div class="kyc-doc-links">
+                                        {% if org.representative.id_card_front %}
+                                            <a href="{{ org.representative.id_card_front.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt trước CCCD</a>
+                                        {% endif %}
+                                        {% if org.representative.id_card_back %}
+                                            <a href="{{ org.representative.id_card_back.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt sau CCCD</a>
+                                        {% endif %}
+                                        {% if org.representative.authorization_letter %}
+                                            <a href="{{ org.representative.authorization_letter.url }}" target="_blank" rel="noopener"><i class="fas fa-file-signature"></i> Giấy ủy quyền</a>
+                                        {% endif %}
+                                        {% if not org.representative.id_card_front and not org.representative.id_card_back and not org.representative.authorization_letter %}
+                                            <span class="caption">Chưa có tệp đính kèm.</span>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                        <p>Chưa có tệp đại diện.</p>
+                                    {% endif %}
+                                    <form method="post" class="mt-3">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ current_url }}#hoso-kyc">
+                                        <input type="hidden" name="organization_id" value="{{ org.id }}">
+                                        <textarea name="rejection_reason" class="form-control kyc-reject-note" rows="2" placeholder="Lý do từ chối hồ sơ (nếu cần)"></textarea>
+                                        <button type="submit" name="kyc_action" value="reject" class="btn btn-sm kyc-btn-danger mt-2" onclick="return confirm('Từ chối hồ sơ KYC của {{ org.name }}?')">
+                                            <i class="fas fa-circle-xmark"></i> Từ chối hồ sơ
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="kyc-empty">
+            <i class="fas fa-inbox"></i>
+            <div>
+                <h4 class="m-0">Chưa có hồ sơ mới</h4>
+                <p class="m-0">Khi tổ chức gửi form đăng ký ngoài client, hồ sơ sẽ xuất hiện tại đây.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card-charity mb-4 overflow-hidden border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+            <h6 class="m-0 fw-800 text-primary"><i class="fas fa-filter me-2"></i> Bộ lọc danh sách</h6>
+        </div>
+        <div class="card-body p-4">
             <form method="GET" class="row g-3 align-items-center">
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0 ps-0" name="q" value="{{ query }}" placeholder="Tìm tên tổ chức...">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Tìm theo tên, SĐT, ngân hàng, quản lý..." value="{{ query }}">
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <select name="status" class="form-select" onchange="this.form.submit()">
-                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Đang chờ duyệt</option>
-                        <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Đã duyệt</option>
-                        <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Bị từ chối</option>
+                    <select name="status" class="form-select">
+                        <option value="">— Trạng thái —</option>
+                        <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Đã xác thực</option>
+                        <option value="locked" {% if selected_status == 'locked' %}selected{% endif %}>Đang khóa</option>
+                        <option value="kyc_pending" {% if selected_status == 'kyc_pending' %}selected{% endif %}>Hồ sơ chờ KYC</option>
+                        <option value="kyc_rejected" {% if selected_status == 'kyc_rejected' %}selected{% endif %}>KYC bị từ chối</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Lọc</button>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold radius-md">LỌC</button>
+                </div>
+                <div class="col-md-12 text-end mt-2">
+                    <a href="{{ export_csv_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-csv me-1"></i> Xuất CSV</a>
+                    <a href="{{ export_excel_url }}" class="small fw-bold text-decoration-none me-3"><i class="fas fa-file-excel me-1"></i> Xuất Excel</a>
+                    <a href="{% url 'admin_panel:giamsat_tochuc' %}" class="small fw-bold text-decoration-none"><i class="fas fa-rotate-left me-1"></i> Xóa lọc</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Table -->
-    <div class="card border-0 shadow-sm radius-md mb-4">
-        <div class="card-body p-0">
-            <div class="table-responsive">
+    <div class="card-charity overflow-hidden border-0 shadow-sm">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ current_url }}">
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <select name="bulk_action" class="form-select form-select-sm" style="width: 200px;">
+                        <option value="">-- Hành động hàng loạt --</option>
+                        <option value="verify">Duyệt nhiều dòng</option>
+                        <option value="lock">Khóa nhiều dòng</option>
+                        <option value="delete">Xóa nhiều dòng</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-dark px-3 fw-bold" onclick="return confirm('Áp dụng thao tác cho các tổ chức đã chọn?')">Áp dụng</button>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                    <thead class="bg-primary text-white sticky-top" style="z-index: 1;">
                         <tr>
-                            <th class="ps-4">Tổ chức</th>
-                            <th>Ngày nộp hồ sơ</th>
-                            <th>Mã số thuế</th>
-                            <th>Người quản lý</th>
-                            <th>Trạng thái Giám sát</th>
-                            <th class="text-end pe-4">Hành động</th>
+                            <th width="4%" class="ps-4"><input type="checkbox" id="select-all-orgs" class="form-check-input"></th>
+                            <th width="8%">Logo</th>
+                            <th width="30%">Tổ chức / Quản lý</th>
+                            <th width="25%">Ngân hàng</th>
+                            <th width="12%" class="text-center">Trạng thái</th>
+                            <th width="15%" class="text-end pe-4">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for org in page_obj %}
-                        <tr>
-                            <td class="ps-4">
-                                <div class="d-flex align-items-center">
-                                    {% if org.logo %}
-                                        <img src="{{ org.logo.url }}" class="rounded-circle me-3" width="40" height="40" style="object-fit: cover;">
-                                    {% elif org.logo_url %}
-                                        <img src="/media/{{ org.logo_url }}" class="rounded-circle me-3" width="40" height="40" style="object-fit: cover;">
-                                    {% else %}
-                                        <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center me-3" style="width:40px; height:40px;">
-                                            <i class="fas fa-building"></i>
-                                        </div>
-                                    {% endif %}
-                                    <div>
-                                        <div class="fw-bold">{{ org.name }}</div>
-                                    </div>
+                        {% for org in orgs %}
+                        <tr class="{% if not org.is_verified %}bg-light opacity-75{% endif %}">
+                            <td class="ps-4"><input type="checkbox" class="row-checkbox-org form-check-input" name="selected_ids" value="{{ org.id }}"></td>
+                            <td class="text-center">
+                                {% if org.logo_url %}
+                                    <img src="/media/{{ org.logo_url }}" 
+                                         onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?background=f3f4f6&color=1e3a8a&name={{ org.name|urlencode }}';" 
+                                         class="rounded border shadow-sm" 
+                                         style="height: 48px; width: 48px; object-fit: cover;">
+                                {% else %}
+                                    <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted small fw-bold" style="height: 48px; width: 48px; font-size: 10px;">NO IMG</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="fw-800 text-dark mb-1">{{ org.name }}</div>
+                                {% if org.manager %}
+                                    <span class="badge bg-primary-100 text-primary border border-primary-200 mt-1 mb-1">
+                                        <i class="fas fa-user-shield me-1"></i> {{ org.manager.username }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning mt-1 mb-1">Chưa có quản lý</span>
+                                {% endif %}
+                                <div class="text-xs text-muted"><i class="fas fa-phone me-1"></i> {{ org.contact_phone|default:"Chưa cập nhật" }}</div>
+                            </td>
+                            <td>
+                                <div class="small">
+                                    <div class="fw-600 text-dark">{{ org.bank_name|default:"—" }}</div>
+                                    <div class="text-muted"><i class="fas fa-money-check me-1"></i>{{ org.bank_account_number|default:"—" }}</div>
+                                    <div class="text-xs text-muted mt-1">{{ org.bank_account_name|default:"—" }}</div>
                                 </div>
                             </td>
-                            <td>{{ org.kyc_submitted_at|date:"d/m/Y H:i" }}</td>
-                            <td>{{ org.tax_id|default:"-" }}</td>
-                            <td>{{ org.manager.username|default:"-" }}</td>
-                            <td>
-                                {% if org.supervisor_kyc_status == 'approved' %}
-                                    <span class="badge bg-success">Đã duyệt</span>
+                            <td class="text-center">
+                                {% if org.is_verified %}
+                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1 radius-pill small"><i class="fas fa-check-circle me-1"></i> Hoạt động</span>
+                                {% elif org.supervisor_kyc_status == 'submitted' %}
+                                    <span class="kyc-badge badge-warning"><i class="fas fa-hourglass-half me-1"></i>Chờ KYC</span>
+                                {% elif org.supervisor_kyc_status == 'under_review' %}
+                                    <span class="kyc-badge badge-primary"><i class="fas fa-magnifying-glass me-1"></i>Đang thẩm định</span>
                                 {% elif org.supervisor_kyc_status == 'rejected' %}
-                                    <span class="badge bg-danger">Từ chối</span>
+                                    <span class="kyc-badge badge-danger"><i class="fas fa-circle-xmark me-1"></i>Từ chối</span>
                                 {% else %}
-                                    <span class="badge bg-warning text-dark">Chờ duyệt</span>
+                                    <span class="badge bg-secondary px-2 py-1 radius-pill small"><i class="fas fa-lock me-1"></i> Đang khóa</span>
+                                {% endif %}
+                                
+                                {% if org.supervisor_kyc_status == 'approved' %}
+                                    <div class="mt-1 text-xs text-success"><i class="fas fa-check-double"></i> Giám sát: Đã duyệt</div>
+                                {% elif org.supervisor_kyc_status == 'rejected' %}
+                                    <div class="mt-1 text-xs text-danger"><i class="fas fa-times"></i> Giám sát: Từ chối</div>
+                                {% elif org.supervisor_kyc_status == 'submitted' or org.supervisor_kyc_status == 'under_review' %}
+                                    <div class="mt-1 text-xs text-warning"><i class="fas fa-clock"></i> Giám sát: Chờ duyệt</div>
                                 {% endif %}
                             </td>
                             <td class="text-end pe-4">
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-org-{{ org.id }}">
-                                    Xem & Thẩm định
-                                </button>
+                                <!-- Giám sát không có quyền sửa/xóa/khóa tổ chức trực tiếp -->
                             </td>
                         </tr>
-
-                        <!-- Modal -->
-                        <div class="modal fade" id="modal-org-{{ org.id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-light">
-                                        <h5 class="modal-title fw-bold">
-                                            <i class="fas fa-clipboard-check text-primary me-2"></i> Thẩm định Tổ chức: {{ org.name }}
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row g-4">
-                                            <div class="col-md-6">
-                                                <h6 class="fw-bold text-muted border-bottom pb-2">Thông tin tổ chức</h6>
-                                                <p><strong>Tên:</strong> {{ org.name }}</p>
-                                                <p><strong>Mã số thuế:</strong> {{ org.tax_id|default:"-" }}</p>
-                                                <p><strong>Website:</strong> {{ org.website|default:"-" }}</p>
-                                                <p><strong>Ngày thành lập:</strong> {{ org.founding_date|date:"d/m/Y"|default:"-" }}</p>
-                                                <p><strong>Số giấy phép:</strong> {{ org.operating_license_number|default:"-" }}</p>
-                                                <p><strong>Ví nhận:</strong> {{ org.wallet_address|default:"-" }}</p>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <h6 class="fw-bold text-muted border-bottom pb-2">Tài khoản Ngân hàng</h6>
-                                                <p><strong>Ngân hàng:</strong> {{ org.bank_name|default:"-" }}</p>
-                                                <p><strong>Chi nhánh:</strong> {{ org.bank_branch|default:"-" }}</p>
-                                                <p><strong>Chủ tài khoản:</strong> {{ org.bank_account_name|default:"-" }}</p>
-                                                <p><strong>Số tài khoản:</strong> {{ org.bank_account_number|default:"-" }}</p>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <h6 class="fw-bold text-muted border-bottom pb-2">Giấy phép hoạt động</h6>
-                                            {% if org.license_document_url %}
-                                                <a href="/media/{{ org.license_document_url }}" target="_blank" class="btn btn-outline-info btn-sm">
-                                                    <i class="fas fa-file-image me-1"></i> Xem giấy phép
-                                                </a>
-                                            {% else %}
-                                                <span class="text-muted fst-italic">Không có bản scan giấy phép</span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light">
-                                        <form method="POST" action="{% url 'admin_panel:giamsat_tochuc' %}">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="organization_id" value="{{ org.id }}">
-                                            
-                                            {% if org.supervisor_kyc_status != 'approved' %}
-                                            <button type="submit" name="action" value="approve" class="btn btn-success" onclick="return confirm('Duyệt hồ sơ này?')">
-                                                <i class="fas fa-check me-1"></i> Duyệt hồ sơ
-                                            </button>
-                                            {% endif %}
-
-                                            {% if org.supervisor_kyc_status != 'rejected' %}
-                                            <button type="button" class="btn btn-danger" data-bs-toggle="collapse" data-bs-target="#reject-form-{{ org.id }}">
-                                                <i class="fas fa-times me-1"></i> Từ chối
-                                            </button>
-                                            <div class="collapse mt-2 text-start w-100" id="reject-form-{{ org.id }}">
-                                                <textarea name="rejection_reason" class="form-control mb-2" rows="2" placeholder="Lý do từ chối..."></textarea>
-                                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm">Xác nhận Từ chối</button>
-                                            </div>
-                                            {% endif %}
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="fas fa-folder-open fa-3x mb-3 text-light"></i>
-                                <p class="mb-0">Không có tổ chức nào.</p>
+                            <td colspan="6" class="admin-empty py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted opacity-20 mb-3"></i>
+                                <p class="text-muted">Không tìm thấy tổ chức nào.</p>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Pagination -->
-            {% if page_obj.has_other_pages %}
-            <div class="p-3 border-top d-flex justify-content-center">
-                <nav aria-label="Page navigation">
-                    <ul class="pagination mb-0">
-                        {% if page_obj.has_previous %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ selected_status }}&q={{ query }}">Trước</a></li>
-                        {% endif %}
-                        
-                        <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
-                        
-                        {% if page_obj.has_next %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ selected_status }}&q={{ query }}">Sau</a></li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            {% endif %}
-        </div>
+        </form>
     </div>
 </div>
+
+{# Modal thêm thủ công đã bỏ theo yêu cầu fix_to_chuc.md — tổ chức bây giờ chỉ được tạo qua hồ sơ KYC do user web gửi từ /to-chuc/. Route them_tochuc giữ để backward-compat nếu có link cũ. #}
+<div class="modal fade d-none" id="addModal" tabindex="-1" aria-hidden="true" style="display: none !important;">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <form class="modal-content border-0 radius-lg shadow-lg" action="{% url 'admin_panel:them_tochuc' %}" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header bg-primary text-white border-0 py-3 px-4">
+                <h5 class="modal-title fw-800"><i class="fas fa-plus-circle me-2"></i> Thêm Tổ chức & Cấp tài khoản</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                
+                <div class="bg-white p-4 radius-md border shadow-sm mb-4 border-start border-4 border-info">
+                    <h6 class="text-primary fw-800 mb-3 text-uppercase small"><i class="fas fa-user-lock me-2"></i> Cấp tài khoản quản trị</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Tên đăng nhập (Username) *</label>
+                            <input type="text" name="org_username" class="form-control" placeholder="VD: quytrongheo" required autocomplete="off">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Mật khẩu *</label>
+                            <input type="text" name="org_password" class="form-control" placeholder="VD: 123456" required autocomplete="off">
+                        </div>
+                        <div class="col-12 text-xs text-muted">
+                            <i class="fas fa-info-circle me-1"></i> Tài khoản này sẽ được tự động tạo và gán quyền quản lý tổ chức.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 radius-md border shadow-sm mb-4">
+                    <h6 class="text-success fw-800 mb-3 text-uppercase small"><i class="fas fa-building me-2"></i> Thông tin Tổ chức</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Tên Tổ chức *</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Hotline (SĐT)</label>
+                            <input type="text" name="phone" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="fw-bold small text-muted">Logo</label>
+                            <input type="file" name="logo" class="form-control">
+                        </div>
+                        
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold small text-muted">Thông tin Ngân hàng (Nhận quyên góp)</label>
+                            <div class="input-group">
+                                <input type="text" name="bank_name" class="form-control" placeholder="Tên NH (VD: MBBank)" required>
+                                <input type="text" name="bank_account" class="form-control" placeholder="Số TK" required>
+                                <input type="text" name="account_holder" class="form-control" placeholder="Tên chủ TK" required>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="fw-bold small text-muted">Địa chỉ ví Crypto (MetaMask) *</label>
+                            <input type="text" name="wallet_address" class="form-control" placeholder="0x..." required>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-warning fw-800 mb-3 text-uppercase small"><i class="fas fa-cogs me-2"></i> Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <input type="text" name="payos_client_id" class="form-control" placeholder="Client ID">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="password" name="payos_api_key" class="form-control" placeholder="API Key">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="password" name="payos_checksum_key" class="form-control" placeholder="Checksum Key">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold small text-muted">Mô tả / Giới thiệu</label>
+                            <textarea name="description" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0 py-3 px-4">
+                <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-primary fw-bold radius-pill px-4"><i class="fas fa-save me-1"></i> Lưu Tổ chức</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <form class="modal-content border-0 radius-lg shadow-lg" id="editForm" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header bg-primary text-white border-0 py-3 px-4">
+                <h5 class="modal-title fw-800"><i class="fas fa-edit me-2"></i> Cập nhật Thông tin Tổ chức</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="alert bg-info-subtle border-info text-info py-2 px-3 radius-md small fw-600 mb-4">
+                    <i class="fas fa-info-circle me-1"></i> Không thể thay đổi tài khoản quản lý tại đây. Vui lòng vào mục Quản lý Người dùng nếu cần.
+                </div>
+                <div class="bg-white p-4 radius-md border shadow-sm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Tên Tổ chức *</label>
+                            <input type="text" name="name" id="e_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold small text-muted">Hotline (SĐT)</label>
+                            <input type="text" name="phone" id="e_phone" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="fw-bold small text-muted">Logo Mới (Bỏ qua nếu không đổi)</label>
+                            <input type="file" name="logo" class="form-control">
+                        </div>
+                        
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold small text-muted">Thông tin Ngân hàng</label>
+                            <div class="row g-2">
+                                <div class="col-md-4"><input type="text" name="bank_name" id="e_bank_name" class="form-control" placeholder="Tên NH" required></div>
+                                <div class="col-md-4"><input type="text" name="bank_account" id="e_bank_account" class="form-control" placeholder="Số TK" required></div>
+                                <div class="col-md-4"><input type="text" name="account_holder" id="e_account_holder" class="form-control" placeholder="Chủ TK" required></div>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold small text-muted">Địa chỉ ví Crypto (MetaMask) *</label>
+                            <input type="text" name="wallet_address" id="e_wallet_address" class="form-control" required>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-warning fw-800 mb-3 text-uppercase small"><i class="fas fa-cogs me-2"></i> Cấu hình PayOS (Dành cho Giải ngân)</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4"><input type="text" name="payos_client_id" id="e_payos_client_id" class="form-control" placeholder="Client ID"></div>
+                                <div class="col-md-4"><input type="password" name="payos_api_key" id="e_payos_api_key" class="form-control" placeholder="API Key"></div>
+                                <div class="col-md-4"><input type="password" name="payos_checksum_key" id="e_payos_checksum_key" class="form-control" placeholder="Checksum Key"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <label class="fw-bold small text-muted">Mô tả chi tiết</label>
+                            <textarea name="description" id="e_description" class="form-control" rows="4"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0 py-3 px-4">
+                <button type="button" class="btn btn-outline-secondary fw-bold radius-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-primary fw-bold radius-pill px-4"><i class="fas fa-save me-1"></i> Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function fillEditForm(id, name, phone, bankName, bankAccount, accHolder, desc, walletAddress, payosClientId, payosApiKey, payosChecksumKey) {
+        document.getElementById('editForm').action = "/admin/tochuc/sua/" + id + "/";
+        document.getElementById('e_name').value = name;
+        document.getElementById('e_phone').value = phone;
+        document.getElementById('e_bank_name').value = bankName;
+        document.getElementById('e_bank_account').value = bankAccount;
+        document.getElementById('e_account_holder').value = accHolder;
+        document.getElementById('e_description').value = desc;
+        document.getElementById('e_wallet_address').value = walletAddress;
+        document.getElementById('e_payos_client_id').value = payosClientId || '';
+        document.getElementById('e_payos_api_key').value = payosApiKey || '';
+        document.getElementById('e_payos_checksum_key').value = payosChecksumKey || '';
+    }
+
+    document.getElementById('select-all-orgs')?.addEventListener('change', function() {
+        document.querySelectorAll('.row-checkbox-org').forEach(cb => {
+            cb.checked = this.checked;
+        });
+    });
+</script>
+
+<style>
+    .fw-800 { font-weight: 800; }
+    .fw-600 { font-weight: 600; }
+    .opacity-20 { opacity: 0.2; }
+    .eyebrow {
+        color: var(--primary-600);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+    .caption {
+        color: var(--neutral-500);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .kyc-panel {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+    }
+    .kyc-panel-head {
+        background: var(--primary-50);
+        border-bottom: 1px solid var(--primary-200);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        flex-wrap: wrap;
+    }
+    .kyc-panel-head h3 {
+        color: var(--primary-900);
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+    .kyc-panel-head p {
+        color: var(--neutral-500);
+        font-size: 13px;
+        line-height: 1.6;
+        margin-top: 4px !important;
+    }
+    .kyc-count,
+    .kyc-mini-badge,
+    .kyc-badge {
+        border-radius: var(--radius-full);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 6px 10px;
+        white-space: nowrap;
+    }
+    .kyc-count,
+    .kyc-mini-badge,
+    .kyc-badge.badge-primary {
+        background: var(--primary-100);
+        color: var(--primary-800);
+    }
+    .kyc-badge.badge-warning {
+        background: var(--warning-100);
+        color: var(--warning-600);
+    }
+    .kyc-badge.badge-success {
+        background: var(--success-100);
+        color: var(--success-600);
+    }
+    .kyc-badge.badge-danger {
+        background: var(--danger-100);
+        color: var(--danger-600);
+    }
+    .kyc-table th {
+        background: var(--white);
+        border-bottom: 1px solid var(--primary-200);
+        color: var(--neutral-500);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        padding: 14px 18px;
+        text-transform: uppercase;
+    }
+    .kyc-table td {
+        border-color: var(--primary-100);
+        color: var(--neutral-700);
+        padding: 16px 18px;
+    }
+    .kyc-logo,
+    .kyc-logo-fallback {
+        width: 52px;
+        height: 52px;
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        flex: 0 0 auto;
+    }
+    .kyc-logo {
+        background: var(--neutral-100);
+        object-fit: cover;
+    }
+    .kyc-logo-fallback {
+        background: var(--primary-100);
+        color: var(--primary-800);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .kyc-btn-primary,
+    .kyc-btn-outline,
+    .kyc-btn-ghost,
+    .kyc-btn-danger {
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 700;
+        gap: 6px;
+        padding: 7px 12px;
+    }
+    .kyc-btn-primary {
+        background: var(--primary-800);
+        color: var(--white);
+        box-shadow: var(--shadow-btn);
+    }
+    .kyc-btn-primary:hover {
+        background: var(--primary-700);
+        color: var(--white);
+    }
+    .kyc-btn-outline {
+        background: transparent;
+        border: 1.5px solid var(--primary-300);
+        color: var(--primary-800);
+    }
+    .kyc-btn-outline:hover,
+    .kyc-btn-ghost:hover {
+        background: var(--primary-50);
+        color: var(--primary-800);
+    }
+    .kyc-btn-ghost {
+        background: var(--primary-100);
+        color: var(--primary-800);
+    }
+    .kyc-btn-danger {
+        background: var(--danger-100);
+        color: var(--danger-600);
+    }
+    .kyc-btn-danger:hover {
+        background: var(--danger-600);
+        color: var(--white);
+    }
+    .kyc-detail-row td {
+        background: var(--primary-50);
+        padding: 1.25rem 1.5rem;
+    }
+    .kyc-detail-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    .kyc-detail-card {
+        background: var(--white);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 1rem;
+    }
+    .kyc-detail-card h4 {
+        color: var(--primary-800);
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+    .kyc-detail-card p {
+        color: var(--neutral-700);
+        font-size: 13px;
+        line-height: 1.65;
+    }
+    .kyc-detail-card dl {
+        display: grid;
+        gap: 8px 12px;
+        grid-template-columns: 110px minmax(0, 1fr);
+        margin: 0;
+    }
+    .kyc-detail-card dt {
+        color: var(--neutral-500);
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .kyc-detail-card dd {
+        color: var(--neutral-700);
+        font-size: 13px;
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+    .kyc-doc-links {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .kyc-doc-links a {
+        align-items: center;
+        background: var(--primary-50);
+        border: 1px solid var(--primary-200);
+        border-radius: var(--radius-md);
+        color: var(--primary-800);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 700;
+        gap: 8px;
+        padding: 9px 11px;
+        text-decoration: none;
+    }
+    .kyc-doc-links a:hover {
+        background: var(--primary-100);
+    }
+    .kyc-reject-note {
+        border: 1.5px solid var(--neutral-300);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+    }
+    .kyc-empty {
+        align-items: center;
+        color: var(--neutral-500);
+        display: flex;
+        gap: 1rem;
+        padding: 2rem 1.5rem;
+    }
+    .kyc-empty i {
+        align-items: center;
+        background: var(--primary-100);
+        border-radius: var(--radius-md);
+        color: var(--primary-800);
+        display: inline-flex;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+    }
+    .kyc-empty h4 {
+        color: var(--primary-900);
+        font-size: 15px;
+        font-weight: 700;
+    }
+    @media (max-width: 767.98px) {
+        .kyc-panel-head {
+            align-items: flex-start;
+        }
+        .kyc-table th,
+        .kyc-table td {
+            min-width: 180px;
+        }
+        .kyc-detail-card dl {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 {% endblock %}
