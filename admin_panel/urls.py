@@ -45,6 +45,7 @@ urlpatterns = [
     path('trangchu/', admin.trangchu, name='trangchu'),
     path('dangnhap/', admin.dangnhap, name='dangnhap'),
     path('dangky/', admin.dangky, name='dangky'),
+    path('hoso-tochuc/', admin.hoso_tochuc, name='hoso_tochuc'),
 
     # Đăng xuất (Mới)
     path('dangxuat/', admin.dangxuat, name='dangxuat'),

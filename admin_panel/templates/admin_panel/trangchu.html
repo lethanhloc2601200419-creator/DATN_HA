@@ -473,7 +473,7 @@
     {% if role == 'partner' %}
     <div class="sidebar-section-title">Tài khoản</div>
     <ul class="sidebar-nav">
-      <li><a href="#"><i class="fas fa-id-card"></i> Hồ sơ tổ chức</a></li>
+      <li><a href="{% url 'admin_panel:hoso_tochuc' %}" class="{% if '/hoso-tochuc/' in request.path %}active{% endif %}"><i class="fas fa-id-card"></i> Hồ sơ tổ chức</a></li>
       <li><a href="#"><i class="fas fa-key"></i> Đổi mật khẩu</a></li>
     </ul>
     {% endif %}

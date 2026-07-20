@@ -442,6 +442,32 @@ def trangchu(request):
     }
     return render(request, 'admin_panel/trangchu.html', context)
 
+@login_required(login_url='admin_panel:dangnhap')
+def hoso_tochuc(request):
+    user = request.user
+    
+    # Xác định role giống trang chủ để hiển thị đúng sidebar
+    role = 'user'
+    if user.is_superuser:
+        role = 'admin'
+    elif _get_disbursement_approver_context(user).get('approver_role') == 'supervisor':
+        role = 'supervisor'
+    elif _user_has_approved_org(user) or Organization.objects.filter(manager=user).exists():
+        role = 'partner'
+    
+    # Lấy hồ sơ tổ chức do user quản lý
+    org = Organization.objects.filter(manager=user).first()
+    
+    if not org:
+        messages.error(request, "Bạn chưa đăng ký hồ sơ tổ chức nào.")
+        return redirect('admin_panel:trangchu')
+        
+    context = {
+        'role': role,
+        'org': org,
+    }
+    return render(request, 'admin_panel/hoso_tochuc.html', context)
+
 # --- VIEW ĐĂNG NHẬP ---
 def dangnhap(request):
     if request.user.is_authenticated:
