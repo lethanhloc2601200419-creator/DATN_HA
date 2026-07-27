@@ -442,11 +442,16 @@ def trangchu(request):
     }
 
     if role in ['admin', 'supervisor']:
-        context['total_disbursed'] = CampaignDisbursement.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
+        # Fix total_disbursed by using DisbursementProposal
+        context['total_disbursed'] = DisbursementProposal.objects.filter(status='executed').aggregate(Sum('amount_requested'))['amount_requested__sum'] or 0
+        
         context['total_donors'] = Donation.objects.filter(status='completed').count()
-        context['active_campaigns'] = Campaign.objects.filter(status='active').count()
+        
+        # Calculate ended campaigns considering active ones that passed their end date
+        today = timezone.now().date()
+        context['active_campaigns'] = Campaign.objects.filter(status='active', end_date__gte=today).count()
         context['completed_campaigns'] = Campaign.objects.filter(status='completed').count()
-        context['ended_campaigns'] = Campaign.objects.filter(status='ended').count()
+        context['ended_campaigns'] = Campaign.objects.filter(Q(status='ended') | Q(status='active', end_date__lt=today)).count()
         
         # Data cho biểu đồ tròn (Donation by Category)
         category_donations = Donation.objects.filter(status='completed').values('campaign__category__name').annotate(total=Sum('amount')).order_by('-total')
