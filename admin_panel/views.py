@@ -438,8 +438,21 @@ def trangchu(request):
         'total_donations_amount': total_donations_amount,
         'total_pending_disbursements': total_pending_disbursements,
         'orgs_count': Organization.objects.count() if role == 'admin' else 0,
-        'recent_activities': ActivityLog.objects.order_by('-created_at')[:6] if role in ['admin', 'supervisor'] else ActivityLog.objects.filter(campaign__organization__manager=user).order_by('-created_at')[:6]
+        'recent_activities': ActivityLog.objects.order_by('-created_at')[:6] if role in ['admin', 'supervisor'] else ActivityLog.objects.filter(campaign__organization__manager=user).order_by('-created_at')[:6],
     }
+
+    if role in ['admin', 'supervisor']:
+        context['total_disbursed'] = CampaignDisbursement.objects.filter(status='completed').aggregate(Sum('amount'))['amount__sum'] or 0
+        context['total_donors'] = Donation.objects.filter(status='completed').count()
+        context['active_campaigns'] = Campaign.objects.filter(status='active').count()
+        context['completed_campaigns'] = Campaign.objects.filter(status='completed').count()
+        context['ended_campaigns'] = Campaign.objects.filter(status='ended').count()
+        
+        # Data cho biểu đồ tròn (Donation by Category)
+        category_donations = Donation.objects.filter(status='completed').values('campaign__category__name').annotate(total=Sum('amount')).order_by('-total')
+        context['chart_category_labels'] = json.dumps([item['campaign__category__name'] or 'Khác' for item in category_donations])
+        context['chart_category_data'] = json.dumps([float(item['total']) for item in category_donations])
+
     return render(request, 'admin_panel/trangchu.html', context)
 
 @login_required(login_url='admin_panel:dangnhap')
