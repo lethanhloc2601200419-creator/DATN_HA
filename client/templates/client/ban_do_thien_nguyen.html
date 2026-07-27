@@ -851,7 +851,12 @@
         markersById = {};
         
         list.forEach(function(c) {
-            var color = c.status === 'active' ? '#f97316' : (c.status === 'completed' ? '#16a34a' : '#6b7280');
+            var displayStatus = c.status;
+            if (c.status === 'active' && c.days_left !== null && c.days_left < 0) {
+                displayStatus = 'ended';
+            }
+            
+            var color = displayStatus === 'active' ? '#f97316' : (displayStatus === 'ended' ? '#16a34a' : '#6b7280');
             var popupHtml = buildPopup(c);
             
             // Nếu bảo vệ người thụ hưởng VÀ có dữ liệu GeoJSON
@@ -883,7 +888,7 @@
 
             // Fallback: vẽ marker bình thường
             var marker = L.marker([c.lat, c.lng], { 
-                icon: buildIcon(c.status),
+                icon: buildIcon(displayStatus),
                 riseOnHover: true,
                 alt: c.title
             });
