@@ -348,7 +348,11 @@ window.addEventListener("load", async function () {
     } catch (error) {
       if (typeof window.hideLoader === "function") window.hideLoader();
       console.error("[DCP][Web3Auth] 5. login lỗi:", error);
-      showToast(error && error.message ? error.message : "Đăng nhập thất bại");
+      let msg = error && error.message ? error.message : "Đăng nhập thất bại";
+      if (msg.includes("Failed to connect with wallet") || msg.includes("Failed to login with auth")) {
+        msg = "Bạn đã huỷ đăng nhập hoặc quá trình kết nối bị lỗi.";
+      }
+      showToast(msg);
     }
   }
 
