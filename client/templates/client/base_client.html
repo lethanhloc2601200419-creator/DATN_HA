@@ -574,7 +574,7 @@
     <script src="{% static 'client/js/auth-adapter.js' %}"></script>
     {{ web3auth_public_config|json_script:"web3auth-config" }}
     <!-- 4. Our Bootstrap Logic (MUST BE LAST) -->
-    <script src="{% static 'client/js/web3auth-bootstrap.js' %}"></script>
+    <script src="{% static 'client/js/web3auth-bootstrap.js' %}?v=2"></script>
 
     <script>
     // Toast Notification System
