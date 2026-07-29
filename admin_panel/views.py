@@ -107,7 +107,7 @@ def _fetch_casso_addresskit(path):
     response.raise_for_status()
     return response.json()
 
-
+# vip
 def _apply_campaign_location(campaign, post_data):
     campaign.beneficiary_province = _clean_admin_unit_name(post_data.get('beneficiary_province')) or None
     campaign.beneficiary_ward = _clean_admin_unit_name(post_data.get('beneficiary_ward')) or None
