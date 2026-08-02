@@ -2379,7 +2379,7 @@ def giamsat_tochuc(request):
         return redirect('admin_panel:giamsat_tochuc')
 
     # Get the list of organizations
-    orgs = Organization.objects.all().order_by('-created_at')
+    orgs = Organization.objects.select_related('representative').all().order_by('-created_at')
     
     status_filter = request.GET.get('status', '')
     if status_filter == 'kyc_pending':

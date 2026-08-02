@@ -353,8 +353,78 @@
                             </td>
                             <td class="text-end pe-4">
                                 <!-- Giám sát không có quyền sửa/xóa/khóa tổ chức trực tiếp -->
+                                <button class="btn btn-sm kyc-btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#org-detail-{{ org.id }}" aria-expanded="false" aria-controls="org-detail-{{ org.id }}">
+                                    <i class="fas fa-eye"></i> Xem chi tiết
+                                </button>
                             </td>
                         </tr>
+                        <tr class="collapse kyc-detail-row" id="org-detail-{{ org.id }}">
+                            <td colspan="6">
+                                <div class="kyc-detail-grid">
+                                    <div class="kyc-detail-card">
+                                        <h4><i class="fas fa-building me-2"></i>Thông tin tổ chức</h4>
+                                        <p>{{ org.description|default:"Chưa có mô tả." }}</p>
+                                        <dl>
+                                            <dt>Website</dt><dd>{{ org.website|default:"—" }}</dd>
+                                            <dt>Mạng xã hội</dt><dd>{{ org.social_media_link|default:"—" }}</dd>
+                                            <dt>Sứ mệnh</dt><dd>{{ org.mission_statement|default:"—" }}</dd>
+                                            <dt>Trụ sở</dt><dd>{{ org.headquarters_address|default:"—" }}</dd>
+                                        </dl>
+                                    </div>
+                                    <div class="kyc-detail-card">
+                                        <h4><i class="fas fa-file-shield me-2"></i>Pháp lý</h4>
+                                        <dl>
+                                            <dt>Giấy phép</dt><dd>{{ org.operating_license_number|default:"—" }}</dd>
+                                            <dt>Ngày thành lập</dt><dd>{{ org.founding_date|date:"d/m/Y"|default:"—" }}</dd>
+                                            <dt>Mã số thuế</dt><dd>{{ org.tax_id|default:"—" }}</dd>
+                                            <dt>Link giấy phép</dt>
+                                            <dd>
+                                                {% if org.license_document_url %}
+                                                    <a href="{{ org.license_document_url }}" target="_blank" rel="noopener">Mở tài liệu</a>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                    <div class="kyc-detail-card">
+                                        <h4><i class="fas fa-user-tie me-2"></i>Người đại diện</h4>
+                                        {% if org.representative %}
+                                        <dl>
+                                            <dt>Họ tên</dt><dd>{{ org.representative.full_name }}</dd>
+                                            <dt>Chức vụ</dt><dd>{{ org.representative.position }}</dd>
+                                            <dt>CCCD/CMND</dt><dd>{{ org.representative.id_card_number }}</dd>
+                                            <dt>Ngày cấp</dt><dd>{{ org.representative.id_card_date|date:"d/m/Y" }}</dd>
+                                            <dt>Nơi cấp</dt><dd>{{ org.representative.id_card_place }}</dd>
+                                            <dt>Địa chỉ thường trú</dt><dd>{{ org.representative.permanent_address }}</dd>
+                                        </dl>
+                                        {% else %}
+                                            <p>Chưa có thông tin đại diện.</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="kyc-detail-card">
+                                        <h4><i class="fas fa-paperclip me-2"></i>Tệp đính kèm</h4>
+                                        {% if org.representative %}
+                                        <div class="kyc-doc-links">
+                                            {% if org.representative.id_card_front %}
+                                                <a href="{{ org.representative.id_card_front.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt trước CCCD</a>
+                                            {% endif %}
+                                            {% if org.representative.id_card_back %}
+                                                <a href="{{ org.representative.id_card_back.url }}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> Mặt sau CCCD</a>
+                                            {% endif %}
+                                            {% if org.representative.authorization_letter %}
+                                                <a href="{{ org.representative.authorization_letter.url }}" target="_blank" rel="noopener"><i class="fas fa-file-signature"></i> Giấy ủy quyền</a>
+                                            {% endif %}
+                                            {% if not org.representative.id_card_front and not org.representative.id_card_back and not org.representative.authorization_letter %}
+                                                <span class="caption">Chưa có tệp đính kèm.</span>
+                                            {% endif %}
+                                        </div>
+                                        {% else %}
+                                            <p>Chưa có tệp đại diện.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
                         {% empty %}
                         <tr>
                             <td colspan="6" class="admin-empty py-5">
