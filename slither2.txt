@@ -1,0 +1,300 @@
+Multiple frameworks detected: solc, Solc-json. Using solc (highest priority). Use --compile-force-framework to override.
+'solc --version' running
+'solc @openzeppelin/=node_modules/@openzeppelin/ smart2.sol --combined-json abi,ast,bin,bin-runtime,srcmap,srcmap-runtime,userdoc,devdoc,hashes --allow-paths .,/home/locwara/Ha/doantn/DATN_HA' running
+INFO:Detectors:
+Detector: incorrect-exp
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) has bitwise-xor operator ^ instead of the exponentiation operator **: 
+	 - inverse = (3 * denominator) ^ 2 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#259)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-exponentiation
+INFO:Detectors:
+Detector: divide-before-multiply
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse = (3 * denominator) ^ 2 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#259)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#263)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#264)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#265)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#266)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#267)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#244)
+	- inverse *= 2 - denominator * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#268)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) performs a multiplication on the result of a division:
+	- low = low / twos (node_modules/@openzeppelin/contracts/utils/math/Math.sol#247)
+	- result = low * inverse (node_modules/@openzeppelin/contracts/utils/math/Math.sol#274)
+Math.invMod(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#317-363) performs a multiplication on the result of a division:
+	- quotient = gcd / remainder (node_modules/@openzeppelin/contracts/utils/math/Math.sol#339)
+	- (gcd,remainder) = (remainder,gcd - remainder * quotient) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#341-348)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+INFO:Detectors:
+Detector: reentrancy-no-eth
+Reentrancy in DCPManager.recordDonation(uint256,address,address,uint256) (smart2.sol#218-264):
+	External calls:
+	- vndt.mint(treasuryWallet,fee) (smart2.sol#238)
+	- vndt.mint(_multisigAddress,netAmount) (smart2.sol#242)
+	State variables written after the call(s):
+	- c.currentAmount += netAmount (smart2.sol#246)
+	DCPManager._campaigns (smart2.sol#69) can be used in cross function reentrancies:
+	- DCPManager._executeDisbursement(uint256) (smart2.sol#309-313)
+	- DCPManager.approveDisbursement(uint256) (smart2.sol#284-304)
+	- DCPManager.createCampaign(uint256,address,address) (smart2.sol#185-201)
+	- DCPManager.getCampaign(uint256) (smart2.sol#318-332)
+	- DCPManager.hasApproved(uint256,address) (smart2.sol#334-336)
+	- DCPManager.proposeDisbursement(uint256,string) (smart2.sol#269-282)
+	- DCPManager.recordDonation(uint256,address,address,uint256) (smart2.sol#218-264)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+INFO:Detectors:
+Detector: reentrancy-benign
+Reentrancy in DCPManager.recordDonation(uint256,address,address,uint256) (smart2.sol#218-264):
+	External calls:
+	- vndt.mint(treasuryWallet,fee) (smart2.sol#238)
+	- vndt.mint(_multisigAddress,netAmount) (smart2.sol#242)
+	State variables written after the call(s):
+	- badgeAmount[newTokenId] = netAmount (smart2.sol#259)
+	- badgeCampaign[newTokenId] = _campaignId (smart2.sol#258)
+	- campaignRaised[_campaignId] += netAmount (smart2.sol#247)
+	- donorContributions[_campaignId][_donor] += netAmount (smart2.sol#253)
+	- totalBadges += 1 (smart2.sol#256)
+	- uniqueDonors[_campaignId] += 1 (smart2.sol#251)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+INFO:Detectors:
+Detector: reentrancy-events
+Reentrancy in DCPManager.recordDonation(uint256,address,address,uint256) (smart2.sol#218-264):
+	External calls:
+	- vndt.mint(treasuryWallet,fee) (smart2.sol#238)
+	- vndt.mint(_multisigAddress,netAmount) (smart2.sol#242)
+	- _safeMint(_donor,newTokenId) (smart2.sol#260)
+		- ERC721Utils.checkOnERC721Received(_msgSender(),address(0),to,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#289)
+		- retval = IERC721Receiver(to).onERC721Received(operator,from,tokenId,data) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#33-47)
+	Event emitted after the call(s):
+	- Approval(owner,to,tokenId) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#394)
+		- _safeMint(_donor,newTokenId) (smart2.sol#260)
+	- BadgeMinted(_donor,newTokenId,_campaignId,netAmount) (smart2.sol#262)
+	- DonationRecorded(_campaignId,_donor,_multisigAddress,netAmount,fee,newTokenId) (smart2.sol#263)
+	- Transfer(from,to,tokenId) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#242)
+		- _safeMint(_donor,newTokenId) (smart2.sol#260)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-4
+INFO:Detectors:
+Detector: assembly
+ERC721Utils.checkOnERC721Received(address,address,address,uint256,bytes) (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#25-49) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#43-45)
+Bytes.slice(bytes,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#86-98) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#93-95)
+Bytes.splice(bytes,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#117-129) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#123-126)
+Bytes.replace(bytes,uint256,bytes,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#154-172) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#167-169)
+Bytes.concat(bytes[]) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#183-203) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#194-196)
+Bytes.toNibbles(bytes) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#210-245) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#211-244)
+Bytes._unsafeReadBytesOffset(bytes,uint256) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#326-331) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Bytes.sol#328-330)
+Panic.panic(uint256) (node_modules/@openzeppelin/contracts/utils/Panic.sol#50-56) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Panic.sol#51-55)
+Strings.toString(uint256) (node_modules/@openzeppelin/contracts/utils/Strings.sol#42-60) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#47-49)
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#52-54)
+Strings.toChecksumHexString(address) (node_modules/@openzeppelin/contracts/utils/Strings.sol#108-126) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#113-115)
+Strings.escapeJSON(string) (node_modules/@openzeppelin/contracts/utils/Strings.sol#461-505) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#468-470)
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#499-502)
+Strings._unsafeReadBytesOffset(bytes,uint256) (node_modules/@openzeppelin/contracts/utils/Strings.sol#513-518) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#515-517)
+Strings._unsafeWriteBytesOffset(bytes,uint256,bytes1) (node_modules/@openzeppelin/contracts/utils/Strings.sol#526-531) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/Strings.sol#528-530)
+Math.add512(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#25-30) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#26-29)
+Math.mul512(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#37-46) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#41-45)
+Math.tryMul(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#73-84) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#76-80)
+Math.tryDiv(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#89-97) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#92-95)
+Math.tryMod(uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#102-110) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#105-108)
+Math.mulDiv(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#206-277) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#229-236)
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#242-251)
+Math.tryModExp(uint256,uint256,uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#411-435) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#413-434)
+Math.tryModExp(bytes,bytes,bytes) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#451-473) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#463-472)
+Math._zeroBytes(bytes) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#478-490) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#482-484)
+Math.log2(uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#619-658) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/Math.sol#655-657)
+SafeCast.toUint(bool) (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#1157-1161) uses assembly
+	- INLINE ASM (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#1158-1160)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage
+INFO:Detectors:
+Detector: pragma
+6 different versions of Solidity are used:
+	- Version constraint ^0.8.20 is used by:
+		-^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/Panic.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5)
+		-^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4)
+		-^0.8.20 (smart2.sol#2)
+	- Version constraint >=0.8.4 is used by:
+		->=0.8.4 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#4)
+	- Version constraint ^0.8.24 is used by:
+		-^0.8.24 (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#4)
+		-^0.8.24 (node_modules/@openzeppelin/contracts/utils/Bytes.sol#4)
+		-^0.8.24 (node_modules/@openzeppelin/contracts/utils/Strings.sol#4)
+	- Version constraint >=0.6.2 is used by:
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol#4)
+		->=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol#4)
+	- Version constraint >=0.5.0 is used by:
+		->=0.5.0 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol#4)
+	- Version constraint >=0.4.16 is used by:
+		->=0.4.16 (node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used
+INFO:Detectors:
+Detector: dead-code
+Context._contextSuffixLength() (node_modules/@openzeppelin/contracts/utils/Context.sol#25-27) is never used and should be removed
+Context._msgData() (node_modules/@openzeppelin/contracts/utils/Context.sol#21-23) is never used and should be removed
+DCPManager._baseURI() (smart2.sol#383-385) is never used and should be removed
+ERC721._approve(address,uint256,address) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#375-377) is never used and should be removed
+ERC721._burn(uint256) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#303-308) is never used and should be removed
+ERC721._increaseBalance(address,uint128) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#199-203) is never used and should be removed
+ERC721._safeTransfer(address,address,uint256) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#352-354) is never used and should be removed
+ERC721._safeTransfer(address,address,uint256,bytes) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#360-363) is never used and should be removed
+ERC721._setApprovalForAll(address,address,bool) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#409-418) is never used and should be removed
+ERC721._transfer(address,address,uint256) (node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol#321-331) is never used and should be removed
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dead-code
+INFO:Detectors:
+Detector: solc-version
+Version constraint ^0.8.20 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- VerbatimInvalidDeduplication
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess.
+It is used by:
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/Panic.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5)
+	- ^0.8.20 (node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4)
+	- ^0.8.20 (smart2.sol#2)
+Version constraint >=0.8.4 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- FullInlinerNonExpressionSplitArgumentEvaluationOrder
+	- MissingSideEffectsOnSelectorAccess
+	- AbiReencodingHeadOverflowWithStaticArrayCleanup
+	- DirtyBytesArrayToStorage
+	- DataLocationChangeInInternalOverride
+	- NestedCalldataArrayAbiReencodingSizeValidation
+	- SignedImmutables.
+It is used by:
+	- >=0.8.4 (node_modules/@openzeppelin/contracts/interfaces/draft-IERC6093.sol#4)
+Version constraint >=0.6.2 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- MissingSideEffectsOnSelectorAccess
+	- AbiReencodingHeadOverflowWithStaticArrayCleanup
+	- DirtyBytesArrayToStorage
+	- NestedCalldataArrayAbiReencodingSizeValidation
+	- ABIDecodeTwoDimensionalArrayMemory
+	- KeccakCaching
+	- EmptyByteArrayCopy
+	- DynamicArrayCleanup
+	- MissingEscapingInFormatting
+	- ArraySliceDynamicallyEncodedBaseType
+	- ImplicitConstructorCallvalueCheck
+	- TupleAssignmentMultiStackSlotComponents
+	- MemoryArrayCreationOverflow.
+It is used by:
+	- >=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol#4)
+	- >=0.6.2 (node_modules/@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol#4)
+Version constraint >=0.5.0 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- DirtyBytesArrayToStorage
+	- ABIDecodeTwoDimensionalArrayMemory
+	- KeccakCaching
+	- EmptyByteArrayCopy
+	- DynamicArrayCleanup
+	- ImplicitConstructorCallvalueCheck
+	- TupleAssignmentMultiStackSlotComponents
+	- MemoryArrayCreationOverflow
+	- privateCanBeOverridden
+	- SignedArrayStorageCopy
+	- ABIEncoderV2StorageArrayWithMultiSlotElement
+	- DynamicConstructorArgumentsClippedABIV2
+	- UninitializedFunctionPointerInConstructor
+	- IncorrectEventSignatureInLibraries
+	- ABIEncoderV2PackedStorage.
+It is used by:
+	- >=0.5.0 (node_modules/@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol#4)
+Version constraint >=0.4.16 contains known severe issues (https://solidity.readthedocs.io/en/latest/bugs.html)
+	- DirtyBytesArrayToStorage
+	- ABIDecodeTwoDimensionalArrayMemory
+	- KeccakCaching
+	- EmptyByteArrayCopy
+	- DynamicArrayCleanup
+	- ImplicitConstructorCallvalueCheck
+	- TupleAssignmentMultiStackSlotComponents
+	- MemoryArrayCreationOverflow
+	- privateCanBeOverridden
+	- SignedArrayStorageCopy
+	- ABIEncoderV2StorageArrayWithMultiSlotElement
+	- DynamicConstructorArgumentsClippedABIV2
+	- UninitializedFunctionPointerInConstructor_0.4.x
+	- IncorrectEventSignatureInLibraries_0.4.x
+	- ExpExponentCleanup
+	- NestedArrayFunctionCallDecoder
+	- ZeroFunctionSelector.
+It is used by:
+	- >=0.4.16 (node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity
+INFO:Detectors:
+Detector: naming-convention
+Parameter DCPManager.setPlatformFee(uint256)._fee (smart2.sol#150) is not in mixedCase
+Parameter DCPManager.setSupervisorWallet(address)._s (smart2.sol#155) is not in mixedCase
+Parameter DCPManager.setTreasuryWallet(address)._t (smart2.sol#160) is not in mixedCase
+Parameter DCPManager.createCampaign(uint256,address,address)._campaignId (smart2.sol#186) is not in mixedCase
+Parameter DCPManager.createCampaign(uint256,address,address)._organization (smart2.sol#187) is not in mixedCase
+Parameter DCPManager.createCampaign(uint256,address,address)._multisigVault (smart2.sol#188) is not in mixedCase
+Parameter DCPManager.recordDonation(uint256,address,address,uint256)._campaignId (smart2.sol#219) is not in mixedCase
+Parameter DCPManager.recordDonation(uint256,address,address,uint256)._donor (smart2.sol#220) is not in mixedCase
+Parameter DCPManager.recordDonation(uint256,address,address,uint256)._multisigAddress (smart2.sol#221) is not in mixedCase
+Parameter DCPManager.recordDonation(uint256,address,address,uint256)._fiatAmount (smart2.sol#222) is not in mixedCase
+Parameter DCPManager.proposeDisbursement(uint256,string)._campaignId (smart2.sol#269) is not in mixedCase
+Parameter DCPManager.proposeDisbursement(uint256,string)._ipfsCid (smart2.sol#269) is not in mixedCase
+Parameter DCPManager.approveDisbursement(uint256)._campaignId (smart2.sol#284) is not in mixedCase
+Parameter DCPManager.getCampaign(uint256)._campaignId (smart2.sol#318) is not in mixedCase
+Parameter DCPManager.hasApproved(uint256,address)._campaignId (smart2.sol#334) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+INFO:Detectors:
+Detector: too-many-digits
+Bytes.toNibbles(bytes) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#210-245) uses literals with too many digits:
+	- chunk_toNibbles_asm_0 = 0x0000000000000000ffffffffffffffff0000000000000000ffffffffffffffff & chunk_toNibbles_asm_0 << 64 | chunk_toNibbles_asm_0 (node_modules/@openzeppelin/contracts/utils/Bytes.sol#222-225)
+Bytes.toNibbles(bytes) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#210-245) uses literals with too many digits:
+	- chunk_toNibbles_asm_0 = 0x00000000ffffffff00000000ffffffff00000000ffffffff00000000ffffffff & chunk_toNibbles_asm_0 << 32 | chunk_toNibbles_asm_0 (node_modules/@openzeppelin/contracts/utils/Bytes.sol#226-229)
+Bytes.reverseBytes32(bytes32) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#258-272) uses literals with too many digits:
+	- value = ((value >> 32) & 0x00000000FFFFFFFF00000000FFFFFFFF00000000FFFFFFFF00000000FFFFFFFF) | ((value & 0x00000000FFFFFFFF00000000FFFFFFFF00000000FFFFFFFF00000000FFFFFFFF) << 32) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#265-267)
+Bytes.reverseBytes32(bytes32) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#258-272) uses literals with too many digits:
+	- value = ((value >> 64) & 0x0000000000000000FFFFFFFFFFFFFFFF0000000000000000FFFFFFFFFFFFFFFF) | ((value & 0x0000000000000000FFFFFFFFFFFFFFFF0000000000000000FFFFFFFFFFFFFFFF) << 64) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#268-270)
+Bytes.reverseBytes16(bytes16) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#275-286) uses literals with too many digits:
+	- value = ((value & 0xFFFFFFFF00000000FFFFFFFF00000000) >> 32) | ((value & 0x00000000FFFFFFFF00000000FFFFFFFF) << 32) (node_modules/@openzeppelin/contracts/utils/Bytes.sol#282-284)
+Math.log2(uint256) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#619-658) uses literals with too many digits:
+	- r = r | byte(uint256,uint256)(x >> r,0x0000010102020202030303030303030300000000000000000000000000000000) (node_modules/@openzeppelin/contracts/utils/math/Math.sol#656)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#too-many-digits
+INFO:Detectors:
+Detector: immutable-states
+DCPManager.adminWallet (smart2.sol#51) should be immutable 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-immutable
+INFO:Slither:smart2.sol analyzed (20 contracts with 102 detectors), 75 result(s) found

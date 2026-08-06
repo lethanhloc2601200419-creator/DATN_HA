@@ -1,0 +1,92 @@
+2026-08-06 20:52:58,691 INFO o.a.j.u.JMeterUtils: Setting Locale to en_EN
+2026-08-06 20:52:58,705 INFO o.a.j.JMeter: Loading user properties from: /home/locwara/Ha/doantn/DATN_HA/apache-jmeter-5.6.3/bin/user.properties
+2026-08-06 20:52:58,705 INFO o.a.j.JMeter: Loading system properties from: /home/locwara/Ha/doantn/DATN_HA/apache-jmeter-5.6.3/bin/system.properties
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: Copyright (c) 1998-2024 The Apache Software Foundation
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: Version 5.6.3
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: java.version=21.0.11
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: java.vm.name=OpenJDK 64-Bit Server VM
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: os.name=Linux
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: os.arch=amd64
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: os.version=7.0.12-arch1-1
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: file.encoding=UTF-8
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: java.awt.headless=null
+2026-08-06 20:52:58,709 INFO o.a.j.JMeter: Max memory     =1073741824
+2026-08-06 20:52:58,710 INFO o.a.j.JMeter: Available Processors =12
+2026-08-06 20:52:58,716 INFO o.a.j.JMeter: Default Locale=English (EN)
+2026-08-06 20:52:58,717 INFO o.a.j.JMeter: JMeter  Locale=English (EN)
+2026-08-06 20:52:58,717 INFO o.a.j.JMeter: JMeterHome=/home/locwara/Ha/doantn/DATN_HA/apache-jmeter-5.6.3
+2026-08-06 20:52:58,717 INFO o.a.j.JMeter: user.dir  =/home/locwara/Ha/doantn/DATN_HA
+2026-08-06 20:52:58,717 INFO o.a.j.JMeter: PWD       =/home/locwara/Ha/doantn/DATN_HA
+2026-08-06 20:52:58,718 INFO o.a.j.JMeter: IP: 100.103.58.42 Name: hacute FullName: hacute.tail43b9a6.ts.net
+2026-08-06 20:52:58,727 INFO o.a.j.JMeter: Loaded icon properties from org/apache/jmeter/images/icon.properties
+2026-08-06 20:52:58,930 INFO o.a.j.JMeterGuiLauncher: Setting LAF to: com.github.weisj.darklaf.DarkLaf:com.github.weisj.darklaf.theme.DarculaTheme
+2026-08-06 20:53:00,377 INFO o.a.j.JMeterGuiLauncher: Loading file: LoadTest_DATN.jmx
+2026-08-06 20:53:00,381 INFO o.a.j.s.FileServer: Default base='/home/locwara/Ha/doantn/DATN_HA'
+2026-08-06 20:53:00,383 INFO o.a.j.s.FileServer: Set new base='/home/locwara/Ha/doantn/DATN_HA'
+2026-08-06 20:53:00,588 INFO o.a.j.s.SaveService: Testplan (JMX) version: 2.2. Testlog (JTL) version: 2.2
+2026-08-06 20:53:00,612 INFO o.a.j.s.SaveService: Using SaveService properties version 5.0
+2026-08-06 20:53:00,615 INFO o.a.j.s.SaveService: Using SaveService properties file encoding UTF-8
+2026-08-06 20:53:00,617 INFO o.a.j.s.SaveService: Loading file: LoadTest_DATN.jmx
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for text/html is org.apache.jmeter.protocol.http.parser.LagartoBasedHtmlParser
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for application/xhtml+xml is org.apache.jmeter.protocol.http.parser.LagartoBasedHtmlParser
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for application/xml is org.apache.jmeter.protocol.http.parser.LagartoBasedHtmlParser
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for text/xml is org.apache.jmeter.protocol.http.parser.LagartoBasedHtmlParser
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for text/vnd.wap.wml is org.apache.jmeter.protocol.http.parser.RegexpHTMLParser
+2026-08-06 20:53:00,661 INFO o.a.j.p.h.s.HTTPSamplerBase: Parser for text/css is org.apache.jmeter.protocol.http.parser.CssParser
+2026-08-06 20:53:00,680 INFO o.a.j.s.FileServer: Set new base='/home/locwara/Ha/doantn/DATN_HA'
+2026-08-06 20:53:00,920 INFO o.a.j.s.SampleResult: Note: Sample TimeStamps are START times
+2026-08-06 20:53:00,920 INFO o.a.j.s.SampleResult: sampleresult.default.encoding is set to UTF-8
+2026-08-06 20:53:00,920 INFO o.a.j.s.SampleResult: sampleresult.useNanoTime=true
+2026-08-06 20:53:00,920 INFO o.a.j.s.SampleResult: sampleresult.nanoThreadSleep=5000
+2026-08-06 20:55:15,372 INFO o.a.j.e.StandardJMeterEngine: Running the test!
+2026-08-06 20:55:15,373 INFO o.a.j.s.SampleEvent: List of sample_variables: []
+2026-08-06 20:55:15,373 INFO o.a.j.s.SampleEvent: List of sample_variables: []
+2026-08-06 20:55:15,374 INFO o.a.j.e.u.CompoundVariable: Note: Function class names must contain the string: '.functions.'
+2026-08-06 20:55:15,374 INFO o.a.j.e.u.CompoundVariable: Note: Function class names must not contain the string: '.gui.'
+2026-08-06 20:55:15,415 INFO o.a.j.g.u.JMeterMenuBar: setRunning(true, *local*)
+2026-08-06 20:55:15,460 INFO o.a.j.e.StandardJMeterEngine: Starting ThreadGroup: 1 : Giả lập 100 Users
+2026-08-06 20:55:15,461 INFO o.a.j.e.StandardJMeterEngine: Starting 10 threads for group Giả lập 100 Users.
+2026-08-06 20:55:15,461 INFO o.a.j.e.StandardJMeterEngine: Thread will continue on error
+2026-08-06 20:55:15,461 INFO o.a.j.t.ThreadGroup: Starting thread group... number=1 threads=10 ramp-up=20 delayedStart=false
+2026-08-06 20:55:15,468 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-1
+2026-08-06 20:55:15,472 INFO o.a.j.t.ThreadGroup: Started thread group number 1
+2026-08-06 20:55:15,472 INFO o.a.j.e.StandardJMeterEngine: All thread groups have been started
+2026-08-06 20:55:15,480 INFO o.a.j.p.h.s.HTTPHCAbstractImpl: Local host = hacute
+2026-08-06 20:55:15,486 INFO o.a.j.p.h.s.HTTPHC4Impl: HTTP request retry count = 0
+2026-08-06 20:55:15,594 INFO o.a.j.p.h.s.h.LazyLayeredConnectionSocketFactory: Setting up HTTPS TrustAll Socket Factory
+2026-08-06 20:55:15,596 INFO o.a.j.u.JsseSSLManager: Using default SSL protocol: TLS
+2026-08-06 20:55:15,597 INFO o.a.j.u.JsseSSLManager: SSL session context: per-thread
+2026-08-06 20:55:15,700 INFO o.a.j.u.SSLManager: JmeterKeyStore Location:  type JKS
+2026-08-06 20:55:15,702 INFO o.a.j.u.SSLManager: KeyStore created OK
+2026-08-06 20:55:15,702 WARN o.a.j.u.SSLManager: Keystore file not found, loading empty keystore
+2026-08-06 20:55:17,463 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-2
+2026-08-06 20:55:19,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-3
+2026-08-06 20:55:21,463 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-4
+2026-08-06 20:55:23,461 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-5
+2026-08-06 20:55:25,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-6
+2026-08-06 20:55:27,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-7
+2026-08-06 20:55:29,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-8
+2026-08-06 20:55:31,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-9
+2026-08-06 20:55:33,462 INFO o.a.j.t.JMeterThread: Thread started: Giả lập 100 Users 1-10
+2026-08-06 20:56:46,541 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-1
+2026-08-06 20:56:46,541 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-1
+2026-08-06 20:56:46,861 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-5
+2026-08-06 20:56:46,861 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-5
+2026-08-06 20:56:46,872 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-9
+2026-08-06 20:56:46,872 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-9
+2026-08-06 20:56:46,912 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-4
+2026-08-06 20:56:46,913 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-4
+2026-08-06 20:56:46,935 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-3
+2026-08-06 20:56:46,936 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-3
+2026-08-06 20:56:46,970 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-8
+2026-08-06 20:56:46,970 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-8
+2026-08-06 20:56:47,011 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-6
+2026-08-06 20:56:47,012 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-6
+2026-08-06 20:56:47,170 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-7
+2026-08-06 20:56:47,170 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-7
+2026-08-06 20:56:47,195 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-2
+2026-08-06 20:56:47,196 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-2
+2026-08-06 20:56:49,760 INFO o.a.j.t.JMeterThread: Thread is done: Giả lập 100 Users 1-10
+2026-08-06 20:56:49,760 INFO o.a.j.t.JMeterThread: Thread finished: Giả lập 100 Users 1-10
+2026-08-06 20:56:49,761 INFO o.a.j.e.StandardJMeterEngine: Notifying test listeners of end of test
+2026-08-06 20:56:49,761 INFO o.a.j.g.u.JMeterMenuBar: setRunning(false, *local*)
