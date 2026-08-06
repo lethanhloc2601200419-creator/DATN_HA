@@ -753,8 +753,11 @@ def payos_return(request, donation_id):
 
 def payos_cancel(request, donation_id):
     donation = get_object_or_404(Donation, pk=donation_id)
+    if donation.status == 'pending':
+        donation.status = 'failed'
+        donation.save(update_fields=['status'])
     return render(request, "client/payment_failed.html", {
-        "message": f"Bạn đã hủy thanh toán PayOS cho giao dịch #{donation.id}.",
+        "message": f"Thanh toán PayOS cho giao dịch #{donation.id} đã bị hủy hoặc hết hạn.",
     })
     
 @csrf_exempt
